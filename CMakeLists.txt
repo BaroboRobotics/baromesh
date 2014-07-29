@@ -21,7 +21,7 @@ add_dependency(serial)
 set(SOURCES
     src/main.cpp)
 
-add_executable(baromesh ${SOURCES} $<TARGET_OBJECTS:robotpb>)
+add_executable(baromesh ${SOURCES})
 
 set_source_files_properties(${SOURCES}
     PROPERTIES COMPILE_FLAGS "-std=c++11")
@@ -29,6 +29,6 @@ set_source_files_properties(${SOURCES}
 add_definitions(-DHAVE_STDLIB -DHAVE_EXCEPTIONS -DHAVE_RTTI)
 target_include_directories(baromesh PRIVATE "${LIBSFP_SOURCE_DIR}/include" 
                                   PRIVATE "$ENV{BOOST_ROOT}"
-                                  PRIVATE $<TARGET_PROPERTY:robotpb,INCLUDE_DIRECTORIES>
+                                  PRIVATE $<TARGET_PROPERTY:robot-interface,INCLUDE_DIRECTORIES>
                                   PRIVATE "${serial_SOURCE_DIR}/include")
-target_link_libraries(baromesh sfp rpc serial)
+target_link_libraries(baromesh sfp rpc serial robot-interface)
