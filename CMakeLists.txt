@@ -18,6 +18,28 @@ add_dependency(ribbon-bridge)
 add_dependency(ribbon-bridge-interfaces)
 add_dependency(serial)
 
+##############################################################################
+# Boost
+
+# FindBoost.cmake uses BOOST_ROOT as a hint for where to look.
+if(NOT DEFINED BOOST_ROOT)
+    if(DEFINED ENV{BOOST_ROOT})
+        set(BOOST_ROOT "$ENV{BOOST_ROOT}")
+    else()
+        message(WARNING "BOOST_ROOT is undefined.\nIf Boost libraries fail to "
+            "be found, try setting -DBOOST_ROOT=/path/to/boost on the CMake "
+            "command line.\n")
+    endif()
+endif()
+
+# Linking statically to Boost is easier for prototyping. For multi-module
+# projects we'll want to use shared libraries and defined -DBOOST_ALL_DYN_LINK
+# or the like.
+set(Boost_USE_STATIC_LIBS ON)
+
+# Boost.Log was introduced in Boost version 1.54.0.
+find_package(Boost 1.54.0 REQUIRED COMPONENTS )
+
 set(SOURCES
     src/main.cpp)
 
@@ -26,9 +48,9 @@ add_executable(baromesh ${SOURCES})
 set_source_files_properties(${SOURCES}
     PROPERTIES COMPILE_FLAGS "-std=c++11")
 
-add_definitions(-DHAVE_STDLIB -DHAVE_EXCEPTIONS -DHAVE_RTTI)
-target_include_directories(baromesh PRIVATE "${LIBSFP_SOURCE_DIR}/include" 
-                                  PRIVATE "$ENV{BOOST_ROOT}"
-                                  PRIVATE $<TARGET_PROPERTY:robot-interface,INCLUDE_DIRECTORIES>
-                                  PRIVATE "${serial_SOURCE_DIR}/include")
+target_include_directories(baromesh
+    PRIVATE $<TARGET_PROPERTY:sfp,INCLUDE_DIRECTORIES>
+            $<TARGET_PROPERTY:robot-interface,INCLUDE_DIRECTORIES>
+            $<TARGET_PROPERTY:serial,INCLUDE_DIRECTORIES>
+            ${Boost_INCLUDE_DIRS})
 target_link_libraries(baromesh sfp rpc serial robot-interface)
