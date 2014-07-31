@@ -1,8 +1,9 @@
-#include "robotproxy.hpp"
+#include "dongleproxy.hpp"
+#include "dongleproxy.hpp"
 #include "serial_framing_protocol.h"
 #include "serial/serial.h"
 
-#include <list>
+#include <algorithm>
 
 static int sfp_write(uint8_t *octets, size_t len, size_t *outlen, void *data)
 {
@@ -37,20 +38,9 @@ int main()
             return 1;
         }
     }
-    printf("0x%X\n", rpc::ComponentId<barobo::Robot>::ledColor );
-    uint32_t val = rpc::ComponentId<barobo::Robot>::ledColor;
-    int i;
-    for(i = 0; i < 4; i++) {
-        printf("0x%X\n", ((uint8_t*)&val)[i]);
-    }
     std::cout << "Connected.\n";
 
-    RobotProxy robotProxy( [&ctx] (const RobotProxy::BufferType& buffer) { 
-        printf("Sending buffer...\n");
-        int i;
-        for(i = 0; i < buffer.size; i++) {
-            printf("send 0x%0X\n", buffer.bytes[i]);
-        }
+    DongleProxy dongleProxy( [&ctx] (const DongleProxy::BufferType& buffer) { 
         sfpWritePacket(&ctx, buffer.bytes, buffer.size, nullptr);
     } );
 
@@ -60,33 +50,39 @@ int main()
             uint8_t byte;
             auto bytesread = usb.read(&byte, 1);
             if(bytesread) {
-                printf("Received byte: 0x%0X\n", byte);
-                RobotProxy::BufferType buffer;
+                DongleProxy::BufferType buffer;
                 auto ret = sfpDeliverOctet(&ctx, byte, buffer.bytes, sizeof(buffer.bytes), &buffer.size);
                 if(ret > 0) {
-                    auto status = robotProxy.deliver(buffer);
+                    auto status = dongleProxy.deliver(buffer);
                     //std::cout << statusToString(status) << "\n";
                     assert(!rpc::hasError(status));
                 }
             }
         }
     }};
-    using Attribute = rpc::Attribute<barobo::Robot>;
-    auto future = robotProxy.set(Attribute::ledColor{0x80808080});
-    std::cout << "Getting future..." << std::endl;
-    future.get();
-    std::cout << "Future gotten." << std::endl;
 
-    std::list<std::future<void>> colorFutures;
+    dongleProxy.subscribe(rpc::Broadcast<barobo::Dongle>::receiveUnicast()).get();
+
+    /* TODO: instantiate a RobotService and give it the contents of this for
+     * loop as a post function. */
     for (unsigned i = 0; i < 255; ++i) {
-        colorFutures.emplace_back(robotProxy.set(Attribute::ledColor{ i << 8 }));
+        barobo_Dongle_Address destination;
+        strcpy((char*)destination.serialId, "ZRG6");
+        destination.port = 0;
+
+        barobo_Dongle_Payload payload;
+        auto hello = "Hello, world";
+        strcpy((char*)payload.value.bytes, hello);
+        payload.value.size = strlen(hello);
+
+        dongleProxy.fire(rpc::MethodIn<barobo::Dongle>::transmitUnicast {
+                destination, payload
+        }).get();
+
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 
-    for (auto& f : colorFutures) { f.get(); }
-
     killThreads = true;
     t.join();
-    //std::cout << future.get().value << "\n";
     return 0;
 }

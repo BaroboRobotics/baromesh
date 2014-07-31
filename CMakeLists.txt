@@ -53,4 +53,4 @@ target_include_directories(baromesh
             $<TARGET_PROPERTY:robot-interface,INCLUDE_DIRECTORIES>
             $<TARGET_PROPERTY:serial,INCLUDE_DIRECTORIES>
             ${Boost_INCLUDE_DIRS})
-target_link_libraries(baromesh sfp rpc serial robot-interface)
+target_link_libraries(baromesh sfp rpc serial robot-interface dongle-interface)
