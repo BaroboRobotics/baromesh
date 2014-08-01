@@ -2,14 +2,17 @@
 #define DONGLEPROXY_HPP_
 
 #include <functional>
+#include <string>
 
 #include "rpc/asyncproxy.hpp"
 #include "gen-dongle.pb.hpp"
 
 class DongleProxy : public rpc::AsyncProxy<DongleProxy, barobo::Dongle> {
 public:
-    DongleProxy (std::function<void(const BufferType&)> postFunc) :
-        mPostFunc(postFunc) {}
+    DongleProxy (std::function<void(const BufferType&)> postFunc,
+            std::function<void(std::string,const uint8_t*,size_t)> receiveFunc)
+        : mPostFunc(postFunc)
+        , mReceiveFunc(receiveFunc) { }
 
     void post (const BufferType& buffer) {
         mPostFunc(buffer);
@@ -32,10 +35,18 @@ public:
             printf(" (empty)");
         }
         printf("\n");
+
+        if (arg.source.port == 0) {
+            mReceiveFunc(arg.source.serialId, arg.payload.value.bytes, arg.payload.value.size);
+        }
+        else {
+            printf("I dunno what to do with this packet!\n");
+        }
     }
 
 private:
     std::function<void(const BufferType&)> mPostFunc;
+    std::function<void(std::string,const uint8_t*,size_t)> mReceiveFunc;
 };
 
 #endif
