@@ -1,21 +1,30 @@
 #ifndef DONGLEPROXY_HPP_
 #define DONGLEPROXY_HPP_
 
-#include <functional>
-#include <string>
+#include "util/callback.hpp"
 
 #include "rpc/asyncproxy.hpp"
 #include "gen-dongle.pb.hpp"
 
+#include <functional>
+#include <string>
+
 class DongleProxy : public rpc::AsyncProxy<DongleProxy, barobo::Dongle> {
 public:
-    DongleProxy (std::function<void(const BufferType&)> postFunc,
-            std::function<void(std::string,const uint8_t*,size_t)> receiveFunc)
-        : mPostFunc(postFunc)
-        , mReceiveFunc(receiveFunc) { }
-
     void post (const BufferType& buffer) {
-        mPostFunc(buffer);
+        bufferPosted(buffer.bytes, buffer.size);
+    }
+
+    util::Signal<void(const uint8_t*,size_t)> bufferPosted;
+
+    // A helper function to make a DongleProxy easier to wire up to an
+    // sfp::Context.
+    void deliverMessage (const uint8_t* data, size_t size) {
+        BufferType buffer;
+        assert(size <= sizeof(buffer.bytes));
+        memcpy(buffer.bytes, data, size);
+        buffer.size = size;
+        deliver(buffer);
     }
 
     using Attribute = rpc::Attribute<barobo::Dongle>;
@@ -45,7 +54,6 @@ public:
     }
 
 private:
-    std::function<void(const BufferType&)> mPostFunc;
     std::function<void(std::string,const uint8_t*,size_t)> mReceiveFunc;
 };
 

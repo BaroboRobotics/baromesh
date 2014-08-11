@@ -13,6 +13,7 @@ function(add_dependency _name)
     add_subdirectory(${DEPS_ROOT}/${_name} ${_name})
 endfunction()
 
+add_dependency(cxx-util)
 add_dependency(libsfp)
 add_dependency(ribbon-bridge)
 add_dependency(ribbon-bridge-interfaces)
@@ -51,6 +52,7 @@ set_source_files_properties(${SOURCES}
 target_include_directories(baromesh
     PRIVATE $<TARGET_PROPERTY:sfp,INCLUDE_DIRECTORIES>
             $<TARGET_PROPERTY:robot-interface,INCLUDE_DIRECTORIES>
+            $<TARGET_PROPERTY:cxx-util,INCLUDE_DIRECTORIES>
             $<TARGET_PROPERTY:serial,INCLUDE_DIRECTORIES>
             ${Boost_INCLUDE_DIRS})
 target_link_libraries(baromesh sfp rpc serial robot-interface dongle-interface)

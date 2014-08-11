@@ -1,72 +1,48 @@
 #include "robotproxy.hpp"
 #include "dongleproxy.hpp"
-#include "serial_framing_protocol.h"
-#include "serial/serial.h"
+#include "reliableusb.hpp"
 
 #include <boost/unordered_map.hpp>
 
 #include <algorithm>
 
-static int sfp_write(uint8_t *octets, size_t len, size_t *outlen, void *data)
-{
-    auto &usb = *static_cast<serial::Serial*>(data);
-    usb.write(octets, len);
-}
-
-static void sfp_lock(void *data)
-{
-}
-
-static void sfp_unlock(void *data)
-{
-}
-
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        printf("Usage: %s <serial-id>\n", argv[0]);
+    if (argc < 2) {
+        printf("Usage: %s <serial-id> [<serial-id> ...]\n", argv[0]);
         return 1;
     }
 
-    const std::string serialId { argv[1] };
+    // Get list of serial IDs from command line.
+    std::vector<std::string> serialIds { argv + 1, argv + argc };
 
-    serial::Serial usb("/dev/ttyACM0", 230400, serial::Timeout::simpleTimeout(1000));
-    SFPcontext ctx;
-    sfpInit(&ctx);
-    sfpSetWriteCallback(&ctx, SFP_WRITE_MULTIPLE, (void*)sfp_write, &usb);
-    sfpSetLockCallback(&ctx, sfp_lock, nullptr);
-    sfpSetUnlockCallback(&ctx, sfp_unlock, nullptr);
+    // Ensure they all sorta look like serial IDs.
+    assert(std::all_of(serialIds.cbegin(), serialIds.cend(),
+                [] (const std::string& s) { return 4 == s.size(); }));
 
-    sfpConnect(&ctx);
-    uint8_t byte;
-    while(!sfpIsConnected(&ctx)) {
-        auto bytesread = usb.read(&byte, 1);
-        if(bytesread) {
-            sfpDeliverOctet(&ctx, byte, nullptr, 0, nullptr);
-        } else {
-            return 1;
+    // Set up the dongle proxy object with its USB/SFP backend.
+    DongleProxy dongleProxy;
+
+    ReliableUsb reliableUsb { std::string("/dev/ttyACM0") };
+    reliableUsb.messageReceived.connect(
+            BIND_MEM_CB(&DongleProxy::deliverMessage, &dongleProxy));
+
+    dongleProxy.bufferPosted.connect(
+            BIND_MEM_CB(&ReliableUsb::sendMessage, &reliableUsb));
+
+#if 0
+    boost::unordered_map<std::string, RobotProxy> robots;
+    auto f = [&robots] (std::string serialId, const uint8_t* bytes, size_t size) {
+        auto iter = robots.find(serialId);
+        if (iter != robots.end()) {
+            RobotProxy::BufferType buffer;
+            memcpy(buffer.bytes, bytes, size);
+            buffer.size = size;
+            iter->second.deliver(buffer);
+        }
+        else {
+            printf("Ain't no such robot named %s\n", serialId.c_str());
         }
     }
-    std::cout << "Connected.\n";
-
-    boost::unordered_map<std::string, RobotProxy> robots;
-
-    DongleProxy dongleProxy {
-        [&ctx] (const DongleProxy::BufferType& buffer) { 
-            sfpWritePacket(&ctx, buffer.bytes, buffer.size, nullptr);
-        },
-        [&robots] (std::string serialId, const uint8_t* bytes, size_t size) {
-            auto iter = robots.find(serialId);
-            if (iter != robots.end()) {
-                RobotProxy::BufferType buffer;
-                memcpy(buffer.bytes, bytes, size);
-                buffer.size = size;
-                iter->second.deliver(buffer);
-            }
-            else {
-                printf("Ain't no such robot named %s\n", serialId.c_str());
-            }
-        }
-    };
 
     std::atomic<bool> killThreads = {false};
     std::thread t{ [&] () {
@@ -131,5 +107,6 @@ int main(int argc, char** argv) {
 
     killThreads = true;
     t.join();
+#endif
     return 0;
 }
