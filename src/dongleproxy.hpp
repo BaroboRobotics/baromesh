@@ -1,21 +1,35 @@
 #ifndef DONGLEPROXY_HPP_
 #define DONGLEPROXY_HPP_
 
-#include <functional>
-#include <string>
+#include "util/callback.hpp"
 
 #include "rpc/asyncproxy.hpp"
 #include "gen-dongle.pb.hpp"
 
+#include <functional>
+#include <string>
+
 class DongleProxy : public rpc::AsyncProxy<DongleProxy, barobo::Dongle> {
 public:
-    DongleProxy (std::function<void(const BufferType&)> postFunc,
-            std::function<void(std::string,const uint8_t*,size_t)> receiveFunc)
-        : mPostFunc(postFunc)
-        , mReceiveFunc(receiveFunc) { }
-
     void post (const BufferType& buffer) {
-        mPostFunc(buffer);
+        bufferPosted(buffer.bytes, buffer.size);
+    }
+
+    util::Signal<void(const uint8_t*,size_t)> bufferPosted;
+
+    // A helper function to make a DongleProxy easier to wire up to an
+    // sfp::Context.
+    void deliverMessage (const uint8_t* data, size_t size) {
+        BufferType buffer;
+        assert(size <= sizeof(buffer.bytes));
+        memcpy(buffer.bytes, data, size);
+        buffer.size = size;
+        auto status = deliver(buffer);
+        if (rpc::hasError(status)) {
+            // TODO shut down gracefully
+            printf("DongleProxy::deliver returned %s\n", rpc::statusToString(status));
+            abort();
+        }
     }
 
     using Attribute = rpc::Attribute<barobo::Dongle>;
@@ -37,16 +51,14 @@ public:
         printf("\n");
 
         if (arg.source.port == 0) {
-            mReceiveFunc(arg.source.serialId, arg.payload.value.bytes, arg.payload.value.size);
+            robotMessageReceived(arg.source.serialId, arg.payload.value.bytes, arg.payload.value.size);
         }
         else {
             printf("I dunno what to do with this packet!\n");
         }
     }
 
-private:
-    std::function<void(const BufferType&)> mPostFunc;
-    std::function<void(std::string,const uint8_t*,size_t)> mReceiveFunc;
+    util::Signal<void(std::string,const uint8_t*,size_t)> robotMessageReceived;
 };
 
 #endif

@@ -1,92 +1,56 @@
 #include "robotproxy.hpp"
 #include "dongleproxy.hpp"
-#include "serial_framing_protocol.h"
-#include "serial/serial.h"
+#include "reliableusb.hpp"
 
 #include <boost/unordered_map.hpp>
 
 #include <algorithm>
 
-static int sfp_write(uint8_t *octets, size_t len, size_t *outlen, void *data)
-{
-    auto &usb = *static_cast<serial::Serial*>(data);
-    usb.write(octets, len);
-}
-
-static void sfp_lock(void *data)
-{
-}
-
-static void sfp_unlock(void *data)
-{
-}
-
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        printf("Usage: %s <serial-id>\n", argv[0]);
+    if (argc < 2) {
+        printf("Usage: %s <serial-id> [<serial-id> ...]\n", argv[0]);
         return 1;
     }
 
-    const std::string serialId { argv[1] };
+    // Get list of serial IDs from command line.
+    std::vector<std::string> serialIds { argv + 1, argv + argc };
 
-    serial::Serial usb("/dev/ttyACM0", 230400, serial::Timeout::simpleTimeout(1000));
-    SFPcontext ctx;
-    sfpInit(&ctx);
-    sfpSetWriteCallback(&ctx, SFP_WRITE_MULTIPLE, (void*)sfp_write, &usb);
-    sfpSetLockCallback(&ctx, sfp_lock, nullptr);
-    sfpSetUnlockCallback(&ctx, sfp_unlock, nullptr);
+    // Ensure they all sorta look like serial IDs.
+    assert(std::all_of(serialIds.cbegin(), serialIds.cend(),
+                [] (const std::string& s) { return 4 == s.size(); }));
 
-    sfpConnect(&ctx);
-    uint8_t byte;
-    while(!sfpIsConnected(&ctx)) {
-        auto bytesread = usb.read(&byte, 1);
-        if(bytesread) {
-            sfpDeliverOctet(&ctx, byte, nullptr, 0, nullptr);
-        } else {
-            return 1;
-        }
-    }
-    std::cout << "Connected.\n";
+    // Set up the dongle proxy object with its USB/SFP backend.
+    DongleProxy dongleProxy;
+    ReliableUsb reliableUsb { std::string("/dev/ttyACM0") };
+
+    dongleProxy.bufferPosted.connect(
+            BIND_MEM_CB(&ReliableUsb::sendMessage, &reliableUsb));
+
+    reliableUsb.messageReceived.connect(
+            BIND_MEM_CB(&DongleProxy::deliverMessage, &dongleProxy));
 
     boost::unordered_map<std::string, RobotProxy> robots;
-
-    DongleProxy dongleProxy {
-        [&ctx] (const DongleProxy::BufferType& buffer) { 
-            sfpWritePacket(&ctx, buffer.bytes, buffer.size, nullptr);
-        },
-        [&robots] (std::string serialId, const uint8_t* bytes, size_t size) {
-            auto iter = robots.find(serialId);
-            if (iter != robots.end()) {
-                RobotProxy::BufferType buffer;
-                memcpy(buffer.bytes, bytes, size);
-                buffer.size = size;
-                iter->second.deliver(buffer);
-            }
-            else {
-                printf("Ain't no such robot named %s\n", serialId.c_str());
-            }
+    auto robotMessageHandler = [&robots] (std::string serialId, const uint8_t* bytes, size_t size) {
+        auto iter = robots.find(serialId);
+        if (iter != robots.end()) {
+            RobotProxy::BufferType buffer;
+            assert(size <= sizeof(buffer.bytes));
+            memcpy(buffer.bytes, bytes, size);
+            buffer.size = size;
+            iter->second.deliver(buffer);
+        }
+        else {
+            printf("Ain't no such robot named %s\n", serialId.c_str());
         }
     };
+    using Lambda = decltype(robotMessageHandler);
 
-    std::atomic<bool> killThreads = {false};
-    std::thread t{ [&] () {
-        while(!killThreads) {
-            uint8_t byte;
-            auto bytesread = usb.read(&byte, 1);
-            if(bytesread) {
-                DongleProxy::BufferType buffer;
-                auto ret = sfpDeliverOctet(&ctx, byte, buffer.bytes, sizeof(buffer.bytes), &buffer.size);
-                if(ret > 0) {
-                    auto status = dongleProxy.deliver(buffer);
-                    std::cout << statusToString(status) << "\n";
-                    assert(!rpc::hasError(status));
-                }
-            }
-        }
-    }};
+    dongleProxy.robotMessageReceived.connect(
+            BIND_MEM_CB(&Lambda::operator(), &robotMessageHandler));
 
     dongleProxy.subscribe(rpc::Broadcast<barobo::Dongle>::receiveUnicast()).get();
 
+    auto& serialId = serialIds[0];
     bool success;
     decltype(robots)::iterator iter;
     std::tie(iter, success) = robots.emplace(std::piecewise_construct, std::forward_as_tuple(serialId),
@@ -96,15 +60,17 @@ int main(int argc, char** argv) {
             destination.port = 0;
 
             barobo_Dongle_Payload payload;
-            // FIXME check buffer sizes for overflow
-            std::copy_n(buffer.bytes, buffer.size, payload.value.bytes);
+            assert(buffer.size <= sizeof(payload.value.bytes));
+            memcpy(payload.value.bytes, buffer.bytes, buffer.size);
             payload.value.size = buffer.size;
 
+#if 0
             printf("sending:");
             for (int i = 0; i < payload.value.size; ++i) {
                 printf(" %02x", payload.value.bytes[i]);
             }
             printf("\n");
+#endif
 
             dongleProxy.fire(rpc::MethodIn<barobo::Dongle>::transmitUnicast {
                     destination, payload
@@ -129,7 +95,5 @@ int main(int argc, char** argv) {
         tim += 0.05;
     }
 
-    killThreads = true;
-    t.join();
     return 0;
 }
