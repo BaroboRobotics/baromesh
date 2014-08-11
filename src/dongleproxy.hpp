@@ -24,7 +24,12 @@ public:
         assert(size <= sizeof(buffer.bytes));
         memcpy(buffer.bytes, data, size);
         buffer.size = size;
-        deliver(buffer);
+        auto status = deliver(buffer);
+        if (rpc::hasError(status)) {
+            // TODO shut down gracefully
+            printf("DongleProxy::deliver returned %s\n", rpc::statusToString(status));
+            abort();
+        }
     }
 
     using Attribute = rpc::Attribute<barobo::Dongle>;
@@ -46,15 +51,14 @@ public:
         printf("\n");
 
         if (arg.source.port == 0) {
-            mReceiveFunc(arg.source.serialId, arg.payload.value.bytes, arg.payload.value.size);
+            robotMessageReceived(arg.source.serialId, arg.payload.value.bytes, arg.payload.value.size);
         }
         else {
             printf("I dunno what to do with this packet!\n");
         }
     }
 
-private:
-    std::function<void(std::string,const uint8_t*,size_t)> mReceiveFunc;
+    util::Signal<void(std::string,const uint8_t*,size_t)> robotMessageReceived;
 };
 
 #endif

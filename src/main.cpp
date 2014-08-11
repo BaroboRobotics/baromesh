@@ -21,20 +21,20 @@ int main(int argc, char** argv) {
 
     // Set up the dongle proxy object with its USB/SFP backend.
     DongleProxy dongleProxy;
-
     ReliableUsb reliableUsb { std::string("/dev/ttyACM0") };
-    reliableUsb.messageReceived.connect(
-            BIND_MEM_CB(&DongleProxy::deliverMessage, &dongleProxy));
 
     dongleProxy.bufferPosted.connect(
             BIND_MEM_CB(&ReliableUsb::sendMessage, &reliableUsb));
 
-#if 0
+    reliableUsb.messageReceived.connect(
+            BIND_MEM_CB(&DongleProxy::deliverMessage, &dongleProxy));
+
     boost::unordered_map<std::string, RobotProxy> robots;
-    auto f = [&robots] (std::string serialId, const uint8_t* bytes, size_t size) {
+    auto robotMessageHandler = [&robots] (std::string serialId, const uint8_t* bytes, size_t size) {
         auto iter = robots.find(serialId);
         if (iter != robots.end()) {
             RobotProxy::BufferType buffer;
+            assert(size <= sizeof(buffer.bytes));
             memcpy(buffer.bytes, bytes, size);
             buffer.size = size;
             iter->second.deliver(buffer);
@@ -42,27 +42,15 @@ int main(int argc, char** argv) {
         else {
             printf("Ain't no such robot named %s\n", serialId.c_str());
         }
-    }
+    };
+    using Lambda = decltype(robotMessageHandler);
 
-    std::atomic<bool> killThreads = {false};
-    std::thread t{ [&] () {
-        while(!killThreads) {
-            uint8_t byte;
-            auto bytesread = usb.read(&byte, 1);
-            if(bytesread) {
-                DongleProxy::BufferType buffer;
-                auto ret = sfpDeliverOctet(&ctx, byte, buffer.bytes, sizeof(buffer.bytes), &buffer.size);
-                if(ret > 0) {
-                    auto status = dongleProxy.deliver(buffer);
-                    std::cout << statusToString(status) << "\n";
-                    assert(!rpc::hasError(status));
-                }
-            }
-        }
-    }};
+    dongleProxy.robotMessageReceived.connect(
+            BIND_MEM_CB(&Lambda::operator(), &robotMessageHandler));
 
     dongleProxy.subscribe(rpc::Broadcast<barobo::Dongle>::receiveUnicast()).get();
 
+    auto& serialId = serialIds[0];
     bool success;
     decltype(robots)::iterator iter;
     std::tie(iter, success) = robots.emplace(std::piecewise_construct, std::forward_as_tuple(serialId),
@@ -72,15 +60,17 @@ int main(int argc, char** argv) {
             destination.port = 0;
 
             barobo_Dongle_Payload payload;
-            // FIXME check buffer sizes for overflow
-            std::copy_n(buffer.bytes, buffer.size, payload.value.bytes);
+            assert(buffer.size <= sizeof(payload.value.bytes));
+            memcpy(payload.value.bytes, buffer.bytes, buffer.size);
             payload.value.size = buffer.size;
 
+#if 0
             printf("sending:");
             for (int i = 0; i < payload.value.size; ++i) {
                 printf(" %02x", payload.value.bytes[i]);
             }
             printf("\n");
+#endif
 
             dongleProxy.fire(rpc::MethodIn<barobo::Dongle>::transmitUnicast {
                     destination, payload
@@ -105,8 +95,5 @@ int main(int argc, char** argv) {
         tim += 0.05;
     }
 
-    killThreads = true;
-    t.join();
-#endif
     return 0;
 }
