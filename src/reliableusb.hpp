@@ -26,9 +26,9 @@ public:
         mSfpContext.connect();
 
         uint8_t byte;
-        while(!mSfpContext.isConnected()) {
+        while (!mSfpContext.isConnected()) {
             auto bytesread = mUsb.read(&byte, 1);
-            if(bytesread) {
+            if (bytesread) {
                 mSfpContext.input(byte);
             }
             else {
