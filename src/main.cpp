@@ -80,6 +80,9 @@ int main(int argc, char** argv) {
 
     assert(success);
 
+    robots.at(serialId).subscribe(rpc::Broadcast<barobo::Robot>::buttonEvent()).get();
+    printf("Subscribed to button events\n");
+
     double tim = 0;
 
     while (1) {

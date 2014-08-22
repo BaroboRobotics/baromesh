@@ -42,7 +42,8 @@ set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.54.0 REQUIRED COMPONENTS )
 
 set(SOURCES
-    src/main.cpp)
+    src/main.cpp
+    src/robotproxy.cpp)
 
 add_executable(baromesh ${SOURCES})
 
@@ -52,7 +53,7 @@ set_source_files_properties(${SOURCES}
 target_include_directories(baromesh
     PRIVATE $<TARGET_PROPERTY:sfp,INCLUDE_DIRECTORIES>
             $<TARGET_PROPERTY:robot-interface,INCLUDE_DIRECTORIES>
-            $<TARGET_PROPERTY:cxx-util,INCLUDE_DIRECTORIES>
+            $<TARGET_PROPERTY:cxx-util,INTERFACE_INCLUDE_DIRECTORIES>
             $<TARGET_PROPERTY:serial,INCLUDE_DIRECTORIES>
             ${Boost_INCLUDE_DIRS})
 target_link_libraries(baromesh sfp rpc serial robot-interface dongle-interface)
