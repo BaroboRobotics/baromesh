@@ -7,12 +7,27 @@
 #include "sfp/context.hpp"
 #include "serial/serial.h"
 
+#include <exception>
+
 namespace dongle {
 
 constexpr const uint32_t kBaudRate = 230400;
 const auto kSerialTimeout = serial::Timeout::simpleTimeout(200);
 constexpr const auto kSfpSettleTimeout = std::chrono::milliseconds(200);
 constexpr const auto kRetryCooldown = std::chrono::milliseconds(200);
+
+struct Exception : std::exception { };
+
+struct ThreadException : Exception {
+    ThreadException (std::exception_ptr eptr)
+            : underlyingExceptionPtr(eptr) { }
+
+    virtual const char* what () const noexcept override {
+        return "Unable to start reader thread";
+    }
+
+    std::exception_ptr underlyingExceptionPtr;
+};
 
 // Encapsulate serial::Serial and sfp::Context to create a reliable,
 // message-oriented USB link.
@@ -32,9 +47,14 @@ public:
         mThread.join();
     }
 
-    void startReadThread () {
-        std::thread t { &DongleTransport::threadMain, this };
-        mThread.swap(t);
+    void startReaderThread () {
+        try {
+            std::thread t { &Transport::threadMain, this };
+            mThread.swap(t);
+        }
+        catch (...) {
+            throw ThreadException(std::current_exception());
+        }
     }
 
     void sendMessage (const uint8_t* data, size_t size) {
@@ -89,16 +109,16 @@ private:
 
     // True if initialization succeeded, false otherwise.
     bool threadInitialize () {
-        std::cout << "threadInitialize\n";
+        std::cerr << "threadInitialize\n";
         // Get the dongle device path, i.e.: /dev/ttyACM0, \\.\COM3, etc.
         char path[64];
         auto status = devicePath(path, sizeof(path));
         if (-1 == status) {
-            std::cout << "threadInitialize: no dongle found\n";
+            std::cerr << "threadInitialize: no dongle found\n";
             return false;
         }
 
-        std::cout << "threadInitialize: found dongle at " << path << "\n";
+        std::cerr << "threadInitialize: found dongle at " << path << "\n";
         try {
             threadConstructUsb(std::string(path));
             threadConnectSfp();
@@ -116,7 +136,7 @@ private:
     }
 
     void threadConstructUsb (std::string path) {
-        std::cout << "threadConstructUsb\n";
+        std::cerr << "threadConstructUsb\n";
         std::unique_lock<std::timed_mutex> lock {
             mUsbMutex,
             std::chrono::seconds(10)
@@ -161,11 +181,12 @@ private:
             }
         }
 
-        std::cout << "threadConnectSfp: settle timeout elapsed\n";
+        std::cerr << "threadConnectSfp: settle timeout elapsed\n";
     }
 
     void threadRun () {
-        std::cout << "threadRun\n";
+        std::cerr << "threadRun\n";
+        assert(mUsb);
         while (!mKillThread) {
             uint8_t byte;
             // Block until kSerialTimeout milliseconds have elapsed.

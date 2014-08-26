@@ -25,7 +25,7 @@ public:
             BIND_MEM_CB(&Proxy::linkUp, this));
         mTransport.linkDown.connect(
             BIND_MEM_CB(&Proxy::linkDown, this));
-        mTransport.startReadThread();
+        mTransport.startReaderThread();
     }
 
     void linkUp () {
