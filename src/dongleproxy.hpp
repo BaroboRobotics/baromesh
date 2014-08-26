@@ -1,5 +1,5 @@
-#ifndef DONGLEPROXY_HPP_
-#define DONGLEPROXY_HPP_
+#ifndef BAROMESH_DONGLE_PROXY_HPP
+#define BAROMESH_DONGLE_PROXY_HPP
 
 #include "dongletransport.hpp"
 
@@ -13,17 +13,18 @@
 #include <iostream>
 
 class RobotTransport {};
-class DongleProxy : public rpc::AsyncProxy<DongleProxy, barobo::Dongle> {
-public:
 
-    DongleProxy ()
-{
+namespace dongle {
+
+class Proxy : public rpc::AsyncProxy<Proxy, barobo::Dongle> {
+public:
+    Proxy () {
         mTransport.messageReceived.connect(
-            BIND_MEM_CB(&DongleProxy::deliverMessage, this));
+            BIND_MEM_CB(&Proxy::deliverMessage, this));
         mTransport.linkUp.connect(
-            BIND_MEM_CB(&DongleProxy::linkUp, this));
+            BIND_MEM_CB(&Proxy::linkUp, this));
         mTransport.linkDown.connect(
-            BIND_MEM_CB(&DongleProxy::linkDown, this));
+            BIND_MEM_CB(&Proxy::linkDown, this));
         mTransport.startReadThread();
     }
 
@@ -35,9 +36,9 @@ public:
         }
     }
 
-    void linkDown (DongleTransport::DownReason reason) {
+    void linkDown (Transport::DownReason reason) {
         std::cout << "linkDown called " <<
-            (reason == DongleTransport::DownReason::NORMALLY ?
+            (reason == Transport::DownReason::NORMALLY ?
             "normally" : "exceptionally") << "\n";
         mLinked = false;
         for (auto robotTransport : mRobotTransports) {
@@ -49,7 +50,7 @@ public:
         mTransport.sendMessage(buffer.bytes, buffer.size);
     }
 
-    // A helper function to make a DongleProxy easier to wire up to an
+    // A helper function to make a Proxy easier to wire up to an
     // sfp::Context.
     void deliverMessage (const uint8_t* data, size_t size) {
         BufferType buffer;
@@ -60,7 +61,7 @@ public:
         auto status = receiveServiceBuffer(buffer);
         if (rpc::hasError(status)) {
             // TODO shut down gracefully
-            printf("DongleProxy::receiveServiceBuffer returned %s\n", rpc::statusToString(status));
+            printf("Proxy::receiveServiceBuffer returned %s\n", rpc::statusToString(status));
             abort();
         }
     }
@@ -95,10 +96,12 @@ public:
     util::Signal<void(std::string,const uint8_t*,size_t)> robotMessageReceived;
 
 private:
-    DongleTransport mTransport;
+    Transport mTransport;
     RobotTransport mRobotTransports[1];
 
     std::atomic<bool> mLinked = { false };
 };
+
+} // namespace dongle
 
 #endif

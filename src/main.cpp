@@ -18,8 +18,8 @@ int main(int argc, char** argv) {
     assert(std::all_of(serialIds.cbegin(), serialIds.cend(),
                 [] (const std::string& s) { return 4 == s.size(); }));
 
-    DongleProxy dongleProxy;
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    dongle::Proxy dongleProxy;
+    std::this_thread::sleep_for(std::chrono::seconds(100));
 #if 0
     auto& serialId = serialIds[0];
     bool success;

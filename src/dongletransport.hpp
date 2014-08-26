@@ -7,23 +7,27 @@
 #include "sfp/context.hpp"
 #include "serial/serial.h"
 
+namespace dongle {
+
 constexpr const uint32_t kBaudRate = 230400;
 const auto kSerialTimeout = serial::Timeout::simpleTimeout(200);
 constexpr const auto kSfpSettleTimeout = std::chrono::milliseconds(200);
-constexpr const auto kDongleRetryCooldown = std::chrono::milliseconds(200);
+constexpr const auto kRetryCooldown = std::chrono::milliseconds(200);
 
 // Encapsulate serial::Serial and sfp::Context to create a reliable,
 // message-oriented USB link.
-class DongleTransport {
+class Transport {
 public:
-    DongleTransport () {
+
+
+    Transport () {
         mSfpContext.output.connect(
-                BIND_MEM_CB(&DongleTransport::writeToUsb, this));
+                BIND_MEM_CB(&Transport::writeToUsb, this));
         mSfpContext.messageReceived.connect(
                 BIND_MEM_CB(&MessageReceived::operator(), &messageReceived));
     }
 
-    ~DongleTransport () {
+    ~Transport () {
         mKillThread = true;
         mThread.join();
     }
@@ -78,7 +82,7 @@ private:
                 }
             }
             if (!mKillThread) {
-                std::this_thread::sleep_for(kDongleRetryCooldown);
+                std::this_thread::sleep_for(kRetryCooldown);
             }
         }
     }
@@ -180,5 +184,7 @@ private:
     std::atomic<bool> mKillThread = { false };
     std::thread mThread;
 };
+
+} // namespace dongle
 
 #endif
