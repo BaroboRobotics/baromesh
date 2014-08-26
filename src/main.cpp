@@ -1,6 +1,5 @@
 #include "robotproxy.hpp"
 #include "dongleproxy.hpp"
-#include "reliableusb.hpp"
 
 #include <boost/unordered_map.hpp>
 
@@ -19,42 +18,15 @@ int main(int argc, char** argv) {
     assert(std::all_of(serialIds.cbegin(), serialIds.cend(),
                 [] (const std::string& s) { return 4 == s.size(); }));
 
-    // Set up the dongle proxy object with its USB/SFP backend.
     DongleProxy dongleProxy;
-    ReliableUsb reliableUsb { std::string("/dev/ttyACM0") };
-
-    dongleProxy.bufferPosted.connect(
-            BIND_MEM_CB(&ReliableUsb::sendMessage, &reliableUsb));
-
-    reliableUsb.messageReceived.connect(
-            BIND_MEM_CB(&DongleProxy::deliverMessage, &dongleProxy));
-
-    boost::unordered_map<std::string, RobotProxy> robots;
-    auto robotMessageHandler = [&robots] (std::string serialId, const uint8_t* bytes, size_t size) {
-        auto iter = robots.find(serialId);
-        if (iter != robots.end()) {
-            RobotProxy::BufferType buffer;
-            assert(size <= sizeof(buffer.bytes));
-            memcpy(buffer.bytes, bytes, size);
-            buffer.size = size;
-            iter->second.deliver(buffer);
-        }
-        else {
-            printf("Ain't no such robot named %s\n", serialId.c_str());
-        }
-    };
-    using Lambda = decltype(robotMessageHandler);
-
-    dongleProxy.robotMessageReceived.connect(
-            BIND_MEM_CB(&Lambda::operator(), &robotMessageHandler));
-
-    dongleProxy.subscribe(rpc::Broadcast<barobo::Dongle>::receiveUnicast()).get();
-
+#if 0
     auto& serialId = serialIds[0];
     bool success;
     decltype(robots)::iterator iter;
     std::tie(iter, success) = robots.emplace(std::piecewise_construct, std::forward_as_tuple(serialId),
-        std::forward_as_tuple([&] (const RobotProxy::BufferType& buffer) {
+        std::forward_as_tuple(
+
+        [&dongleProxy] (const RobotProxy::BufferType& buffer) {
             barobo_Dongle_Address destination;
             strcpy((char*)destination.serialId, serialId.c_str());
             destination.port = 0;
@@ -97,6 +69,28 @@ int main(int argc, char** argv) {
         //std::this_thread::sleep_for(std::chrono::milliseconds(50));
         tim += 0.05;
     }
-
+#endif
     return 0;
 }
+
+#if 0
+
+        boost::unordered_map<std::string, RobotProxy> mRobotRoster;
+        auto robotMessageHandler = [&robots] (std::string serialId, const uint8_t* bytes, size_t size) {
+            auto iter = robots.find(serialId);
+            if (iter != robots.end()) {
+                RobotProxy::BufferType buffer;
+                assert(size <= sizeof(buffer.bytes));
+                memcpy(buffer.bytes, bytes, size);
+                buffer.size = size;
+                iter->second.deliver(buffer);
+            }
+            else {
+                printf("Ain't no such robot named %s\n", serialId.c_str());
+            }
+        };
+        using Lambda = decltype(robotMessageHandler);
+
+        dongleProxy.robotMessageReceived.connect(
+                BIND_MEM_CB(&Lambda::operator(), &robotMessageHandler));
+#endif

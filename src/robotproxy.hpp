@@ -6,12 +6,15 @@
 #include "rpc/asyncproxy.hpp"
 #include "gen-robot.pb.hpp"
 
+const char* buttonToString (barobo_Robot_Button button);
+const char* buttonStateToString (barobo_Robot_ButtonState state);
+
 class RobotProxy : public rpc::AsyncProxy<RobotProxy, barobo::Robot> {
 public:
     RobotProxy (std::function<void(const BufferType&)> postFunc) :
         mPostFunc(postFunc) {}
 
-    void post (const BufferType& buffer) {
+    void bufferToService (const BufferType& buffer) {
         mPostFunc(buffer);
     }
 
@@ -23,28 +26,6 @@ public:
     }
 
     void onBroadcast(Broadcast::buttonEvent in) {
-        auto buttonToString = [] (barobo_Robot_Button button) {
-            switch (button) {
-                case barobo_Robot_Button_POWER:
-                    return "POWER";
-                case barobo_Robot_Button_A:
-                    return "A";
-                case barobo_Robot_Button_B:
-                    return "B";
-                default:
-                    return "(unknown)";
-            }
-        };
-        auto buttonStateToString = [] (barobo_Robot_ButtonState state) {
-            switch (state) {
-                case barobo_Robot_ButtonState_UP:
-                    return "UP";
-                case barobo_Robot_ButtonState_DOWN:
-                    return "DOWN";
-                default:
-                    return "(unknown)";
-            }
-        };
         std::cout << "Received button event: timestamp(" << in.timestamp
                   << ") button(" << buttonToString(in.button)
                   << ") state(" << buttonStateToString(in.state)
