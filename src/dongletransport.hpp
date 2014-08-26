@@ -5,17 +5,16 @@
 #include "sfp/context.hpp"
 #include "serial/serial.h"
 
-#include <boost/scope_exit.hpp>
-
 constexpr const uint32_t kBaudRate = 230400;
-constexpr const uint32_t kSerialTimeout = 1000;
+const auto kSerialTimeout = serial::Timeout::simpleTimeout(200);
+constexpr const auto kSfpSettleTimeout = std::chrono::milliseconds(200);
+constexpr const auto kDongleRetryCooldown = std::chrono::milliseconds(200);
 
 // Encapsulate serial::Serial and sfp::Context to create a reliable,
 // message-oriented USB link.
 class DongleTransport {
 public:
-    DongleTransport ()
-            : mThread(&DongleTransport::threadMain, this) {
+    DongleTransport () {
         mSfpContext.output.connect(
                 BIND_MEM_CB(&DongleTransport::writeToUsb, this));
         mSfpContext.messageReceived.connect(
@@ -27,6 +26,11 @@ public:
         mThread.join();
     }
 
+    void startReadThread () {
+        std::thread t { &DongleTransport::threadMain, this };
+        mThread.swap(t);
+    }
+
     void sendMessage (const uint8_t* data, size_t size) {
         mSfpContext.sendMessage(data, size);
     }
@@ -34,10 +38,16 @@ public:
     using MessageReceived = util::Signal<void(const uint8_t*,size_t)>;
     MessageReceived messageReceived;
     
+    enum class DownReason {
+        NORMALLY, EXCEPTIONALLY
+    };
+
     util::Signal<void()> linkUp;
-    util::Signal<void()> linkDown;
+    util::Signal<void(DownReason)> linkDown;
+
 
 private:
+    
     void writeToUsb (uint8_t octet) {
         // FIXME: this is terribly inefficient to be doing for every single byte
         std::unique_lock<std::timed_mutex> lock {
@@ -57,47 +67,64 @@ private:
 
     void threadMain () {
         while (!mKillThread) {
-            // call some function to wait until a dongle is plugged in
-            // ensure that this function is written in such a way that you can 
-            // check mKillThread now and then, though...
-            std::string devicePath { "/dev/ttyACM0" };
-            try {
-                threadConstructUsb(devicePath); // FIXME what if I throw? linkUp
-                                                // was never called
+            if (threadInitialize()) {
+                linkUp();
+                try {
+                    threadRun();
+                    linkDown(DownReason::NORMALLY);
+                }
+                catch (...) {
+                    linkDown(DownReason::EXCEPTIONALLY);
+                }
             }
-            catch (...) {
-                // TODO Figure out what to do with the following cases:
-                // perms?
-                // read error
-                // libsfp failure?
-                // break, continue?
-            }
-            linkUp();
-            try {
-                threadRun();
-                linkDown(); // normally
-            }
-            catch (...) {
-                linkDown(); // exceptionally
+            if (!mKillThread) {
+                std::this_thread::sleep_for(kDongleRetryCooldown);
             }
         }
     }
 
-    void threadConstructUsb (std::string devicePath) {
-        {
-            std::unique_lock<std::timed_mutex> lock {
-                mUsbMutex,
-                std::chrono::seconds(10)
-            };
-            if (!lock) {
-                throw std::runtime_error("timed out waiting on USB lock");
-            }
-            mUsb.reset(new serial::Serial
-               ( devicePath
-               , kBaudRate
-               , serial::Timeout::simpleTimeout(kSerialTimeout)));
+    // True if initialization succeeded, false otherwise.
+    bool threadInitialize () {
+        std::cout << "threadInitialize\n";
+        // call some function to wait until a dongle is plugged in
+        // ensure that this function is written in such a way that you can 
+        // check mKillThread now and then, though...
+        std::string devicePath { "/dev/ttyACM0" };
+        try {
+            threadConstructUsb(devicePath); // FIXME what if I throw? linkUp
+                                            // was never called
+            threadConnectSfp();
         }
-        
+        catch (...) {
+            std::cout << "threadConstructUsb threw\n";
+            // TODO Figure out what to do with the following cases:
+            // perms?
+            // read error
+            // libsfp failure?
+            // break, continue?
+            return false;
+        }
+        return true;
+    }
+
+    void threadConstructUsb (std::string devicePath) {
+        std::cout << "threadConstructUsb\n";
+        std::unique_lock<std::timed_mutex> lock {
+            mUsbMutex,
+            std::chrono::seconds(10)
+        };
+        if (!lock) {
+            throw std::runtime_error("timed out waiting on USB lock");
+        }
+        mUsb.reset(new serial::Serial
+           ( devicePath
+           , kBaudRate
+           , kSerialTimeout));
+    }
+
+    void threadConnectSfp () {
+        std::cout << "threadConnectSfp\n";
+        assert(mUsb);
         mSfpContext.connect();
 
         uint8_t byte;
@@ -110,9 +137,28 @@ private:
                 throw std::runtime_error("libsfp connection failure");
             }
         }
+
+        std::cout << "threadConnectSfp: we think we're connected\n";
+
+        // Although we think we're connected, we don't know if the remote host
+        // agrees yet. Wait a little bit for the dust to settle.
+        using Clock = std::chrono::steady_clock;
+        auto timeStop = Clock::now() + kSfpSettleTimeout;
+        // FIXME if kSerialTimeout > kSfpSettleTimeout, mUsb->read() could
+        // block longer than we want. Solution: temporarily adjust mUsb's
+        // timeout?
+        while (!mKillThread && Clock::now() < timeStop) {
+            auto bytesread = mUsb->read(&byte, 1);
+            if (bytesread) {
+                mSfpContext.input(byte);
+            }
+        }
+
+        std::cout << "threadConnectSfp: settle timeout elapsed\n";
     }
 
     void threadRun () {
+        std::cout << "threadRun\n";
         while (!mKillThread) {
             uint8_t byte;
             // Block until kSerialTimeout milliseconds have elapsed.

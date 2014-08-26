@@ -10,27 +10,35 @@
 
 #include <functional>
 #include <string>
+#include <iostream>
+
 class RobotTransport {};
 class DongleProxy : public rpc::AsyncProxy<DongleProxy, barobo::Dongle> {
 public:
 
-    DongleProxy () {
+    DongleProxy ()
+{
         mTransport.messageReceived.connect(
             BIND_MEM_CB(&DongleProxy::deliverMessage, this));
         mTransport.linkUp.connect(
             BIND_MEM_CB(&DongleProxy::linkUp, this));
         mTransport.linkDown.connect(
             BIND_MEM_CB(&DongleProxy::linkDown, this));
+        mTransport.startReadThread();
     }
 
     void linkUp () {
+        std::cout << "linkUp called\n";
         mLinked = true;
         for (auto robotTransport : mRobotTransports) {
             //robotTransport.linkUp();
         }
     }
 
-    void linkDown () {
+    void linkDown (DongleTransport::DownReason reason) {
+        std::cout << "linkDown called " <<
+            (reason == DongleTransport::DownReason::NORMALLY ?
+            "normally" : "exceptionally") << "\n";
         mLinked = false;
         for (auto robotTransport : mRobotTransports) {
             //robotTransport.linkDown();
