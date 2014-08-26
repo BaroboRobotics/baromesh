@@ -11,10 +11,15 @@
 
 namespace dongle {
 
-constexpr const uint32_t kBaudRate = 230400;
+const uint32_t kBaudRate = 230400;
 const auto kSerialTimeout = serial::Timeout::simpleTimeout(200);
-constexpr const auto kSfpSettleTimeout = std::chrono::milliseconds(200);
-constexpr const auto kRetryCooldown = std::chrono::milliseconds(200);
+
+// SFP timeouts must be greater than or equal to the serial timeout above.
+// Think about it.
+const auto kSfpConnectionTimeout = std::chrono::milliseconds(5000);
+const auto kSfpSettleTimeout = std::chrono::milliseconds(200);
+
+const auto kRetryCooldown = std::chrono::milliseconds(200);
 
 struct Exception : std::exception { };
 
@@ -148,32 +153,38 @@ private:
     }
 
     void threadConnectSfp () {
-        std::cout << "threadConnectSfp\n";
+        std::cerr << "threadConnectSfp\n";
         assert(mUsb);
-        mSfpContext.connect();
 
         uint8_t byte;
-        // FIXME maybe: the way this is written means that kSerialTimeout is
-        // also our sfp-connection timeout.
-        while (!mKillThread && !mSfpContext.isConnected()) {
-            auto bytesread = mUsb->read(&byte, 1);
-            if (bytesread) {
-                mSfpContext.input(byte);
-            }
-            else {
-                throw std::runtime_error("libsfp connection failure");
+
+        using Clock = std::chrono::steady_clock;
+
+        mSfpContext.initialize();
+        auto timeStop = Clock::now() + kSfpConnectionTimeout;
+        while (!mKillThread && !mSfpContext.isConnected()
+                && Clock::now() < timeStop) {
+            mSfpContext.connect();
+            while (!mKillThread && !mSfpContext.isConnected()) {
+                auto bytesread = mUsb->read(&byte, 1);
+                if (bytesread) {
+                    mSfpContext.input(byte);
+                }
+                else {
+                    break;
+                }
             }
         }
 
-        std::cout << "threadConnectSfp: we think we're connected\n";
+        if (!mKillThread && !mSfpContext.isConnected()) {
+            throw std::runtime_error("libsfp connection failure");
+        }
+
+        std::cerr << "threadConnectSfp: we think we're connected\n";
 
         // Although we think we're connected, we don't know if the remote host
         // agrees yet. Wait a little bit for the dust to settle.
-        using Clock = std::chrono::steady_clock;
-        auto timeStop = Clock::now() + kSfpSettleTimeout;
-        // FIXME if kSerialTimeout > kSfpSettleTimeout, mUsb->read() could
-        // block longer than we want. Solution: temporarily adjust mUsb's
-        // timeout?
+        timeStop = Clock::now() + kSfpSettleTimeout;
         while (!mKillThread && Clock::now() < timeStop) {
             auto bytesread = mUsb->read(&byte, 1);
             if (bytesread) {
