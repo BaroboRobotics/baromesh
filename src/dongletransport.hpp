@@ -1,6 +1,8 @@
 #ifndef BAROMESH_DONGLETRANSPORT_HPP
 #define BAROMESH_DONGLETRANSPORT_HPP
 
+#include "dongledevicepath.hpp"
+
 #define SFP_CONFIG_THREADSAFE
 #include "sfp/context.hpp"
 #include "serial/serial.h"
@@ -45,9 +47,7 @@ public:
     util::Signal<void()> linkUp;
     util::Signal<void(DownReason)> linkDown;
 
-
 private:
-    
     void writeToUsb (uint8_t octet) {
         // FIXME: this is terribly inefficient to be doing for every single byte
         std::unique_lock<std::timed_mutex> lock {
@@ -86,13 +86,17 @@ private:
     // True if initialization succeeded, false otherwise.
     bool threadInitialize () {
         std::cout << "threadInitialize\n";
-        // call some function to wait until a dongle is plugged in
-        // ensure that this function is written in such a way that you can 
-        // check mKillThread now and then, though...
-        std::string devicePath { "/dev/ttyACM0" };
+        // Get the dongle device path, i.e.: /dev/ttyACM0, \\.\COM3, etc.
+        char path[64];
+        auto status = devicePath(path, sizeof(path));
+        if (-1 == status) {
+            std::cout << "threadInitialize: no dongle found\n";
+            return false;
+        }
+
+        std::cout << "threadInitialize: found dongle at " << path << "\n";
         try {
-            threadConstructUsb(devicePath); // FIXME what if I throw? linkUp
-                                            // was never called
+            threadConstructUsb(std::string(path));
             threadConnectSfp();
         }
         catch (...) {
@@ -107,7 +111,7 @@ private:
         return true;
     }
 
-    void threadConstructUsb (std::string devicePath) {
+    void threadConstructUsb (std::string path) {
         std::cout << "threadConstructUsb\n";
         std::unique_lock<std::timed_mutex> lock {
             mUsbMutex,
@@ -116,10 +120,7 @@ private:
         if (!lock) {
             throw std::runtime_error("timed out waiting on USB lock");
         }
-        mUsb.reset(new serial::Serial
-           ( devicePath
-           , kBaudRate
-           , kSerialTimeout));
+        mUsb.reset(new serial::Serial(path, kBaudRate, kSerialTimeout));
     }
 
     void threadConnectSfp () {
@@ -128,6 +129,8 @@ private:
         mSfpContext.connect();
 
         uint8_t byte;
+        // FIXME maybe: the way this is written means that kSerialTimeout is
+        // also our sfp-connection timeout.
         while (!mKillThread && !mSfpContext.isConnected()) {
             auto bytesread = mUsb->read(&byte, 1);
             if (bytesread) {
