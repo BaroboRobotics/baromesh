@@ -139,11 +139,23 @@ private:
         mUsb.reset(new serial::Serial(path, kBaudRate, kSerialTimeout));
     }
 
+    void readPump(bool breakOnEmptyRead, std::function<bool()> predicate) {
+        uint8_t byte;
+        // TODO check mUsb.available() and read all the bytes available
+        while (predicate()) {
+            auto bytesread = mUsb->read(&byte, 1);
+            if (bytesread) {
+                mSfpContext.input(byte);
+            }
+            else if(breakOnEmptyRead) {
+                break;
+            }
+        }
+    }
+
     void threadConnectSfp () {
         std::cerr << "threadConnectSfp\n";
         assert(mUsb);
-
-        uint8_t byte;
 
         using Clock = std::chrono::steady_clock;
 
@@ -152,19 +164,15 @@ private:
         while (!mKillThread && !mSfpContext.isConnected()
                 && Clock::now() < timeStop) {
             mSfpContext.connect();
-            while (!mKillThread && !mSfpContext.isConnected()) {
-                auto bytesread = mUsb->read(&byte, 1);
-                if (bytesread) {
-                    mSfpContext.input(byte);
-                }
-                else {
-                    break;
-                }
-            }
+            // exception = MEH. That means catching and ignoring
+            // ReadPumpException?
+            readPump(true, [this] () {
+                return !mKillThread && !mSfpContext.isConnected();
+            });
         }
 
         if (!mKillThread && !mSfpContext.isConnected()) {
-            throw std::runtime_error("libsfp connection failure");
+            throw SfpConnectionException();
         }
 
         std::cerr << "threadConnectSfp: we think we're connected\n";
@@ -172,27 +180,22 @@ private:
         // Although we think we're connected, we don't know if the remote host
         // agrees yet. Wait a little bit for the dust to settle.
         timeStop = Clock::now() + kSfpSettleTimeout;
-        while (!mKillThread && Clock::now() < timeStop) {
-            auto bytesread = mUsb->read(&byte, 1);
-            if (bytesread) {
-                mSfpContext.input(byte);
-            }
-        }
+
+        readPump(false, [this, timeStop] () {
+            return !mKillThread && Clock::now() < timeStop;
+        });
 
         std::cerr << "threadConnectSfp: settle timeout elapsed\n";
     }
 
-    void threadRun () {
-        std::cerr << "threadRun\n";
+    void threadPumpClientData () {
         assert(mUsb);
-        while (!mKillThread) {
-            uint8_t byte;
-            // Block until kSerialTimeout milliseconds have elapsed.
-            // TODO check mUsb.available() and read all the bytes available
-            auto bytesread = mUsb->read(&byte, 1);
-            if (bytesread) {
-                mSfpContext.input(byte);
-            }
+        std::cerr << "threadPumpClientData\n";
+        try {
+            readPump(false, [this] () { return !mKillThread; });
+        }
+        catch (...) {
+            throw ReadPumpException(std::current_exception());
         }
     }
 
