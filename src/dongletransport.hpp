@@ -83,48 +83,40 @@ private:
 
     void threadMain () {
         while (!mKillThread) {
-            if (threadInitialize()) {
+            try {
+                threadConstructUsb(devicePath());
+                threadConnectSfp();
                 linkUp();
-                try {
-                    threadRun();
-                    linkDown(DownReason::NORMALLY);
-                }
-                catch (...) {
-                    linkDown(DownReason::EXCEPTIONALLY);
-                }
+                // If threadPumpClientData hits an exception, we need to call
+                // linkDown(EXCEPTIONALLY). So, it wraps all exceptions and
+                // we catch the wrapper below.
+                threadPumpClientData();
+                // Otherwise, we have been asked to go quietly into the
+                // night (mKillThread = true).
+                linkDown(DownReason::NORMALLY);
             }
+            catch (ReadPumpException& exc) {
+                linkDown(DownReason::EXCEPTIONALLY);
+                // ?
+            }
+            catch (DongleNotFoundException& exc) {
+                // probably do nothing
+                std::cerr << exc.what() << '\n';
+            }
+            catch (SfpConnectionException& exc) {
+                // YELLOW LIGHT
+                std::cerr << exc.what() << '\n';
+            }
+            catch (std::exception &e) {
+                std::cerr << e.what();
+                // TODO
+                // deliverException(std::current_exception());
+            }
+
             if (!mKillThread) {
                 std::this_thread::sleep_for(kRetryCooldown);
             }
         }
-    }
-
-    // True if initialization succeeded, false otherwise.
-    bool threadInitialize () {
-        std::cerr << "threadInitialize\n";
-        // Get the dongle device path, i.e.: /dev/ttyACM0, \\.\COM3, etc.
-        char path[64];
-        auto status = devicePath(path, sizeof(path));
-        if (-1 == status) {
-            std::cerr << "threadInitialize: no dongle found\n";
-            return false;
-        }
-
-        std::cerr << "threadInitialize: found dongle at " << path << "\n";
-        try {
-            threadConstructUsb(std::string(path));
-            threadConnectSfp();
-        }
-        catch (...) {
-            std::cout << "threadConstructUsb threw\n";
-            // TODO Figure out what to do with the following cases:
-            // perms?
-            // read error
-            // libsfp failure?
-            // break, continue?
-            return false;
-        }
-        return true;
     }
 
     void threadConstructUsb (std::string path) {
