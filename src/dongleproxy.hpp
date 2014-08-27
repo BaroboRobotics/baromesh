@@ -72,7 +72,7 @@ public:
     void onBroadcast(Attribute::dummyAttribute) { }
 
     void onBroadcast(Broadcast::receiveUnicast arg) {
-        printf("received from %.*s:%d |", sizeof(arg.source.serialId),
+        printf("received from %s:%d |",
                 arg.source.serialId, arg.source.port);
         if (arg.payload.value.size) {
             for (size_t i = 0; i < arg.payload.value.size; ++i) {
