@@ -10,9 +10,7 @@
 #include <ctype.h>
 #include <unistd.h>
 
-namespace dongle {
-
-int devicePath (char *buf, size_t len) {
+int devicePathImpl (char *buf, size_t len) {
   const char* sysfs = getenv("SYSFS_PATH");
   if (!sysfs) {
     sysfs = "/sys";
@@ -77,5 +75,3 @@ int devicePath (char *buf, size_t len) {
 
   return dongle_found ? 0 : -1;
 }
-
-} // namespace dongle

@@ -14,9 +14,7 @@
 static CFTypeRef get_string_prop (io_object_t device, const char *prop);
 static CFTypeRef get_string_prop_r (io_object_t device, const char *prop);
 
-namespace dongle {
-
-int devicePath (char *buf, size_t len) {
+int devicePathImpl (char *buf, size_t len) {
   kern_return_t result;
   io_iterator_t it;
 
@@ -108,8 +106,6 @@ int devicePath (char *buf, size_t len) {
 
   return -1;
 }
-
-} // namespace dongle
 
 static CFTypeRef get_string_prop (io_object_t device, const char *prop) {
   CFStringRef key = CFStringCreateWithCString(kCFAllocatorDefault,

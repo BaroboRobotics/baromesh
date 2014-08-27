@@ -7,7 +7,7 @@
 #include "sfp/context.hpp"
 #include "serial/serial.h"
 
-#include <exception>
+#include "dongleexception.hpp"
 
 namespace dongle {
 
@@ -20,19 +20,6 @@ const auto kSfpConnectionTimeout = std::chrono::milliseconds(5000);
 const auto kSfpSettleTimeout = std::chrono::milliseconds(200);
 
 const auto kRetryCooldown = std::chrono::milliseconds(200);
-
-struct Exception : std::exception { };
-
-struct ThreadException : Exception {
-    ThreadException (std::exception_ptr eptr)
-            : underlyingExceptionPtr(eptr) { }
-
-    virtual const char* what () const noexcept override {
-        return "Unable to start reader thread";
-    }
-
-    std::exception_ptr underlyingExceptionPtr;
-};
 
 // Encapsulate serial::Serial and sfp::Context to create a reliable,
 // message-oriented USB link.

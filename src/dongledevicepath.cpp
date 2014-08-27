@@ -1,3 +1,6 @@
+#include "dongledevicepath.hpp"
+#include "dongleexception.hpp"
+
 struct usb_dongle_id {
   const char *manufacturer;
   const char *product;
@@ -11,6 +14,23 @@ static const usb_dongle_id g_barobo_usb_dongle_ids[] = {
   { "Barobo, Inc.", "Linkbot USB-Serial Adapter" },
   { "Barobo, Inc.", "Barobo USB-Serial Adapter" }
 };
+
+static int devicePathImpl(char *, size_t);
+
+namespace dongle {
+
+std::string devicePath () {
+    // Get the dongle device path, i.e.: /dev/ttyACM0, \\.\COM3, etc.
+    char path[64];
+    auto status = devicePathImpl(path, sizeof(path));
+    if (-1 == status) {
+        throw DongleNotFoundException();
+    }
+    return std::string(path);
+}
+
+}
+
 
 /* For convenience. */
 #define NUM_BAROBO_USB_DONGLE_IDS \
