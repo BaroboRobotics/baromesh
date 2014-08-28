@@ -60,19 +60,7 @@ public:
 private:
     void writeToUsb (uint8_t octet) {
         // FIXME: this is terribly inefficient to be doing for every single byte
-        std::unique_lock<std::timed_mutex> lock {
-            mUsbMutex,
-            std::chrono::seconds(10)
-        };
-        if (!lock) {
-            throw std::runtime_error("timed out waiting on USB lock");
-        }
-        if (mUsb) {
-            mUsb->write(&octet, 1);
-        }
-        else {
-            throw std::runtime_error("no dongle present");
-        }
+        mSerial.write(&octet, 1);
     }
 
     enum class State {
@@ -103,7 +91,7 @@ private:
             try {
                 auto path = devicePath();
                 setState(State::dongleConnecting); // yellowLight();
-                threadOpenUsb(path);
+                threadOpenSerial(path);
                 threadConnectSfp();
                 setState(State::dongleConnected); // greenLight();
                 threadPumpClientData();
@@ -134,24 +122,18 @@ private:
         }
     }
 
-    void threadOpenUsb (std::string path) {
-        std::cerr << "threadOpenUsb\n";
-        std::unique_lock<std::timed_mutex> lock {
-            mUsbMutex,
-            std::chrono::seconds(10)
-        };
-        if (!lock) {
-            throw std::runtime_error("timed out waiting on USB lock");
-        }
-        mUsb.reset(new serial::Serial(path, kBaudRate, kSerialTimeout));
+    void threadOpenSerial (std::string path) {
+        std::cerr << "threadOpenSerial\n";
+        mSerial.close();
+        mSerial.setPort(path);
+        mSerial.open();
     }
 
     void readWhile(std::function<bool()> predicate, bool breakOnEmptyRead = false) {
-        assert(mUsb);
         uint8_t byte;
-        // TODO check mUsb.available() and read all the bytes available
+        // TODO check mSerial.available() and read all the bytes available
         while (predicate()) {
-            auto bytesread = mUsb->read(&byte, 1);
+            auto bytesread = mSerial.read(&byte, 1);
             if (bytesread) {
                 mSfpContext.input(byte);
             }
@@ -191,8 +173,7 @@ private:
     State mState = State::noDongle;
 
     sfp::Context mSfpContext;
-    std::unique_ptr<serial::Serial> mUsb;
-    std::timed_mutex mUsbMutex;
+    serial::Serial mSerial = { "", kBaudRate, kSerialTimeout };
 
     std::atomic<bool> mKillThread = { false };
     std::thread mThread;
