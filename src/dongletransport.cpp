@@ -2,13 +2,30 @@
 
 namespace dongle {
 
+// Since this is a separate method, clients can connect to our signals
+// before the reader thread starts and possibly fires those signals.
 void Transport::startReaderThread () {
     try {
         std::thread t { &Transport::threadMain, this };
         mThread.swap(t);
     }
     catch (...) {
-        throw ThreadException(std::current_exception());
+        throw ThreadError(std::current_exception());
+    }
+}
+
+void Transport::sendMessage (const uint8_t* data, size_t size) {
+    if (mState != State::dongleConnected) {
+        throw NotConnected();
+    }
+    try {
+        mSfpContext.sendMessage(data, size);
+    }
+    catch (serial::SerialException &e) {
+        throw SerialError(std::make_exception_ptr(e));
+    }
+    catch (serial::IOException& e) {
+        throw SerialError(std::make_exception_ptr(e));
     }
 }
 

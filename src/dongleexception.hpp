@@ -5,18 +5,51 @@
 
 namespace dongle {
 
-struct Exception : std::exception { };
+// Exceptions that can be thrown from methods of class Transport
+class Exception : std::exception {};
 
-struct ThreadException : Exception {
-    ThreadException (std::exception_ptr eptr)
-            : underlyingExceptionPtr(eptr) { }
-
+class NotConnected : public Exception {
     virtual const char* what () const noexcept override {
-        return "Unable to start reader thread";
+        return "dongle not connected during write";
+    }
+};
+
+struct WrappedException : Exception {
+    WrappedException(std::exception_ptr eptr, std::string msg)
+            : mWhat(wrapWhat(eptr, msg)) { }
+
+    virtual const char* what () const noexcept override final {
+        return mWhat.c_str();
     }
 
-    std::exception_ptr underlyingExceptionPtr;
+private:
+
+    std::string mWhat;
+    std::string wrapWhat(std::exception_ptr eptr, std::string what) {
+        try {
+            std::rethrow_exception(eptr);
+        }
+        catch (std::exception &e) {
+            return what + std::string(e.what());
+        }
+        catch (...) {
+            return "(wat?)";
+        }
+        return "";
+    }
 };
+
+struct SerialError : WrappedException {
+    SerialError (std::exception_ptr ep)
+            : WrappedException(ep, "serial error during write: ") { }
+};
+
+struct ThreadError : WrappedException {
+    ThreadError (std::exception_ptr eptr)
+            : WrappedException(eptr, "thread creation error: ") { }
+};
+
+// The following are PRIVATE (not thrown to client code)
 
 struct ReadPumpException : Exception {
     ReadPumpException (std::exception_ptr eptr)
@@ -41,6 +74,6 @@ struct SfpConnectionException : Exception {
     }
 };
 
-}
+} // namespace dongle
 
 #endif

@@ -2,12 +2,11 @@
 #define BAROMESH_DONGLETRANSPORT_HPP
 
 #include "dongledevicepath.hpp"
+#include "dongleexception.hpp"
 
 #define SFP_CONFIG_THREADSAFE
 #include "sfp/context.hpp"
 #include "serial/serial.h"
-
-#include "dongleexception.hpp"
 
 #include <iostream>
 #include <atomic>
@@ -41,9 +40,7 @@ public:
 
     void startReaderThread();
 
-    void sendMessage (const uint8_t* data, size_t size) {
-        mSfpContext.sendMessage(data, size);
-    }
+    void sendMessage (const uint8_t* data, size_t size);
 
     using MessageReceived = util::Signal<void(const uint8_t*,size_t)>;
     MessageReceived sigMessageReceived;
@@ -67,7 +64,7 @@ private:
     void readWhile(std::function<bool()> predicate, bool breakOnEmptyRead = false);
     void setState(State);
 
-    State mState = State::noDongle;
+    std::atomic<State> mState = { State::noDongle };
     sfp::Context mSfpContext;
     serial::Serial mSerial = { "", kBaudRate, kSerialTimeout };
     std::atomic<bool> mKillThread = { false };
