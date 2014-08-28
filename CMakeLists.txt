@@ -45,6 +45,7 @@ set(SOURCES
     src/main.cpp
     src/robotproxy.cpp
     src/dongledevicepath.cpp
+    src/dongletransport.cpp
     )
 
 add_executable(baromesh ${SOURCES})
