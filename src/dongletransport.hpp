@@ -14,9 +14,8 @@ namespace dongle {
 const uint32_t kBaudRate = 230400;
 const auto kSerialTimeout = serial::Timeout::simpleTimeout(200);
 
-// SFP timeouts must be greater than or equal to the serial timeout above.
+// SFP settle timeout must be greater than or equal to the serial timeout above.
 // Think about it.
-const auto kSfpConnectionTimeout = std::chrono::milliseconds(5000);
 const auto kSfpSettleTimeout = std::chrono::milliseconds(200);
 
 const auto kRetryCooldown = std::chrono::milliseconds(200);
@@ -25,13 +24,11 @@ const auto kRetryCooldown = std::chrono::milliseconds(200);
 // message-oriented USB link.
 class Transport {
 public:
-
-
     Transport () {
         mSfpContext.output.connect(
                 BIND_MEM_CB(&Transport::writeToUsb, this));
         mSfpContext.messageReceived.connect(
-                BIND_MEM_CB(&MessageReceived::operator(), &messageReceived));
+                BIND_MEM_CB(&MessageReceived::operator(), &sigMessageReceived));
     }
 
     ~Transport () {
@@ -54,14 +51,11 @@ public:
     }
 
     using MessageReceived = util::Signal<void(const uint8_t*,size_t)>;
-    MessageReceived messageReceived;
-    
-    enum class DownReason {
-        NORMALLY, EXCEPTIONALLY
-    };
+    MessageReceived sigMessageReceived;
 
-    util::Signal<void()> linkUp;
-    util::Signal<void(DownReason)> linkDown;
+    util::Signal<void()> sigNoDongle;
+    util::Signal<void()> sigDongleConnecting;
+    util::Signal<void()> sigDongleConnected;
 
 private:
     void writeToUsb (uint8_t octet) {
@@ -81,46 +75,67 @@ private:
         }
     }
 
+    enum class State {
+        noDongle,
+        dongleConnecting,
+        dongleConnected
+    };
+
+    void setState(State s) {
+        mState = s;
+        switch(s) {
+            case State::noDongle:
+                sigNoDongle();
+                break;
+            case State::dongleConnecting:
+                sigDongleConnecting();
+                break;
+            case State::dongleConnected:
+                sigDongleConnected();
+                break;
+            default:
+                assert(false);
+        }
+    }
+
     void threadMain () {
         while (!mKillThread) {
             try {
-                threadConstructUsb(devicePath());
+                auto path = devicePath();
+                setState(State::dongleConnecting); // yellowLight();
+                threadOpenUsb(path);
                 threadConnectSfp();
-                linkUp();
-                // If threadPumpClientData hits an exception, we need to call
-                // linkDown(EXCEPTIONALLY). So, it wraps all exceptions and
-                // we catch the wrapper below.
+                setState(State::dongleConnected); // greenLight();
                 threadPumpClientData();
-                // Otherwise, we have been asked to go quietly into the
-                // night (mKillThread = true).
-                linkDown(DownReason::NORMALLY);
-            }
-            catch (ReadPumpException& exc) {
-                linkDown(DownReason::EXCEPTIONALLY);
-                // ?
             }
             catch (DongleNotFoundException& exc) {
-                // probably do nothing
+                // Dongle unplugged or turned off. Non-fatal.
+            }
+            // Too bad the serial exceptions don't all inherit from
+            // SerialException. :|
+            catch (serial::SerialException& exc) {
                 std::cerr << exc.what() << '\n';
             }
-            catch (SfpConnectionException& exc) {
-                // YELLOW LIGHT
+            catch (serial::IOException& exc) {
                 std::cerr << exc.what() << '\n';
             }
-            catch (std::exception &e) {
-                std::cerr << e.what();
-                // TODO
-                // deliverException(std::current_exception());
+            catch (serial::PortNotOpenedException& exc) {
+                std::cerr << exc.what() << '\n';
             }
+            // Let any other exceptions crash the program! They should only
+            // be coming from user code called as sfp callbacks, or
+            // catastrophic situations.
+            // NO: catch (std::exception &e) {}
 
             if (!mKillThread) {
+                setState(State::noDongle); // redLight();
                 std::this_thread::sleep_for(kRetryCooldown);
             }
         }
     }
 
-    void threadConstructUsb (std::string path) {
-        std::cerr << "threadConstructUsb\n";
+    void threadOpenUsb (std::string path) {
+        std::cerr << "threadOpenUsb\n";
         std::unique_lock<std::timed_mutex> lock {
             mUsbMutex,
             std::chrono::seconds(10)
@@ -131,7 +146,8 @@ private:
         mUsb.reset(new serial::Serial(path, kBaudRate, kSerialTimeout));
     }
 
-    void readPump(bool breakOnEmptyRead, std::function<bool()> predicate) {
+    void readWhile(std::function<bool()> predicate, bool breakOnEmptyRead = false) {
+        assert(mUsb);
         uint8_t byte;
         // TODO check mUsb.available() and read all the bytes available
         while (predicate()) {
@@ -139,7 +155,7 @@ private:
             if (bytesread) {
                 mSfpContext.input(byte);
             }
-            else if(breakOnEmptyRead) {
+            else if (breakOnEmptyRead) {
                 break;
             }
         }
@@ -147,49 +163,32 @@ private:
 
     void threadConnectSfp () {
         std::cerr << "threadConnectSfp\n";
-        assert(mUsb);
-
         using Clock = std::chrono::steady_clock;
 
         mSfpContext.initialize();
-        auto timeStop = Clock::now() + kSfpConnectionTimeout;
-        while (!mKillThread && !mSfpContext.isConnected()
-                && Clock::now() < timeStop) {
+        while (!mKillThread && !mSfpContext.isConnected()) {
             mSfpContext.connect();
-            // exception = MEH. That means catching and ignoring
-            // ReadPumpException?
-            readPump(true, [this] () {
+            readWhile([this] () {
                 return !mKillThread && !mSfpContext.isConnected();
-            });
+            }, true);
         }
-
-        if (!mKillThread && !mSfpContext.isConnected()) {
-            throw SfpConnectionException();
-        }
-
         std::cerr << "threadConnectSfp: we think we're connected\n";
 
         // Although we think we're connected, we don't know if the remote host
         // agrees yet. Wait a little bit for the dust to settle.
-        timeStop = Clock::now() + kSfpSettleTimeout;
-
-        readPump(false, [this, timeStop] () {
+        auto timeStop = Clock::now() + kSfpSettleTimeout;
+        readWhile([this, timeStop] () {
             return !mKillThread && Clock::now() < timeStop;
         });
-
         std::cerr << "threadConnectSfp: settle timeout elapsed\n";
     }
 
     void threadPumpClientData () {
-        assert(mUsb);
         std::cerr << "threadPumpClientData\n";
-        try {
-            readPump(false, [this] () { return !mKillThread; });
-        }
-        catch (...) {
-            throw ReadPumpException(std::current_exception());
-        }
+        readWhile([this] () { return !mKillThread; });
     }
+
+    State mState = State::noDongle;
 
     sfp::Context mSfpContext;
     std::unique_ptr<serial::Serial> mUsb;

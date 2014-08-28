@@ -19,33 +19,37 @@ namespace dongle {
 class Proxy : public rpc::AsyncProxy<Proxy, barobo::Dongle> {
 public:
     Proxy () {
-        mTransport.messageReceived.connect(
+        mTransport.sigMessageReceived.connect(
             BIND_MEM_CB(&Proxy::deliverMessage, this));
-        mTransport.linkUp.connect(
-            BIND_MEM_CB(&Proxy::linkUp, this));
-        mTransport.linkDown.connect(
-            BIND_MEM_CB(&Proxy::linkDown, this));
+        mTransport.sigNoDongle.connect(
+            BIND_MEM_CB(&Proxy::noDongle, this));
+        mTransport.sigDongleConnecting.connect(
+            BIND_MEM_CB(&Proxy::dongleConnecting, this));
+        mTransport.sigDongleConnected.connect(
+            BIND_MEM_CB(&Proxy::dongleConnected, this));
         mTransport.startReaderThread();
     }
 
-    void linkUp () {
-        std::cout << "linkUp called\n";
+    void noDongle () {
+        std::cout << "RECEIVED noDongle" << "\n";
+        mLinked = false;
+        for (auto robotTransport : mRobotTransports) {
+            //robotTransport.linkDown();
+        }
+    }
+
+    void dongleConnecting() {
+        std::cout << "RECEIVED dongleConnecting" << "\n";
+    }
+
+    void dongleConnected () {
+        std::cout << "RECEIVED dongleConnected\n";
         mLinked = true;
         for (auto robotTransport : mRobotTransports) {
             //robotTransport.linkUp();
         }
     }
 
-    void linkDown (Transport::DownReason reason) {
-        std::cout << "linkDown called " <<
-            (reason == Transport::DownReason::NORMALLY ?
-            "normally" : "exceptionally") << "\n";
-        mLinked = false;
-        for (auto robotTransport : mRobotTransports) {
-            //robotTransport.linkDown();
-        }
-    }
-    
     void bufferToService (const BufferType& buffer) {
         mTransport.sendMessage(buffer.bytes, buffer.size);
     }
