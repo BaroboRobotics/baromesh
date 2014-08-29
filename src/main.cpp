@@ -34,16 +34,19 @@ int main(int argc, char** argv) {
     std::this_thread::sleep_for(std::chrono::seconds(1));
     dongleProxy.subscribe(rpc::Broadcast<barobo::Dongle>::receiveUnicast()).get();
 
-    auto& serialId = serialIds[0];
-    robot::Proxy robotProxy { serialId, dongleProxy };
+    auto func = [&dongleProxy](std::string serialId) {
+        double tim = 0;
+        robot::Proxy robotProxy { serialId, dongleProxy };
+        while (1) {
+            sendNewColor(robotProxy, tim);
+            tim += 0.05;
+        }
+    };
 
-    robotProxy.subscribe(rpc::Broadcast<barobo::Robot>::buttonEvent()).get();
-    printf("Subscribed to button events\n");
+    std::thread t1 { func, std::string("HLJ3") };
+    std::thread t2 { func, std::string("487J") };
 
-    double tim = 0;
-    while (1) {
-        sendNewColor(robotProxy, tim);
-        tim += 0.05;
-    }
+    t1.join();
+    t2.join();
     return 0;
 }
