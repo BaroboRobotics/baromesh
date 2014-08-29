@@ -44,15 +44,15 @@ public:
     void sendMessage (const uint8_t* data, size_t size);
 
     util::Signal<void(const uint8_t*, size_t)> sigMessageReceived;
-    util::Signal<void()> sigNoDongle;
-    util::Signal<void()> sigDongleConnecting;
-    util::Signal<void()> sigDongleConnected;
+    util::Signal<void()> sigDisconnected;
+    util::Signal<void()> sigConnecting;
+    util::Signal<void()> sigConnected;
 
 private:
     enum class State {
-        noDongle,
-        dongleConnecting,
-        dongleConnected
+        disconnected,
+        connecting,
+        connected
     };
 
     void writeToUsb (uint8_t octet) { mSerial.write(&octet, 1); }
@@ -63,7 +63,7 @@ private:
     void readWhile(std::function<bool()> predicate, bool breakOnEmptyRead = false);
     void setState(State);
 
-    std::atomic<State> mState = { State::noDongle };
+    std::atomic<State> mState = { State::disconnected };
     sfp::Context mSfpContext;
     serial::Serial mSerial = { "", kBaudRate, kSerialTimeout };
     std::atomic<bool> mKillThread = { false };

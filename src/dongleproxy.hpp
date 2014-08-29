@@ -23,29 +23,29 @@ public:
     Proxy () {
         mTransport.sigMessageReceived.connect(
             BIND_MEM_CB(&Proxy::deliverMessage, this));
-        mTransport.sigNoDongle.connect(
-            BIND_MEM_CB(&Proxy::noDongle, this));
-        mTransport.sigDongleConnecting.connect(
-            BIND_MEM_CB(&Proxy::dongleConnecting, this));
-        mTransport.sigDongleConnected.connect(
-            BIND_MEM_CB(&Proxy::dongleConnected, this));
+        mTransport.sigDisconnected.connect(
+            BIND_MEM_CB(&Proxy::disconnected, this));
+        mTransport.sigConnecting.connect(
+            BIND_MEM_CB(&Proxy::connecting, this));
+        mTransport.sigConnected.connect(
+            BIND_MEM_CB(&Proxy::connected, this));
         mTransport.startReaderThread();
     }
 
-    void noDongle () {
-        std::cout << "RECEIVED noDongle" << "\n";
+    void disconnected () {
+        std::cout << "RECEIVED disconnected" << "\n";
         mLinked = false;
         for (auto robotTransport : mRobotTransports) {
             //robotTransport.linkDown();
         }
     }
 
-    void dongleConnecting() {
-        std::cout << "RECEIVED dongleConnecting" << "\n";
+    void connecting() {
+        std::cout << "RECEIVED connecting" << "\n";
     }
 
-    void dongleConnected () {
-        std::cout << "RECEIVED dongleConnected\n";
+    void connected () {
+        std::cout << "RECEIVED connected\n";
         mLinked = true;
         for (auto robotTransport : mRobotTransports) {
             //robotTransport.linkUp();

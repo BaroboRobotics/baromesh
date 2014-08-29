@@ -15,7 +15,7 @@ void Transport::startReaderThread () {
 }
 
 void Transport::sendMessage (const uint8_t* data, size_t size) {
-    if (mState != State::dongleConnected) {
+    if (mState != State::connected) {
         throw NotConnected();
     }
     try {
@@ -30,19 +30,21 @@ void Transport::sendMessage (const uint8_t* data, size_t size) {
 }
 
 void Transport::setState(State s) {
-    mState = s;
-    switch(s) {
-        case State::noDongle:
-            sigNoDongle();
-            break;
-        case State::dongleConnecting:
-            sigDongleConnecting();
-            break;
-        case State::dongleConnected:
-            sigDongleConnected();
-            break;
-        default:
-            assert(false);
+    if (mState != s) {
+        mState = s;
+        switch(s) {
+            case State::disconnected:
+                sigDisconnected();
+                break;
+            case State::connecting:
+                sigConnecting();
+                break;
+            case State::connected:
+                sigConnected();
+                break;
+            default:
+                assert(false);
+        }
     }
 }
 
@@ -50,10 +52,10 @@ void Transport::threadMain () {
     while (!mKillThread) {
         try {
             auto path = devicePath();
-            setState(State::dongleConnecting); // yellowLight();
+            setState(State::connecting); // yellowLight();
             threadOpenSerial(path);
             threadConnectSfp();
-            setState(State::dongleConnected); // greenLight();
+            setState(State::connected); // greenLight();
             threadPumpClientData();
         }
         catch (DongleNotFoundException& exc) {
@@ -76,7 +78,7 @@ void Transport::threadMain () {
         // NO: catch (std::exception &e) {}
 
         if (!mKillThread) {
-            setState(State::noDongle); // redLight();
+            setState(State::disconnected); // redLight();
             std::this_thread::sleep_for(kRetryCooldown);
         }
     }
