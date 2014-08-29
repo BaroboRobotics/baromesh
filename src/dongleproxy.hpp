@@ -87,14 +87,12 @@ public:
             printf(" (empty)");
         }
         printf("\n");
-#if 0
         if (arg.source.port == 0) {
             robotMessageReceived(arg.source.serialId, arg.payload.value.bytes, arg.payload.value.size);
         }
         else {
             printf("I dunno what to do with this packet!\n");
         }
-#endif
     }
 
     util::Signal<void(std::string,const uint8_t*,size_t)> robotMessageReceived;

@@ -120,10 +120,14 @@ void Transport::readWhile(std::function<bool()> predicate, bool breakOnEmptyRead
     while (predicate()) {
         auto bytesread = mSerial.read(&byte, 1);
         if (bytesread) {
+            std::cerr << "o";
             mSfpContext.input(byte);
         }
-        else if (breakOnEmptyRead) {
-            break;
+        else {
+            std::cerr << "·";
+            if (breakOnEmptyRead) {
+                break;
+            }
         }
     }
 }
