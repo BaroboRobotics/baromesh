@@ -6,7 +6,7 @@
 #include <algorithm>
 
 
-void sendNewColor(RobotProxy &robotProxy, double tim) {
+void sendNewColor(robot::Proxy &robotProxy, double tim) {
     uint32_t red, green, blue;
     red = (sin(tim) + 1) * 127;
     green = (sin(tim + 2 * M_PI / 3) + 1) * 127;
@@ -35,29 +35,14 @@ int main(int argc, char** argv) {
     dongleProxy.subscribe(rpc::Broadcast<barobo::Dongle>::receiveUnicast()).get();
 
     auto& serialId = serialIds[0];
-    RobotProxy robotProxy { serialId, dongleProxy };
-
-    auto robotMessageHandler = [&robotProxy, &serialId] (std::string incomingSerialId,
-              const uint8_t* bytes, size_t size) {
-          RobotProxy::BufferType buffer;
-          assert(incomingSerialId == serialId);
-          assert(size <= sizeof(buffer.bytes));
-          memcpy(buffer.bytes, bytes, size);
-          buffer.size = size;
-          robotProxy.receiveServiceBuffer(buffer);
-    };
-    using Lambda = decltype(robotMessageHandler);
-
-    dongleProxy.robotMessageReceived.connect(
-            BIND_MEM_CB(&Lambda::operator(), &robotMessageHandler));
+    robot::Proxy robotProxy { serialId, dongleProxy };
 
     robotProxy.subscribe(rpc::Broadcast<barobo::Robot>::buttonEvent()).get();
     printf("Subscribed to button events\n");
 
     double tim = 0;
     while (1) {
-        //sendNewColor(robotProxy, tim);
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        sendNewColor(robotProxy, tim);
         tim += 0.05;
     }
     return 0;

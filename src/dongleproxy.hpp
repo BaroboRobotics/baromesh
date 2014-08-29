@@ -12,7 +12,9 @@
 #include <string>
 #include <iostream>
 
-class RobotTransport {};
+namespace robot {
+    class Transport;
+}
 
 namespace dongle {
 
@@ -54,8 +56,7 @@ public:
         mTransport.sendMessage(buffer.bytes, buffer.size);
     }
 
-    // A helper function to make a Proxy easier to wire up to an
-    // sfp::Context.
+    // A helper function to make a Proxy easier to wire up to a transport
     void deliverMessage (const uint8_t* data, size_t size) {
         BufferType buffer;
         // TODO think about what could cause buffer overflows, handle them gracefully
@@ -65,7 +66,7 @@ public:
         auto status = receiveServiceBuffer(buffer);
         if (rpc::hasError(status)) {
             // TODO shut down gracefully
-            printf("Proxy::receiveServiceBuffer returned %s\n", rpc::statusToString(status));
+            printf("Dongle::receiveServiceBuffer returned %s\n", rpc::statusToString(status));
             abort();
         }
     }
@@ -74,32 +75,13 @@ public:
     using Broadcast = rpc::Broadcast<barobo::Dongle>;
 
     void onBroadcast(Attribute::dummyAttribute) { }
+    void onBroadcast(Broadcast::receiveUnicast arg);
 
-    void onBroadcast(Broadcast::receiveUnicast arg) {
-        printf("received from %s:%d |",
-                arg.source.serialId, arg.source.port);
-        if (arg.payload.value.size) {
-            for (size_t i = 0; i < arg.payload.value.size; ++i) {
-                printf(" %02x", arg.payload.value.bytes[i]);
-            }
-        }
-        else {
-            printf(" (empty)");
-        }
-        printf("\n");
-        if (arg.source.port == 0) {
-            robotMessageReceived(arg.source.serialId, arg.payload.value.bytes, arg.payload.value.size);
-        }
-        else {
-            printf("I dunno what to do with this packet!\n");
-        }
-    }
-
-    util::Signal<void(std::string,const uint8_t*,size_t)> robotMessageReceived;
+    void registerRobotTransport(robot::Transport* rt);
 
 private:
     Transport mTransport;
-    RobotTransport mRobotTransports[1];
+    std::map<std::string, robot::Transport*> mRobotTransports;
 
     std::atomic<bool> mLinked = { false };
 };

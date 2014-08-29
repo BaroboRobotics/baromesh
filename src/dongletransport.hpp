@@ -29,6 +29,7 @@ public:
     Transport () {
         mSfpContext.output.connect(
                 BIND_MEM_CB(&Transport::writeToUsb, this));
+        using MessageReceived = decltype(sigMessageReceived);
         mSfpContext.messageReceived.connect(
                 BIND_MEM_CB(&MessageReceived::operator(), &sigMessageReceived));
     }
@@ -42,9 +43,7 @@ public:
 
     void sendMessage (const uint8_t* data, size_t size);
 
-    using MessageReceived = util::Signal<void(const uint8_t*,size_t)>;
-    MessageReceived sigMessageReceived;
-
+    util::Signal<void(const uint8_t*, size_t)> sigMessageReceived;
     util::Signal<void()> sigNoDongle;
     util::Signal<void()> sigDongleConnecting;
     util::Signal<void()> sigDongleConnected;

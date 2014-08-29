@@ -8,13 +8,18 @@
 
 #include <functional>
 
+namespace robot {
+
 const char* buttonToString (barobo_Robot_Button button);
 const char* buttonStateToString (barobo_Robot_ButtonState state);
 
-class RobotProxy : public rpc::AsyncProxy<RobotProxy, barobo::Robot> {
+class Proxy : public rpc::AsyncProxy<Proxy, barobo::Robot> {
 public:
-    RobotProxy (std::string serialId, dongle::Proxy& dongleProxy)
-        : mTransport(serialId, dongleProxy) { }
+    Proxy (std::string serialId, dongle::Proxy& dongleProxy)
+            : mTransport(serialId, dongleProxy) {
+        mTransport.sigMessageReceived.connect(
+            BIND_MEM_CB(&Proxy::deliverMessage, this));
+    }
 
     void bufferToService (const BufferType& buffer) {
         mTransport.sendMessage(buffer.bytes, buffer.size);
@@ -35,7 +40,24 @@ public:
     }
 
 private:
-    robot::Transport mTransport;
+    Transport mTransport;
+
+    // A helper function to make a Proxy easier to wire up to a transport
+    void deliverMessage (const uint8_t* data, size_t size) {
+        BufferType buffer;
+        // TODO think about what could cause buffer overflows, handle them gracefully
+        assert(size <= sizeof(buffer.bytes));
+        memcpy(buffer.bytes, data, size);
+        buffer.size = size;
+        auto status = receiveServiceBuffer(buffer);
+        if (rpc::hasError(status)) {
+            // TODO shut down gracefully
+            printf("Robot::receiveServiceBuffer returned %s\n", rpc::statusToString(status));
+            abort();
+        }
+    }
+
 };
 
+} // namespace robot
 #endif

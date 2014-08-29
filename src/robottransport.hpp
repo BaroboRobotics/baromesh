@@ -8,8 +8,10 @@ namespace robot {
 class Transport {
 public:
     Transport (std::string serialId, dongle::Proxy& dongleProxy)
-        : mSerialId(serialId)
-        , mDongleProxy(dongleProxy) { }
+            : mSerialId(serialId)
+            , mDongleProxy(dongleProxy) {
+        mDongleProxy.registerRobotTransport(this);
+    }
 
     void sendMessage (const uint8_t* bytes, size_t size) {
         barobo_Dongle_Address destination;
@@ -27,8 +29,12 @@ public:
         f.get();
     }
 
+    util::Signal<void(const uint8_t*, size_t)> sigMessageReceived;
+
+    std::string serialId() const { return mSerialId; }
+
 private:
-    std::string mSerialId;
+    const std::string mSerialId;
     dongle::Proxy& mDongleProxy;
 };
 
