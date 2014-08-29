@@ -14,9 +14,8 @@ public:
     }
 
     void sendMessage (const uint8_t* bytes, size_t size) {
-        barobo_Dongle_Address destination;
-        strcpy((char*)destination.serialId, mSerialId.c_str());
-        destination.port = 0;
+        barobo_Dongle_SerialId serialId;
+        memcpy(serialId.value, mSerialId.c_str(), 5);
 
         barobo_Dongle_Payload payload;
         assert(size <= sizeof(payload.value.bytes));
@@ -24,7 +23,7 @@ public:
         payload.value.size = size;
 
         auto f = mDongleProxy.fire(rpc::MethodIn<barobo::Dongle>::transmitUnicast {
-                destination, payload
+                serialId, payload
         });
         f.get();
     }
