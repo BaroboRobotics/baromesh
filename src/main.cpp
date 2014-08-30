@@ -12,9 +12,9 @@ void sendNewColor(robot::Proxy &robotProxy, double tim) {
     green = (sin(tim + 2 * M_PI / 3) + 1) * 127;
     blue = (sin(tim + 4 * M_PI / 4) + 1) * 127;
     auto future = robotProxy.set(rpc::Attribute<barobo::Robot>::ledColor{red << 16 | green << 8 | blue});
-    printf("sent request\n");
+    //printf("sent request\n");
     future.get();
-    printf("got reply\n");
+    //printf("got reply\n");
 }
 
 int main(int argc, char** argv) {

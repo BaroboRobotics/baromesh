@@ -12,6 +12,7 @@ void Proxy::registerRobotTransport(robot::Transport* rt) {
 }
 
 void Proxy::onBroadcast(Broadcast::receiveUnicast arg) {
+#if 0
     printf("received from %s |", arg.serialId.value);
     if (arg.payload.value.size) {
         for (size_t i = 0; i < arg.payload.value.size; ++i) {
@@ -22,6 +23,7 @@ void Proxy::onBroadcast(Broadcast::receiveUnicast arg) {
         printf(" (empty)");
     }
     printf("\n");
+#endif
     auto i = mRobotTransports.find(arg.serialId.value);
     if (i != mRobotTransports.end()) {
         auto transport = i->second;
