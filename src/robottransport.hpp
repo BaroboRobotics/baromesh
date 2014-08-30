@@ -8,11 +8,14 @@ namespace robot {
 class Transport {
 public:
     Transport (std::string serialId) : mSerialId(serialId) {
-        mDongleProxy.registerRobotTransport(this);
+        auto success = mDongleProxy.registerRobotTransport(this);
+        // we are a unique transport
+        assert(success); // maybe this should be a throw
     }
 
     ~Transport () {
-        mDongleProxy.unregisterRobotTransport(this);
+        auto success = mDongleProxy.unregisterRobotTransport(this);
+        assert(success);
     }
 
     void sendMessage (const uint8_t* bytes, size_t size) {

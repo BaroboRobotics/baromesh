@@ -3,17 +3,17 @@
 
 namespace dongle {
 
-void Proxy::registerRobotTransport(robot::Transport* rt) {
+bool Proxy::registerRobotTransport(robot::Transport* rt) {
     decltype(mRobotTransports)::iterator i;
     bool success;
     std::tie(i, success) =
         mRobotTransports.insert(std::make_pair(rt->serialId(), rt));
-    assert(success);
+    return success;
 }
 
-void Proxy::unregisterRobotTransport (robot::Transport* rt) {
+bool Proxy::unregisterRobotTransport (robot::Transport* rt) {
     auto nRemoved = mRobotTransports.erase(rt->serialId());
-    assert(1 == nRemoved);
+    return 1 == nRemoved;
 }
 
 void Proxy::onBroadcast(Broadcast::receiveUnicast arg) {

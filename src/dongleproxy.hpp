@@ -77,8 +77,8 @@ public:
     void onBroadcast(Attribute::dummyAttribute) { }
     void onBroadcast(Broadcast::receiveUnicast arg);
 
-    void registerRobotTransport(robot::Transport* rt);
-    void unregisterRobotTransport(robot::Transport* rt);
+    bool registerRobotTransport(robot::Transport* rt);
+    bool unregisterRobotTransport(robot::Transport* rt);
 
 private:
     Transport mTransport;
