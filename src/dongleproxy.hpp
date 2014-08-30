@@ -78,6 +78,7 @@ public:
     void onBroadcast(Broadcast::receiveUnicast arg);
 
     void registerRobotTransport(robot::Transport* rt);
+    void unregisterRobotTransport(robot::Transport* rt);
 
 private:
     Transport mTransport;

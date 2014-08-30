@@ -11,6 +11,11 @@ void Proxy::registerRobotTransport(robot::Transport* rt) {
     assert(success);
 }
 
+void Proxy::unregisterRobotTransport (robot::Transport* rt) {
+    auto nRemoved = mRobotTransports.erase(rt->serialId());
+    assert(1 == nRemoved);
+}
+
 void Proxy::onBroadcast(Broadcast::receiveUnicast arg) {
 #if 0
     printf("received from %s |", arg.serialId.value);

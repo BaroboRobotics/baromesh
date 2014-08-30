@@ -13,6 +13,10 @@ public:
         mDongleProxy.registerRobotTransport(this);
     }
 
+    ~Transport () {
+        mDongleProxy.unregisterRobotTransport(this);
+    }
+
     void sendMessage (const uint8_t* bytes, size_t size) {
         barobo_Dongle_SerialId serialId;
         memcpy(serialId.value, mSerialId.c_str(), 5);
