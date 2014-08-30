@@ -15,8 +15,7 @@ const char* buttonStateToString (barobo_Robot_ButtonState state);
 
 class Proxy : public rpc::AsyncProxy<Proxy, barobo::Robot> {
 public:
-    Proxy (std::string serialId, dongle::Proxy& dongleProxy)
-            : mTransport(serialId, dongleProxy) {
+    Proxy (std::string serialId) : mTransport(serialId) {
         mTransport.sigMessageReceived.connect(
             BIND_MEM_CB(&Proxy::deliverMessage, this));
     }
@@ -40,8 +39,6 @@ public:
     }
 
 private:
-    Transport mTransport;
-
     // A helper function to make a Proxy easier to wire up to a transport
     void deliverMessage (const uint8_t* data, size_t size) {
         BufferType buffer;
@@ -57,6 +54,7 @@ private:
         }
     }
 
+    Transport mTransport;
 };
 
 } // namespace robot

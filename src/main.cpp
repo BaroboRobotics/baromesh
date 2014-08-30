@@ -30,13 +30,11 @@ int main(int argc, char** argv) {
     assert(std::all_of(serialIds.cbegin(), serialIds.cend(),
                 [] (const std::string& s) { return 4 == s.size(); }));
 
-    dongle::Proxy dongleProxy;
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    dongleProxy.subscribe(rpc::Broadcast<barobo::Dongle>::receiveUnicast()).get();
 
-    auto func = [&dongleProxy](std::string serialId) {
+    auto func = [] (std::string serialId) {
         double tim = 0;
-        robot::Proxy robotProxy { serialId, dongleProxy };
+        robot::Proxy robotProxy { serialId };
         while (1) {
             sendNewColor(robotProxy, tim);
             tim += 0.05;

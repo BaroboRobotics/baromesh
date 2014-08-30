@@ -7,9 +7,7 @@ namespace robot {
 
 class Transport {
 public:
-    Transport (std::string serialId, dongle::Proxy& dongleProxy)
-            : mSerialId(serialId)
-            , mDongleProxy(dongleProxy) {
+    Transport (std::string serialId) : mSerialId(serialId) {
         mDongleProxy.registerRobotTransport(this);
     }
 
@@ -38,7 +36,7 @@ public:
 
 private:
     const std::string mSerialId;
-    dongle::Proxy& mDongleProxy;
+    static dongle::Proxy mDongleProxy;
 };
 
 } // namespace robot

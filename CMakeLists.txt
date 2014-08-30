@@ -43,10 +43,11 @@ find_package(Boost 1.54.0 REQUIRED COMPONENTS )
 
 set(SOURCES
     src/main.cpp
-    src/robotproxy.cpp
     src/dongledevicepath.cpp
-    src/dongletransport.cpp
     src/dongleproxy.cpp
+    src/dongletransport.cpp
+    src/robotproxy.cpp
+    src/robottransport.cpp
     )
 
 add_executable(baromesh ${SOURCES})
