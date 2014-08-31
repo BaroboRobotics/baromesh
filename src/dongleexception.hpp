@@ -6,9 +6,9 @@
 namespace dongle {
 
 // Exceptions that can be thrown from methods of class Transport
-class Exception : std::exception {};
+struct Exception : std::exception {};
 
-class NotConnected : public Exception {
+struct NotConnected : Exception {
     virtual const char* what () const noexcept override {
         return "dongle not connected during write";
     }
