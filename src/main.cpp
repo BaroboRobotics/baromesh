@@ -17,6 +17,25 @@ void sendNewColor(robot::Proxy &robotProxy, double tim) {
     //printf("got reply\n");
 }
 
+void lavaLamp (std::string serialId) {
+    double t = 0;
+    robot::Proxy robotProxy { serialId };
+    try {
+        while (1) {
+            sendNewColor(robotProxy, t);
+            t += 0.05;
+        }
+    }
+    catch (std::exception& e) {
+        std::cout << std::hex;
+        // FIXME: This serial ID should be information backed into e.what() in
+        // some cases.
+        std::cout << "(" << serialId << ") error setting color(" << t << "): "
+                  << e.what() << '\n';
+    }
+}
+
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         printf("Usage: %s <serial-id> [<serial-id> ...]\n", argv[0]);
@@ -30,21 +49,16 @@ int main(int argc, char** argv) {
     assert(std::all_of(serialIds.cbegin(), serialIds.cend(),
                 [] (const std::string& s) { return 4 == s.size(); }));
 
+    std::vector<std::thread> lavaLampThreads;
+
     std::this_thread::sleep_for(std::chrono::seconds(1));
+    for (auto s : serialIds) {
+        lavaLampThreads.emplace_back(lavaLamp, s);
+    }
 
-    auto func = [] (std::string serialId) {
-        double tim = 0;
-        robot::Proxy robotProxy { serialId };
-        while (1) {
-            sendNewColor(robotProxy, tim);
-            tim += 0.05;
-        }
-    };
+    for (auto& t: lavaLampThreads) {
+        t.join();
+    }
 
-    std::thread t1 { func, std::string("HLJ3") };
-    std::thread t2 { func, std::string("487J") };
-
-    t1.join();
-    t2.join();
     return 0;
 }
