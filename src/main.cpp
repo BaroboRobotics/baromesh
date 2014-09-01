@@ -21,6 +21,8 @@ void lavaLamp (std::string serialId) {
     double t = 0;
     robot::Proxy robotProxy { serialId };
     try {
+        robotProxy.connect().get();
+        std::cout << "Robot " << serialId << " connected!\n";
         while (1) {
             sendNewColor(robotProxy, t);
             t += 0.05;
@@ -28,7 +30,7 @@ void lavaLamp (std::string serialId) {
     }
     catch (std::exception& e) {
         std::cout << std::hex;
-        // FIXME: This serial ID should be information backed into e.what() in
+        // FIXME: This serial ID should be information baked into e.what() in
         // some cases.
         std::cout << "(" << serialId << ") error setting color(" << t << "): "
                   << e.what() << '\n';
