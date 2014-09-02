@@ -1,18 +1,27 @@
 #ifndef ROBOTPROXY_HPP_
 #define ROBOTPROXY_HPP_
 
-#include <functional>
+#include "robottransport.hpp"
 
 #include "rpc/asyncproxy.hpp"
 #include "gen-robot.pb.hpp"
 
-class RobotProxy : public rpc::AsyncProxy<RobotProxy, barobo::Robot> {
-public:
-    RobotProxy (std::function<void(const BufferType&)> postFunc) :
-        mPostFunc(postFunc) {}
+#include <functional>
 
-    void post (const BufferType& buffer) {
-        mPostFunc(buffer);
+namespace robot {
+
+const char* buttonToString (barobo_Robot_Button button);
+const char* buttonStateToString (barobo_Robot_ButtonState state);
+
+class Proxy : public rpc::AsyncProxy<Proxy, barobo::Robot> {
+public:
+    Proxy (std::string serialId) : mTransport(serialId) {
+        mTransport.sigMessageReceived.connect(
+            BIND_MEM_CB(&Proxy::deliverMessage, this));
+    }
+
+    void bufferToService (const BufferType& buffer) {
+        mTransport.sendMessage(buffer.bytes, buffer.size);
     }
 
     using Attribute = rpc::Attribute<barobo::Robot>;
@@ -23,28 +32,6 @@ public:
     }
 
     void onBroadcast(Broadcast::buttonEvent in) {
-        auto buttonToString = [] (barobo_Robot_Button button) {
-            switch (button) {
-                case barobo_Robot_Button_POWER:
-                    return "POWER";
-                case barobo_Robot_Button_A:
-                    return "A";
-                case barobo_Robot_Button_B:
-                    return "B";
-                default:
-                    return "(unknown)";
-            }
-        };
-        auto buttonStateToString = [] (barobo_Robot_ButtonState state) {
-            switch (state) {
-                case barobo_Robot_ButtonState_UP:
-                    return "UP";
-                case barobo_Robot_ButtonState_DOWN:
-                    return "DOWN";
-                default:
-                    return "(unknown)";
-            }
-        };
         std::cout << "Received button event: timestamp(" << in.timestamp
                   << ") button(" << buttonToString(in.button)
                   << ") state(" << buttonStateToString(in.state)
@@ -52,7 +39,22 @@ public:
     }
 
 private:
-    std::function<void(const BufferType&)> mPostFunc;
+    // A helper function to make a Proxy easier to wire up to a transport
+    void deliverMessage (const uint8_t* data, size_t size) {
+        BufferType buffer;
+        // TODO think about what could cause buffer overflows, handle them gracefully
+        assert(size <= sizeof(buffer.bytes));
+        memcpy(buffer.bytes, data, size);
+        buffer.size = size;
+        auto status = receiveServiceBuffer(buffer);
+        if (rpc::hasError(status)) {
+            // TODO shut down gracefully?
+            printf("Robot::receiveServiceBuffer returned %s\n", rpc::statusToString(status));
+        }
+    }
+
+    Transport mTransport;
 };
 
+} // namespace robot
 #endif

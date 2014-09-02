@@ -1,5 +1,7 @@
-#ifndef DONGLEPROXY_HPP_
-#define DONGLEPROXY_HPP_
+#ifndef BAROMESH_DONGLE_PROXY_HPP
+#define BAROMESH_DONGLE_PROXY_HPP
+
+#include "dongletransport.hpp"
 
 #include "util/callback.hpp"
 
@@ -8,27 +10,63 @@
 
 #include <functional>
 #include <string>
+#include <iostream>
 
-class DongleProxy : public rpc::AsyncProxy<DongleProxy, barobo::Dongle> {
+namespace robot {
+    class Transport;
+}
+
+namespace dongle {
+
+class Proxy : public rpc::AsyncProxy<Proxy, barobo::Dongle> {
 public:
-    void post (const BufferType& buffer) {
-        bufferPosted(buffer.bytes, buffer.size);
+    Proxy () {
+        mTransport.sigMessageReceived.connect(
+            BIND_MEM_CB(&Proxy::deliverMessage, this));
+        mTransport.sigDisconnected.connect(
+            BIND_MEM_CB(&Proxy::disconnected, this));
+        mTransport.sigConnecting.connect(
+            BIND_MEM_CB(&Proxy::connecting, this));
+        mTransport.sigConnected.connect(
+            BIND_MEM_CB(&Proxy::connected, this));
+        mTransport.startReaderThread();
     }
 
-    util::Signal<void(const uint8_t*,size_t)> bufferPosted;
+    void disconnected () {
+        std::cout << "RECEIVED disconnected" << "\n";
+        mLinked = false;
+        for (auto robotTransport : mRobotTransports) {
+            //robotTransport.linkDown();
+        }
+    }
 
-    // A helper function to make a DongleProxy easier to wire up to an
-    // sfp::Context.
+    void connecting() {
+        std::cout << "RECEIVED connecting" << "\n";
+    }
+
+    void connected () {
+        std::cout << "RECEIVED connected\n";
+        mLinked = true;
+        for (auto robotTransport : mRobotTransports) {
+            //robotTransport.linkUp();
+        }
+    }
+
+    void bufferToService (const BufferType& buffer) {
+        mTransport.sendMessage(buffer.bytes, buffer.size);
+    }
+
+    // A helper function to make a Proxy easier to wire up to a transport
     void deliverMessage (const uint8_t* data, size_t size) {
         BufferType buffer;
+        // TODO think about what could cause buffer overflows, handle them gracefully
         assert(size <= sizeof(buffer.bytes));
         memcpy(buffer.bytes, data, size);
         buffer.size = size;
-        auto status = deliver(buffer);
+        auto status = receiveServiceBuffer(buffer);
         if (rpc::hasError(status)) {
-            // TODO shut down gracefully
-            printf("DongleProxy::deliver returned %s\n", rpc::statusToString(status));
-            abort();
+            // TODO shut down gracefully?
+            printf("Dongle::receiveServiceBuffer returned %s\n", rpc::statusToString(status));
         }
     }
 
@@ -36,29 +74,18 @@ public:
     using Broadcast = rpc::Broadcast<barobo::Dongle>;
 
     void onBroadcast(Attribute::dummyAttribute) { }
+    void onBroadcast(Broadcast::receiveUnicast arg);
 
-    void onBroadcast(Broadcast::receiveUnicast arg) {
-        printf("received from %.*s:%d |", sizeof(arg.source.serialId),
-                arg.source.serialId, arg.source.port);
-        if (arg.payload.value.size) {
-            for (size_t i = 0; i < arg.payload.value.size; ++i) {
-                printf(" %02x", arg.payload.value.bytes[i]);
-            }
-        }
-        else {
-            printf(" (empty)");
-        }
-        printf("\n");
+    bool registerRobotTransport(robot::Transport* rt);
+    bool unregisterRobotTransport(robot::Transport* rt);
 
-        if (arg.source.port == 0) {
-            robotMessageReceived(arg.source.serialId, arg.payload.value.bytes, arg.payload.value.size);
-        }
-        else {
-            printf("I dunno what to do with this packet!\n");
-        }
-    }
+private:
+    Transport mTransport;
+    std::map<std::string, robot::Transport*> mRobotTransports;
 
-    util::Signal<void(std::string,const uint8_t*,size_t)> robotMessageReceived;
+    std::atomic<bool> mLinked = { false };
 };
+
+} // namespace dongle
 
 #endif

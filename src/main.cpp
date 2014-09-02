@@ -1,10 +1,58 @@
 #include "robotproxy.hpp"
 #include "dongleproxy.hpp"
-#include "reliableusb.hpp"
 
 #include <boost/unordered_map.hpp>
 
 #include <algorithm>
+
+
+void sendNewColor(robot::Proxy &robotProxy, double tim) {
+    uint32_t red, green, blue;
+    red = (sin(tim) + 1) * 127;
+    green = (sin(tim + 2 * M_PI / 3) + 1) * 127;
+    blue = (sin(tim + 4 * M_PI / 4) + 1) * 127;
+    auto future = robotProxy.set(rpc::Attribute<barobo::Robot>::ledColor{red << 16 | green << 8 | blue});
+    //printf("sent request\n");
+    future.get();
+    //printf("got reply\n");
+}
+
+void lavaLamp (std::string serialId) {
+    double t = 0;
+    robot::Proxy robotProxy { serialId };
+    try {
+        auto serviceInfo = robotProxy.connect().get();
+
+        std::cout << "Local RPC version "
+                  << rpc::Version<>::triplet() << '\n';
+        std::cout << "Local barobo.Robot interface version "
+                  << rpc::Version<barobo::Robot>::triplet() << '\n';
+
+        std::cout << serialId << " RPC version "
+                  << serviceInfo.rpcVersion() << '\n';
+        std::cout << serialId << " barobo.Robot interface version "
+                  << serviceInfo.interfaceVersion() << '\n';
+
+        if (!serviceInfo.connected()) {
+            std::cout << serialId << ": connection refused\n";
+            return;
+        }
+        std::cout << serialId << ": connected\n";
+
+        while (1) {
+            sendNewColor(robotProxy, t);
+            t += 0.05;
+        }
+    }
+    catch (std::exception& e) {
+        std::cout << std::hex;
+        // FIXME: This serial ID should be information baked into e.what() in
+        // some cases.
+        std::cout << "(" << serialId << ") error setting color(" << t << "): "
+                  << e.what() << '\n';
+    }
+}
+
 
 int main(int argc, char** argv) {
     if (argc < 2) {
@@ -19,83 +67,15 @@ int main(int argc, char** argv) {
     assert(std::all_of(serialIds.cbegin(), serialIds.cend(),
                 [] (const std::string& s) { return 4 == s.size(); }));
 
-    // Set up the dongle proxy object with its USB/SFP backend.
-    DongleProxy dongleProxy;
-    ReliableUsb reliableUsb { std::string("/dev/ttyACM0") };
+    std::vector<std::thread> lavaLampThreads;
 
-    dongleProxy.bufferPosted.connect(
-            BIND_MEM_CB(&ReliableUsb::sendMessage, &reliableUsb));
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    for (auto s : serialIds) {
+        lavaLampThreads.emplace_back(lavaLamp, s);
+    }
 
-    reliableUsb.messageReceived.connect(
-            BIND_MEM_CB(&DongleProxy::deliverMessage, &dongleProxy));
-
-    boost::unordered_map<std::string, RobotProxy> robots;
-    auto robotMessageHandler = [&robots] (std::string serialId, const uint8_t* bytes, size_t size) {
-        auto iter = robots.find(serialId);
-        if (iter != robots.end()) {
-            RobotProxy::BufferType buffer;
-            assert(size <= sizeof(buffer.bytes));
-            memcpy(buffer.bytes, bytes, size);
-            buffer.size = size;
-            iter->second.deliver(buffer);
-        }
-        else {
-            printf("Ain't no such robot named %s\n", serialId.c_str());
-        }
-    };
-    using Lambda = decltype(robotMessageHandler);
-
-    dongleProxy.robotMessageReceived.connect(
-            BIND_MEM_CB(&Lambda::operator(), &robotMessageHandler));
-
-    dongleProxy.subscribe(rpc::Broadcast<barobo::Dongle>::receiveUnicast()).get();
-
-    auto& serialId = serialIds[0];
-    bool success;
-    decltype(robots)::iterator iter;
-    std::tie(iter, success) = robots.emplace(std::piecewise_construct, std::forward_as_tuple(serialId),
-        std::forward_as_tuple([&] (const RobotProxy::BufferType& buffer) {
-            barobo_Dongle_Address destination;
-            strcpy((char*)destination.serialId, serialId.c_str());
-            destination.port = 0;
-
-            barobo_Dongle_Payload payload;
-            assert(buffer.size <= sizeof(payload.value.bytes));
-            memcpy(payload.value.bytes, buffer.bytes, buffer.size);
-            payload.value.size = buffer.size;
-
-#if 0
-            printf("sending:");
-            for (int i = 0; i < payload.value.size; ++i) {
-                printf(" %02x", payload.value.bytes[i]);
-            }
-            printf("\n");
-#endif
-
-            dongleProxy.fire(rpc::MethodIn<barobo::Dongle>::transmitUnicast {
-                    destination, payload
-            }).get();
-        })
-    );
-
-    assert(success);
-
-    robots.at(serialId).subscribe(rpc::Broadcast<barobo::Robot>::buttonEvent()).get();
-    printf("Subscribed to button events\n");
-
-    double tim = 0;
-
-    while (1) {
-        uint32_t red, green, blue;
-        red = (sin(tim) + 1) * 127;
-        green = (sin(tim + 2 * M_PI / 3) + 1) * 127;
-        blue = (sin(tim + 4 * M_PI / 4) + 1) * 127;
-        auto future = robots.at(serialId).set(rpc::Attribute<barobo::Robot>::ledColor{red << 16 | green << 8 | blue});
-        printf("sent request\n");
-        future.get();
-        printf("got reply\n");
-        //std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        tim += 0.05;
+    for (auto& t: lavaLampThreads) {
+        t.join();
     }
 
     return 0;

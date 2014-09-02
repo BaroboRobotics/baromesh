@@ -1,5 +1,7 @@
 #include "robotproxy.hpp"
 
+namespace robot {
+
 const char* buttonToString (barobo_Robot_Button button) {
     switch (button) {
         case barobo_Robot_Button_POWER:
@@ -23,3 +25,5 @@ const char* buttonStateToString (barobo_Robot_ButtonState state) {
             return "(unknown)";
     }
 }
+
+} // namespace robot
