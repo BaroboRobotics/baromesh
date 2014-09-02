@@ -1,5 +1,5 @@
-#include "dongledevicepath.hpp"
-#include "dongleexception.hpp"
+#include "baromesh/dongledevicepath.hpp"
+#include "baromesh/dongleexception.hpp"
 
 struct usb_dongle_id {
   const char *manufacturer;
