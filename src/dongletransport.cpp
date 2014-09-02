@@ -125,7 +125,6 @@ void Transport::readWhile(std::function<bool()> predicate, bool breakOnEmptyRead
             mSfpContext.input(byte);
         }
         else {
-            std::cerr << "·";
             if (breakOnEmptyRead) {
                 break;
             }
