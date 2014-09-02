@@ -65,9 +65,8 @@ public:
         buffer.size = size;
         auto status = receiveServiceBuffer(buffer);
         if (rpc::hasError(status)) {
-            // TODO shut down gracefully
+            // TODO shut down gracefully?
             printf("Dongle::receiveServiceBuffer returned %s\n", rpc::statusToString(status));
-            abort();
         }
     }
 

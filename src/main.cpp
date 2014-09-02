@@ -21,6 +21,24 @@ void lavaLamp (std::string serialId) {
     double t = 0;
     robot::Proxy robotProxy { serialId };
     try {
+        auto serviceInfo = robotProxy.connect().get();
+
+        std::cout << "Local RPC version "
+                  << rpc::Version<>::triplet() << '\n';
+        std::cout << "Local barobo.Robot interface version "
+                  << rpc::Version<barobo::Robot>::triplet() << '\n';
+
+        std::cout << serialId << " RPC version "
+                  << serviceInfo.rpcVersion() << '\n';
+        std::cout << serialId << " barobo.Robot interface version "
+                  << serviceInfo.interfaceVersion() << '\n';
+
+        if (!serviceInfo.connected()) {
+            std::cout << serialId << ": connection refused\n";
+            return;
+        }
+        std::cout << serialId << ": connected\n";
+
         while (1) {
             sendNewColor(robotProxy, t);
             t += 0.05;
@@ -28,7 +46,7 @@ void lavaLamp (std::string serialId) {
     }
     catch (std::exception& e) {
         std::cout << std::hex;
-        // FIXME: This serial ID should be information backed into e.what() in
+        // FIXME: This serial ID should be information baked into e.what() in
         // some cases.
         std::cout << "(" << serialId << ") error setting color(" << t << "): "
                   << e.what() << '\n';
