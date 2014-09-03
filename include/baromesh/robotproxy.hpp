@@ -28,15 +28,14 @@ public:
     using Broadcast = rpc::Broadcast<barobo::Robot>;
 
     void onBroadcast(Attribute::dummyAttribute attr) {
-        std::cout << "Received dummyAttribute broadcast. " << attr.value << "\n";
+        std::cout << "Received dummyAttribute broadcast. " << attr.value << std::endl;
     }
 
     void onBroadcast(Broadcast::buttonEvent in) {
-        std::cout << "Received button event: timestamp(" << in.timestamp
-                  << ") button(" << buttonToString(in.button)
-                  << ") state(" << buttonStateToString(in.state)
-                  << ")\n";
+        buttonEvent(in.button, in.state);
     }
+
+    util::Signal<void(int,int)> buttonEvent;
 
 private:
     // A helper function to make a Proxy easier to wire up to a transport
