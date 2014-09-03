@@ -27,8 +27,8 @@ public:
     using Attribute = rpc::Attribute<barobo::Robot>;
     using Broadcast = rpc::Broadcast<barobo::Robot>;
 
-    void onBroadcast(Attribute::buzzerFrequency attr) {
-        std::cout << "Received buzzerFrequency broadcast. " << attr.value << "\n";
+    void onBroadcast(Attribute::dummyAttribute attr) {
+        std::cout << "Received dummyAttribute broadcast. " << attr.value << "\n";
     }
 
     void onBroadcast(Broadcast::buttonEvent in) {
