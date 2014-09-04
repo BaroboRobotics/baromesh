@@ -24,12 +24,7 @@ public:
         mTransport.sendMessage(buffer.bytes, buffer.size);
     }
 
-    using Attribute = rpc::Attribute<barobo::Robot>;
     using Broadcast = rpc::Broadcast<barobo::Robot>;
-
-    void onBroadcast(Attribute::dummyAttribute attr) {
-        std::cout << "Received dummyAttribute broadcast. " << attr.value << std::endl;
-    }
 
     void onBroadcast(Broadcast::buttonEvent in) {
         buttonEvent(in.button, in.state);
