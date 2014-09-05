@@ -26,11 +26,16 @@ public:
 
     using Broadcast = rpc::Broadcast<barobo::Robot>;
 
-    void onBroadcast(Broadcast::buttonEvent in) {
+    void onBroadcast (Broadcast::buttonEvent in) {
         buttonEvent(in.button, in.state);
     }
 
+    void onBroadcast (Broadcast::encoderEvent in) {
+        encoderEvent(in.value, in.value, in.value, 1 << in.encoder);
+    }
+
     util::Signal<void(int,int)> buttonEvent;
+    util::Signal<void(double,double,double,int)> encoderEvent;
 
 private:
     // A helper function to make a Proxy easier to wire up to a transport
