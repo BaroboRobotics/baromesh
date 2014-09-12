@@ -45,6 +45,3 @@ target_include_directories(baromesh
            include
     )
 target_link_libraries(baromesh sfp rpc serial robot-interface dongle-interface)
-if (WIN32)
-  target_link_libraries(baromesh ws2_32)
-endif()
