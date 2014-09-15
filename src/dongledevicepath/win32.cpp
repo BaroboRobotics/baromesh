@@ -77,6 +77,7 @@ static PBYTE getPropertyBuf (HDEVINFO devices, PSP_DEVINFO_DATA dev,
     memset(buf, 0, sizeof(BYTE) * *size);
 
     if (!SetupDiGetDeviceRegistryProperty(devices, dev, key, type, buf, *size, NULL)) {
+        err = GetLastError();
         win32_error(_T("SetupDiGetDeviceRegistryProperty"), err);
         return NULL;
     }
@@ -301,6 +302,7 @@ int devicePathImpl (char *tty, size_t len) {
     dev.cbSize = sizeof(SP_DEVINFO_DATA);
     DWORD i = 0;
     BOOL b = SetupDiEnumDeviceInfo(devices, i, &dev);
+    DWORD err = 0;
     int ret = -1;
     while (b) {
         if (isDongle(devices, &dev)) {
@@ -316,8 +318,8 @@ int devicePathImpl (char *tty, size_t len) {
         /* And get the next device. */
         dev.cbSize = sizeof(SP_DEVINFO_DATA);
         b = SetupDiEnumDeviceInfo(devices, ++i, &dev);
+        err = GetLastError();
     }
-    DWORD err = GetLastError();
     if (ERROR_SUCCESS != err && ERROR_NO_MORE_ITEMS != err) {
         win32_error(_T("SetupDiEnumDeviceInfo"), GetLastError());
         exit(1);

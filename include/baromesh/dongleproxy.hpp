@@ -70,10 +70,8 @@ public:
         }
     }
 
-    using Attribute = rpc::Attribute<barobo::Dongle>;
     using Broadcast = rpc::Broadcast<barobo::Dongle>;
 
-    void onBroadcast(Attribute::dummyAttribute) { }
     void onBroadcast(Broadcast::receiveUnicast arg);
 
     bool registerRobotTransport(robot::Transport* rt);
