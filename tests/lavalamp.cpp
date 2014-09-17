@@ -1,17 +1,16 @@
-#include "robotproxy.hpp"
-#include "dongleproxy.hpp"
-
-#include <boost/unordered_map.hpp>
+#include "baromesh/baromesh.hpp"
 
 #include <algorithm>
 
+#undef M_PI
+#define M_PI 3.14159265358979323846
 
 void sendNewColor(robot::Proxy &robotProxy, double tim) {
     uint32_t red, green, blue;
     red = (sin(tim) + 1) * 127;
     green = (sin(tim + 2 * M_PI / 3) + 1) * 127;
     blue = (sin(tim + 4 * M_PI / 4) + 1) * 127;
-    auto future = robotProxy.set(rpc::Attribute<barobo::Robot>::ledColor{red << 16 | green << 8 | blue});
+    auto future = robotProxy.fire(rpc::MethodIn<barobo::Robot>::setLedColor{red << 16 | green << 8 | blue});
     //printf("sent request\n");
     future.get();
     //printf("got reply\n");

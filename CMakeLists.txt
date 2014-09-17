@@ -45,3 +45,8 @@ target_include_directories(baromesh
            include
     )
 target_link_libraries(baromesh sfp rpc serial robot-interface dongle-interface)
+
+if(BAROMESH_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
