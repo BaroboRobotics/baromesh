@@ -22,28 +22,37 @@ void Transport::startReaderThread () {
 }
 
 void Transport::sendMessage (const uint8_t* data, size_t size) {
+    BOOST_LOG_NAMED_SCOPE("dongle::Transport::sendMessage");
     if (mState != State::connected) {
+        BOOST_LOG(mLog) << "dongle not connected";
         throw NotConnected();
     }
     try {
+        BOOST_LOG(mLog) << "sending message through SFP";
         mSfpContext.sendMessage(data, size);
+        BOOST_LOG(mLog) << "message sent";
     }
     catch (boost::system::system_error& e) {
+        BOOST_LOG(mLog) << "error sending message: " << e.what();
         throw SerialError(std::make_exception_ptr(e));
     }
 }
 
 void Transport::setState(State s) {
+    BOOST_LOG_NAMED_SCOPE("dongle::Transport::setState");
     if (mState != s) {
         mState = s;
         switch(s) {
             case State::disconnected:
+                BOOST_LOG(mLog) << "dongle transport disconnected";
                 sigDisconnected();
                 break;
             case State::connecting:
+                BOOST_LOG(mLog) << "dongle transport connecting";
                 sigConnecting();
                 break;
             case State::connected:
+                BOOST_LOG(mLog) << "dongle transport connected";
                 sigConnected();
                 break;
             default:
@@ -53,17 +62,22 @@ void Transport::setState(State s) {
 }
 
 void Transport::threadMain () {
+    /* FIXME this thread can be started before the main thread, since it
+     * (currently) lives in a static object. This isn't a problem, except that
+     * it means calls to BOOST_LOG_NAMED_SCOPE() or BOOST_LOG_FUNCTION() will
+     * segfault, if the main thread hasn't initialized the logging core yet.
+     * Figure out a solution. */
     while (!mKillThread) {
         try {
             auto path = devicePath();
-            std::cerr << "Found dongle device at " << path << '\n';
+            BOOST_LOG(mLog) << "Found dongle device at " << path;
             setState(State::connecting);
 
             // Open the serial port and set up a read pump
             mSerial.close();
             mSerial.open(path);
             mSerial.set_option(boost::asio::serial_port_base::baud_rate(kBaudRate));
-            std::cerr << path << " opened" << '\n';
+            BOOST_LOG(mLog) << path << " opened";
             asyncRead();
 
             // Initiate the SFP connection and set up a timer to tend it
@@ -82,7 +96,7 @@ void Transport::threadMain () {
         }
         catch (boost::system::system_error& e) {
             // Boost.Asio (i.e., I/O) errors. Non-fatal.
-            std::cerr << "exception in reader thread: " << e.what() << '\n';
+            BOOST_LOG(mLog) << "exception in reader thread: " << e.what();
         }
         // Let any other exceptions crash the program! They should only
         // be coming from catastrophic situations.
@@ -102,7 +116,7 @@ void Transport::asyncRead () {
 
 void Transport::readHandler (const boost::system::error_code& ec, size_t nBytesRead) {
     if (ec) {
-        std::cerr << "read error: " << ec.message() << '\n';
+        BOOST_LOG(mLog) << "read error: " << ec.message();
         // If the read pump isn't operating, then the SFP connection process is
         // moot. Cancel it so mIoService.run() doesn't block needlessly.
         mSfpTimer.cancel();
@@ -125,12 +139,12 @@ void Transport::asyncSfpConnect () {
 
 void Transport::sfpConnectHandler (const boost::system::error_code& ec) {
     if (ec) {
-        std::cerr << "sfp connect timer error: " << ec.message() << '\n';
+        BOOST_LOG(mLog) << "sfp connect timer error: " << ec.message();
         return;
     }
 
     if (mSfpContext.isConnected()) {
-        std::cerr << "we think we're connected, settling ..." << '\n';
+        BOOST_LOG(mLog) << "we think we're connected, settling ...";
         asyncSfpSettle();
     }
     else {
@@ -146,16 +160,16 @@ void Transport::asyncSfpSettle () {
 
 void Transport::sfpSettleHandler (const boost::system::error_code& ec) {
     if (ec) {
-        std::cerr << "sfp settle timer error: " << ec.message() << '\n';
+        BOOST_LOG(mLog) << "sfp settle timer error: " << ec.message();
         return;
     }
 
     if (mSfpContext.isConnected()) {
-        std::cerr << "SFP connection handshake complete" << '\n';
+        BOOST_LOG(mLog) << "SFP connection handshake complete";
         mIoService.dispatch([this] () { setState(State::connected); });
     }
     else {
-        std::cerr << "SFP connection failed to settle" << '\n';
+        BOOST_LOG(mLog) << "SFP connection failed to settle";
         mIoService.stop();
     }
 }

@@ -12,6 +12,9 @@
 #include <boost/asio/steady_timer.hpp>
 #include <boost/asio/write.hpp>
 
+#include <boost/log/common.hpp>
+#include <boost/log/sources/logger.hpp>
+
 #include <iostream>
 #include <atomic>
 
@@ -76,6 +79,8 @@ private:
     boost::asio::steady_timer mSfpTimer;
 
     std::array<uint8_t, 512> mReadBuffer;
+
+    boost::log::sources::logger mLog;
 
     std::atomic<State> mState = { State::disconnected };
     sfp::Context mSfpContext;
