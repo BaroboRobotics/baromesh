@@ -6,27 +6,25 @@
 
 #define SFP_CONFIG_THREADSAFE
 #include "sfp/context.hpp"
-#include "serial/serial.h"
+
+#include <boost/asio/io_service.hpp>
+#include <boost/asio/serial_port.hpp>
+#include <boost/asio/steady_timer.hpp>
+#include <boost/asio/write.hpp>
 
 #include <iostream>
 #include <atomic>
 
 namespace dongle {
 
-const uint32_t kBaudRate = 230400;
-const auto kSerialTimeout = serial::Timeout::simpleTimeout(200);
-
-// SFP settle timeout must be greater than or equal to the serial timeout above.
-// Think about it.
-const auto kSfpSettleTimeout = std::chrono::milliseconds(200);
-
-const auto kRetryCooldown = std::chrono::milliseconds(200);
-
-// Encapsulate serial::Serial and sfp::Context to create a reliable,
+// Encapsulate boost::asio::serial_port and sfp::Context to create a reliable,
 // message-oriented USB link.
 class Transport {
 public:
-    Transport () {
+    Transport ()
+        : mSerial(mIoService)
+        , mSfpTimer(mIoService)
+    {
         mSfpContext.output.connect(
                 BIND_MEM_CB(&Transport::writeToUsb, this));
         using MessageReceived = decltype(sigMessageReceived);
@@ -36,6 +34,7 @@ public:
 
     ~Transport () {
         mKillThread = true;
+        mIoService.stop();
         mThread.join();
     }
 
@@ -55,17 +54,31 @@ private:
         connected
     };
 
-    void writeToUsb (uint8_t octet) { mSerial.write(&octet, 1); }
+    void setState (State);
+
+    void writeToUsb (uint8_t octet) {
+        boost::asio::write(mSerial, boost::asio::buffer(&octet, 1));
+    }
+
     void threadMain ();
-    void threadOpenSerial (std::string path);
-    void threadConnectSfp ();
-    void threadPumpClientData ();
-    void readWhile(std::function<bool()> predicate, bool breakOnEmptyRead = false);
-    void setState(State);
+
+    void asyncRead ();
+    void readHandler (const boost::system::error_code&, size_t);
+
+    void asyncSfpConnect ();
+    void sfpConnectHandler (const boost::system::error_code&);
+
+    void asyncSfpSettle ();
+    void sfpSettleHandler (const boost::system::error_code&);
+
+    boost::asio::io_service mIoService;
+    boost::asio::serial_port mSerial;
+    boost::asio::steady_timer mSfpTimer;
+
+    std::array<uint8_t, 512> mReadBuffer;
 
     std::atomic<State> mState = { State::disconnected };
     sfp::Context mSfpContext;
-    serial::Serial mSerial = { "", kBaudRate, kSerialTimeout };
     std::atomic<bool> mKillThread = { false };
     std::thread mThread;
 };
