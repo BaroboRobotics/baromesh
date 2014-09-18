@@ -47,6 +47,12 @@ target_link_libraries(baromesh
            ${Boost_LIBRARIES}
     )
 
+if(WIN32)
+    target_link_libraries(baromesh
+        PRIVATE setupapi
+        )
+endif()
+
 if(BAROMESH_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
