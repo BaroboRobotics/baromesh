@@ -19,9 +19,7 @@ endif()
 # projects we'll want to use shared libraries and defined -DBOOST_ALL_DYN_LINK
 # or the like.
 set(Boost_USE_STATIC_LIBS ON)
-
-# Boost.Log was introduced in Boost version 1.54.0.
-find_package(Boost 1.54.0 REQUIRED COMPONENTS )
+find_package(Boost 1.54.0 REQUIRED COMPONENTS system)
 
 set(SOURCES
     src/dongledevicepath.cpp
@@ -40,11 +38,20 @@ target_include_directories(baromesh
     PUBLIC $<TARGET_PROPERTY:sfp,INCLUDE_DIRECTORIES>
            $<TARGET_PROPERTY:robot-interface,INCLUDE_DIRECTORIES>
            $<TARGET_PROPERTY:cxx-util,INTERFACE_INCLUDE_DIRECTORIES>
-           $<TARGET_PROPERTY:serial,INCLUDE_DIRECTORIES>
            ${Boost_INCLUDE_DIRS}
            include
     )
-target_link_libraries(baromesh sfp rpc serial robot-interface dongle-interface)
+target_link_libraries(baromesh
+    PUBLIC sfp rpc cxx-util
+           robot-interface dongle-interface
+           ${Boost_LIBRARIES}
+    )
+
+if(WIN32)
+    target_link_libraries(baromesh
+        PRIVATE setupapi
+        )
+endif()
 
 if(BAROMESH_BUILD_TESTS)
     enable_testing()
