@@ -1,6 +1,9 @@
 #ifndef BAROMESH_DONGLE_PROXY_HPP
 #define BAROMESH_DONGLE_PROXY_HPP
 
+#include <boost/log/common.hpp>
+#include <boost/log/sources/logger.hpp>
+
 #include "dongletransport.hpp"
 
 #include "util/callback.hpp"
@@ -53,20 +56,25 @@ public:
     }
 
     void bufferToService (const BufferType& buffer) {
+        BOOST_LOG_NAMED_SCOPE("dongle::Proxy::bufferToService");
+        BOOST_LOG(mLog) << "sending message through dongle::Transport";
         mTransport.sendMessage(buffer.bytes, buffer.size);
+        BOOST_LOG(mLog) << "message sent";
     }
 
     // A helper function to make a Proxy easier to wire up to a transport
     void deliverMessage (const uint8_t* data, size_t size) {
+        BOOST_LOG_NAMED_SCOPE("dongle::Proxy::deliverMessage");
         BufferType buffer;
         // TODO think about what could cause buffer overflows, handle them gracefully
         assert(size <= sizeof(buffer.bytes));
         memcpy(buffer.bytes, data, size);
         buffer.size = size;
+        BOOST_LOG(mLog) << "receiving service buffer";
         auto status = receiveServiceBuffer(buffer);
         if (rpc::hasError(status)) {
             // TODO shut down gracefully?
-            printf("Dongle::receiveServiceBuffer returned %s\n", rpc::statusToString(status));
+            BOOST_LOG(mLog) << "receiveServiceBuffer returned " << rpc::statusToString(status);
         }
     }
 
@@ -78,6 +86,8 @@ public:
     bool unregisterRobotTransport(robot::Transport* rt);
 
 private:
+    boost::log::sources::logger_mt mLog;
+
     Transport mTransport;
     std::map<std::string, robot::Transport*> mRobotTransports;
 
