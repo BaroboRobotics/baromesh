@@ -1,8 +1,11 @@
-#include "barobo/qlinkbot.hpp"
+#include "baromesh/robotproxy.hpp"
 
-#include "baromesh/baromesh.hpp"
+#include <boost/log/common.hpp>
+#include <boost/log/sources/logger.hpp>
 
 #include <iostream>
+#include <memory>
+#include <string>
 
 #undef M_PI
 #define M_PI 3.14159265358979323846
@@ -22,29 +25,70 @@ using MethodIn = rpc::MethodIn<barobo::Robot>;
 struct Linkbot::Impl {
     Impl (const std::string& id)
         : serialId(id)
-        , proxy(id.toStdString()) { }
+        , proxy(id)
+    {}
+
+    mutable boost::log::sources::logger log;
 
     std::string serialId;
     robot::Proxy proxy;
+
+    void newButtonValues (int button, int event) {
+        if (buttonChangedCallback) {
+            buttonChangedCallback(button, event);
+        }
+    }
+
+    void newMotorValues(double j1, double j2, double j3, int mask) {
+        if (jointsChangedCallback) {
+            jointsChangedCallback(j1, j2, j3, mask);
+        }
+
+        if (jointChangedCallback) {
+            double angles[3];
+            angles[0] = j1;
+            angles[1] = j2;
+            angles[2] = j3;
+            int i;
+            for(i = 0; i < 3; i++) {
+                if(mask & (1<<i)) {
+                    jointChangedCallback(i+1, angles[i]);
+                }
+            }
+        }
+    }
+
+
+    std::function<void(int,int)> buttonChangedCallback;
+    std::function<void(double,double,double,int)> jointsChangedCallback;
+    std::function<void(int,double)> jointChangedCallback;
+    std::function<void(double,double,double)> accelChangedCallback;
 };
 
-Linkbot::Linkbot(const std::string& id)
-        : m(new Linkbot::Impl(id)) {
-    m->proxy.buttonEvent.connect(BIND_MEM_CB(&Linkbot::newButtonValues, this));
-    m->proxy.encoderEvent.connect(BIND_MEM_CB(&Linkbot::newMotorValues, this));
+Linkbot::Linkbot (const std::string& id)
+    : m(nullptr)
+{
+    // By using a unique_ptr, we can guarantee that our Impl will get cleaned
+    // up if any code in the rest of the ctor throws.
+    std::unique_ptr<Impl> p { new Linkbot::Impl(id) };
+
+    p->proxy.buttonEvent.connect(
+        BIND_MEM_CB(&Linkbot::Impl::newButtonValues, p.get())
+    );
+    p->proxy.encoderEvent.connect(
+        BIND_MEM_CB(&Linkbot::Impl::newMotorValues, p.get())
+    );
+
+    // Our C++03 API only uses a raw pointer, so transfer ownership from the
+    // unique_ptr to the raw pointer. This should always be the last line of
+    // the ctor.
+    m = p.release();
 }
 
-// Out-of-line destructor (even if empty) is needed for unique_ptr, see
-// http://herbsutter.com/gotw/_100/
-Linkbot::~Linkbot () { }
-
-void swap (Linkbot& lhs, Linkbot& rhs) {
-    using std::swap;
-    swap(lhs.m, rhs.m);
-}
-
-Linkbot::Linkbot (Linkbot&& other) {
-    swap(*this, other);
+Linkbot::~Linkbot () {
+    // This should probably be the only line in Linkbot's dtor. Let Impl's
+    // subobjects clean themselves up.
+    delete m;
 }
 
 void Linkbot::disconnectRobot()
@@ -59,28 +103,58 @@ void Linkbot::connectRobot()
     // Check version before we check if the connection succeeded--the user will
     // probably want to know to flash the robot, regardless.
     if (serviceInfo.rpcVersion() != rpc::Version<>::triplet()) {
-        throw VersionMismatch(m->serialId.toStdString() + " RPC version " +
+        throw VersionMismatch(m->serialId + " RPC version " +
             to_string(serviceInfo.rpcVersion()) + " != local RPC version " +
             to_string(rpc::Version<>::triplet()));
     }
     else if (serviceInfo.interfaceVersion() != rpc::Version<barobo::Robot>::triplet()) {
-        throw VersionMismatch(m->serialId.toStdString() + " Robot interface version " +
+        throw VersionMismatch(m->serialId + " Robot interface version " +
             to_string(serviceInfo.interfaceVersion()) + " != local Robot interface version " +
             to_string(rpc::Version<barobo::Robot>::triplet()));
     }
 
     if (serviceInfo.connected()) {
-        qDebug().nospace() << qPrintable(m->serialId) << ": connected";
+        BOOST_LOG(m->log) << m->serialId << ": connected";
     }
     else {
-        throw ConnectionRefused(m->serialId.toStdString() + " refused our connection");
+        throw ConnectionRefused(m->serialId + " refused our connection");
     }
+}
+
+using namespace std::placeholders; // _1, _2, etc.
+
+void setButtonChangedCallback (ButtonChangedCallback cb, void* userData) {
+    m->buttonChangedCallback =
+        cb
+        ? std::bind(cb, _1, _2, userData)
+        : nullptr;
+}
+
+void setJointsChangedCallback (JointsChangedCallback cb, void* userData) {
+    m->jointsChangedCallback =
+        cb
+        ? std::bind(cb, _1, _2, _3, _4, userData)
+        : nullptr;
+}
+
+void setJointChangedCallback (JointChangedCallback cb, void* userData) {
+    m->jointChangedCallback =
+        cb
+        ? std::bind(cb, _1, _2, userData)
+        : nullptr;
+}
+
+void setAccelChangedCallback (AccelChangedCallback cb, void* userData) {
+    m->accelChangedCallback =
+        cb
+        ? std::bind(cb, _1, _2, _3, userData)
+        : nullptr;
 }
 
 int Linkbot::enableAccelEventCallback()
 {
-#warning Unimplemented stub function in qlinkbot
-    qWarning() << "Unimplemented stub function in qlinkbot";
+#warning Unimplemented stub function in Linkbot
+    BOOST_LOG(m->log) << "Unimplemented stub function in Linkbot";
 }
 
 int Linkbot::enableButtonCallback()
@@ -89,7 +163,7 @@ int Linkbot::enableButtonCallback()
         m->proxy.fire(MethodIn::enableButtonEvent{true}).get();
     }
     catch (std::exception& e) {
-        qDebug().nospace() << qPrintable(m->serialId) << ": " << e.what();
+        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
         return -1;
     }
     return 0;
@@ -105,37 +179,12 @@ int Linkbot::enableJointEventCallback()
         }).get();
     }
     catch (std::exception& e) {
-        qDebug().nospace() << qPrintable(m->serialId) << ": " << e.what();
+        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
     }
 }
 
 std::string Linkbot::getSerialID() const {
     return m->serialId;
-}
-
-void Linkbot::newAccelValues(double x, double y, double z)
-{
-    emit accelChanged(this, x, y, z);
-}
-
-void Linkbot::newButtonValues(int button, int buttonDown)
-{
-    emit buttonChanged(this, button, buttonDown);
-}
-
-void Linkbot::newMotorValues(double j1, double j2, double j3, int mask)
-{
-    emit jointsChanged(this, j1, j2, j3, mask);
-    double angles[3];
-    angles[0] = j1;
-    angles[1] = j2;
-    angles[2] = j3;
-    int i;
-    for(i = 0; i < 3; i++) {
-        if(mask & (1<<i)) {
-            emit jointChanged(this, i+1, angles[i]);
-        }
-    }
 }
 
 int Linkbot::setJointSpeeds (double s0, double s1, double s2) {
@@ -148,15 +197,15 @@ int Linkbot::setJointSpeeds (double s0, double s1, double s2) {
         f2.get();
     }
     catch (std::exception& e) {
-        qDebug().nospace() << qPrintable(m->serialId) << ": " << e.what();
+        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
         return -1;
     }
     return 0;
 }
 
 int Linkbot::disableAccelEventCallback () {
-#warning Unimplemented stub function in qlinkbot
-    qWarning() << "Unimplemented stub function in qlinkbot";
+#warning Unimplemented stub function in Linkbot
+    BOOST_LOG(m->log) << "Unimplemented stub function in Linkbot";
     return 0;
 }
 
@@ -165,7 +214,7 @@ int Linkbot::disableButtonCallback () {
         m->proxy.fire(MethodIn::enableButtonEvent{false}).get();
     }
     catch (std::exception& e) {
-        qDebug().nospace() << qPrintable(m->serialId) << ": " << e.what();
+        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
         return -1;
     }
     return 0;
@@ -180,7 +229,8 @@ int Linkbot::disableJointEventCallback () {
         }).get();
     }
     catch (std::exception& e) {
-        qDebug().nospace() << qPrintable(m->serialId) << ": " << e.what();
+        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
+        return -1;
     }
     return 0;
 }
@@ -194,7 +244,7 @@ int Linkbot::getJointAngles (double& a0, double& a1, double& a2, int) {
         a2 = radToDeg(values.values[2]);
     }
     catch (std::exception& e) {
-        qDebug().nospace() << qPrintable(m->serialId) << ": " << e.what();
+        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
         return -1;
     }
     return 0;
@@ -209,7 +259,7 @@ int Linkbot::moveNB (double a0, double a1, double a2) {
         }).get();
     }
     catch (std::exception& e) {
-        qDebug().nospace() << qPrintable(m->serialId) << ": " << e.what();
+        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
         return -1;
     }
     return 0;
@@ -224,7 +274,7 @@ int Linkbot::moveToNB (double a0, double a1, double a2) {
         }).get();
     }
     catch (std::exception& e) {
-        qDebug().nospace() << qPrintable(m->serialId) << ": " << e.what();
+        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
         return -1;
     }
     return 0;
@@ -235,7 +285,7 @@ int Linkbot::stop () {
         m->proxy.fire(MethodIn::stop{}).get();
     }
     catch (std::exception& e) {
-        qDebug().nospace() << qPrintable(m->serialId) << ": " << e.what();
+        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
         return -1;
     }
     return 0;
@@ -248,15 +298,15 @@ int Linkbot::setColorRGB (int r, int g, int b) {
         }).get();
     }
     catch (std::exception& e) {
-        qDebug().nospace() << qPrintable(m->serialId) << ": " << e.what();
+        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
         return -1;
     }
     return 0;
 }
 
 int Linkbot::setJointEventThreshold (int, double) {
-#warning Unimplemented stub function in qlinkbot
-    qWarning() << "Unimplemented stub function in qlinkbot";
+#warning Unimplemented stub function in Linkbot
+    BOOST_LOG(m->log) << "Unimplemented stub function in Linkbot";
     return 0;
 }
 
@@ -265,7 +315,7 @@ int Linkbot::setBuzzerFrequencyOn (float freq) {
         m->proxy.fire(MethodIn::setBuzzerFrequency{freq}).get();
     }
     catch (std::exception& e) {
-        qDebug().nospace() << qPrintable(m->serialId) << ": " << e.what();
+        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
         return -1;
     }
     return 0;
@@ -277,11 +327,11 @@ int Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
         major = version.major;
         minor = version.minor;
         patch = version.patch;
-        qDebug().nospace() << qPrintable(m->serialId) << " Firmware version "
+        BOOST_LOG(m->log) << m->serialId << " Firmware version "
                            << major << '.' << minor << '.' << patch;
     }
     catch (std::exception& e) {
-        qDebug().nospace() << qPrintable(m->serialId) << ": " << e.what();
+        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
         return -1;
     }
     return 0;

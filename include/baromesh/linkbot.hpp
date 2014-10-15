@@ -1,12 +1,10 @@
 #ifndef QLINKBOT_H__
 #define QLINKBOT_H__
 
-#include "qbarobo_global.h"
-
-#include <QObject>
-
 #include <stdexcept>
-#include <memory>
+#include <string>
+
+namespace barobo {
 
 enum MotorDir {
     FORWARD,
@@ -15,21 +13,18 @@ enum MotorDir {
     HOLD
 };
 
-class QLINKBOT_API QLinkbot : public QObject
-{
-    Q_OBJECT
+/* A C++03-compatible Linkbot API. */
+class Linkbot {
 public:
-    explicit QLinkbot(const QString&);
-    ~QLinkbot ();
+    explicit Linkbot (const std::string&);
+    ~Linkbot ();
 
+private:
     // noncopyable
-    QLinkbot (const QLinkbot&) = delete;
-    QLinkbot& operator= (const QLinkbot&) = delete;
+    Linkbot (const Linkbot&);
+    Linkbot& operator= (const Linkbot&);
 
-    // movable
-    friend void swap (QLinkbot& lhs, QLinkbot& rhs);
-    QLinkbot (QLinkbot&&);
-
+public:
     void connectRobot();
     void disconnectRobot();
     int enableAccelEventCallback();
@@ -38,12 +33,15 @@ public:
     int disableAccelEventCallback ();
     int disableButtonCallback ();
     int disableJointEventCallback ();
-    QString getSerialID() const;
+    std::string getSerialID() const;
 
-    inline bool operator==(const QLinkbot& other) { 
+    inline bool operator== (const Linkbot& other) {
       return this->getSerialID() == other.getSerialID();
     }
-    inline bool operator!=(const QLinkbot& other){return !operator==(other);}
+
+    inline bool operator!= (const Linkbot& other) {
+        return !operator==(other);
+    }
 
     // functions take angles in degrees
     // All functions are non-blocking. Use moveWait() to wait for non-blocking
@@ -63,27 +61,31 @@ public:
     int setBuzzerFrequencyOn (float);
     int getVersions (uint32_t&, uint32_t&, uint32_t&);
 
+    // Exceptions thrown by connectRobot(). Maybe get rid of them, switch to
+    // return codes for everything?
     struct ConnectionRefused : std::runtime_error {
         ConnectionRefused (std::string s) : std::runtime_error(s) { }
     };
+
     struct VersionMismatch : std::runtime_error {
         VersionMismatch (std::string s) : std::runtime_error(s) { }
     };
 
-signals:
-    void buttonChanged(QLinkbot *linkbot, int button, int event);
-    void jointsChanged(QLinkbot *linkbot, double j1, double j2, double j3, int mask);
-    void jointChanged(QLinkbot *linkbot, int joint, double anglePosition);
-    void accelChanged(QLinkbot *linkbot, double x, double y, double z);
+    typedef void (*ButtonChangedCallback)(int button, int event, void* userData);
+    typedef void (*JointsChangedCallback)(double j1, double j2, double j3, int mask, void* userData);
+    typedef void (*JointChangedCallback)(int joint, double anglePosition, void* userData);
+    typedef void (*AccelChangedCallback)(double x, double y, double z, void* userData);
 
-public slots:
-    void newAccelValues(double x, double y, double z);
-    void newButtonValues(int button, int buttonDown);
-    void newMotorValues(double j1, double j2, double j3, int mask);
+    void setButtonChangedCallback (ButtonChangedCallback cb, void* userData);
+    void setJointsChangedCallback (JointsChangedCallback cb, void* userData);
+    void setJointChangedCallback (JointChangedCallback cb, void* userData);
+    void setAccelChangedCallback (AccelChangedCallback cb, void* userData);
 
 private:
     struct Impl;
-    std::unique_ptr<Impl> m;
+    Impl* m;
 };
+
+} // namespace barobo
 
 #endif
