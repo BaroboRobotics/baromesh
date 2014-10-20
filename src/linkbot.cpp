@@ -58,11 +58,16 @@ struct Linkbot::Impl {
         }
     }
 
+    void newAccelValues(double x, double y, double z, int timestamp) {
+        if (accelChangedCallback) {
+            accelChangedCallback(x, y, z, timestamp);
+        }
+    }
 
     std::function<void(int,int)> buttonChangedCallback;
     std::function<void(double,double,double,int)> jointsChangedCallback;
     std::function<void(int,double)> jointChangedCallback;
-    std::function<void(double,double,double)> accelChangedCallback;
+    std::function<void(double,double,double,int)> accelChangedCallback;
 };
 
 Linkbot::Linkbot (const std::string& id)
@@ -77,6 +82,9 @@ Linkbot::Linkbot (const std::string& id)
     );
     p->proxy.encoderEvent.connect(
         BIND_MEM_CB(&Linkbot::Impl::newMotorValues, p.get())
+    );
+    p->proxy.accelerometerEvent.connect(
+        BIND_MEM_CB(&Linkbot::Impl::newAccelValues, p.get())
     );
 
     // Our C++03 API only uses a raw pointer, so transfer ownership from the
