@@ -27,6 +27,7 @@ set(SOURCES
     src/dongletransport.cpp
     src/robotproxy.cpp
     src/robottransport.cpp
+    src/linkbot.cpp
     )
 
 add_library(baromesh ${SOURCES})
