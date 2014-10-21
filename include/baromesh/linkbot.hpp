@@ -1,10 +1,16 @@
-#ifndef QLINKBOT_H__
-#define QLINKBOT_H__
+#ifndef BAROMESH_LINKBOT_HPP
+#define BAROMESH_LINKBOT_HPP
 
-#include <stdexcept>
+#include "baromesh/error.hpp"
+
 #include <string>
 
 namespace barobo {
+
+enum ButtonState {
+    UP,
+    DOWN
+};
 
 enum MotorDir {
     FORWARD,
@@ -16,7 +22,7 @@ enum MotorDir {
 /* A C++03-compatible Linkbot API. */
 class Linkbot {
 public:
-    explicit Linkbot (const std::string&);
+    explicit Linkbot (const std::string& serialId);
     ~Linkbot ();
 
 private:
@@ -25,61 +31,49 @@ private:
     Linkbot& operator= (const Linkbot&);
 
 public:
-    void connectRobot();
-    void disconnectRobot();
-    int enableAccelEventCallback();
-    int enableButtonCallback();
-    int enableJointEventCallback();
-    int disableAccelEventCallback ();
-    int disableButtonCallback ();
-    int disableJointEventCallback ();
-    std::string getSerialID() const;
+    std::string serialId () const;
 
-    inline bool operator== (const Linkbot& other) {
-      return this->getSerialID() == other.getSerialID();
+    bool operator== (const Linkbot& that) const {
+      return this->serialId() == that.serialId();
     }
 
-    inline bool operator!= (const Linkbot& other) {
-        return !operator==(other);
+    bool operator!= (const Linkbot& that) const {
+        return !operator==(that);
     }
 
-    // functions take angles in degrees
+    // All member functions may throw a barobo::Error exception on failure.
+
+    void connect ();
+    void disconnect ();
+
+    // Member functions take angles in degrees.
     // All functions are non-blocking. Use moveWait() to wait for non-blocking
-    // movement functions
-    int drive(int mask, double, double, double);
-    int driveTo(int mask, double, double, double);
-    int getJointAngles (int & timestamp, double&, double&, double&, int=10);
-    int getAccelerometer(int &timestamp, double&, double&, double&);
-    int move (int mask, double, double, double);
-    int moveContinuous(int mask, MotorDir dir1, MotorDir dir2, MotorDir dir3);
-    int moveTo (int mask, double, double, double);
-    int moveWait(int mask);
-    int setColorRGB (int, int, int);
-    int setJointEventThreshold (int, double);
-    int setJointSpeeds (int mask, double, double, double);
-    int stop ();
-    int setBuzzerFrequencyOn (float);
-    int getVersions (uint32_t&, uint32_t&, uint32_t&);
+    // movement functions.
+    void drive (int mask, double, double, double);
+    void driveTo (int mask, double, double, double);
+    void getJointAngles (int& timestamp, double&, double&, double&, int=10);
+    void getAccelerometer (int& timestamp, double&, double&, double&);
+    void move (int mask, double, double, double);
+    void moveContinuous (int mask, MotorDir dir1, MotorDir dir2, MotorDir dir3);
+    void moveTo (int mask, double, double, double);
+    void moveWait (int mask);
+    void setLedColor (int, int, int);
+    void setJointEventThreshold (int, double);
+    void setJointSpeeds (int mask, double, double, double);
+    void stop ();
+    void setBuzzerFrequencyOn (float);
+    void getVersions (uint32_t&, uint32_t&, uint32_t&);
 
-    // Exceptions thrown by connectRobot(). Maybe get rid of them, switch to
-    // return codes for everything?
-    struct ConnectionRefused : std::runtime_error {
-        ConnectionRefused (std::string s) : std::runtime_error(s) { }
-    };
+    typedef void (*ButtonEventCallback)(int buttonNo, ButtonState event, void* userData);
+    // JointEventCallback's anglePosition parameter is reported in degrees.
+    typedef void (*JointEventCallback)(int jointNo, double anglePosition, void* userData);
+    typedef void (*AccelerometerEventCallback)(double x, double y, double z, void* userData);
 
-    struct VersionMismatch : std::runtime_error {
-        VersionMismatch (std::string s) : std::runtime_error(s) { }
-    };
-
-    typedef void (*ButtonChangedCallback)(int button, int event, void* userData);
-    typedef void (*JointsChangedCallback)(double j1, double j2, double j3, int mask, void* userData);
-    typedef void (*JointChangedCallback)(int joint, double anglePosition, void* userData);
-    typedef void (*AccelChangedCallback)(double x, double y, double z, void* userData);
-
-    void setButtonChangedCallback (ButtonChangedCallback cb, void* userData);
-    void setJointsChangedCallback (JointsChangedCallback cb, void* userData);
-    void setJointChangedCallback (JointChangedCallback cb, void* userData);
-    void setAccelChangedCallback (AccelChangedCallback cb, void* userData);
+    // Passing a null pointer as the first parameter of those three functions
+    // will disable its respective events.
+    void setButtonEventCallback (ButtonEventCallback, void* userData);
+    void setJointEventCallback (JointEventCallback, void* userData);
+    void setAccelerometerEventCallback (AccelerometerEventCallback, void* userData);
 
 private:
     struct Impl;

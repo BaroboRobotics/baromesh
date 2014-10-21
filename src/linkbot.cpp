@@ -1,3 +1,4 @@
+#include "baromesh/linkbot.hpp"
 #include "baromesh/robotproxy.hpp"
 
 #include <boost/log/common.hpp>
@@ -9,6 +10,8 @@
 
 #undef M_PI
 #define M_PI 3.14159265358979323846
+
+namespace barobo {
 
 namespace {
 
@@ -34,30 +37,24 @@ struct Linkbot::Impl {
     robot::Proxy proxy;
 
     void newButtonValues (int button, int event) {
-        if (buttonChangedCallback) {
-            buttonChangedCallback(button, event);
+        if (buttonEventCallback) {
+            buttonEventCallback(button, static_cast<ButtonState>(event));
         }
     }
 
-    void newMotorValues(double j1, double j2, double j3, int mask) {
-        if (jointsChangedCallback) {
-            jointsChangedCallback(j1, j2, j3, mask);
-        }
-
-        if (jointChangedCallback) {
-            double angles[3];
-            angles[0] = j1;
-            angles[1] = j2;
-            angles[2] = j3;
-            int i;
-            for(i = 0; i < 3; i++) {
-                if(mask & (1<<i)) {
-                    jointChangedCallback(i+1, angles[i]);
-                }
-            }
+    void newJointValues (int jointNo, double anglePosition) {
+        if (jointEventCallback) {
+            jointEventCallback(jointNo, radToDeg(anglePosition));
         }
     }
 
+    void newAccelerometerValues (double a1, double a2, double a3) {
+        if (accelerometerEventCallback) {
+            accelerometerEventCallback(a1, a2, a3);
+        }
+    }
+
+<<<<<<< HEAD
     void newAccelValues(double x, double y, double z, int timestamp) {
         if (accelChangedCallback) {
             accelChangedCallback(x, y, z, timestamp);
@@ -68,6 +65,11 @@ struct Linkbot::Impl {
     std::function<void(double,double,double,int)> jointsChangedCallback;
     std::function<void(int,double)> jointChangedCallback;
     std::function<void(double,double,double,int)> accelChangedCallback;
+=======
+    std::function<void(int,ButtonState)> buttonEventCallback;
+    std::function<void(int,double)> jointEventCallback;
+    std::function<void(double,double,double)> accelerometerEventCallback;
+>>>>>>> Revise Linkbot interface
 };
 
 Linkbot::Linkbot (const std::string& id)
@@ -81,7 +83,10 @@ Linkbot::Linkbot (const std::string& id)
         BIND_MEM_CB(&Linkbot::Impl::newButtonValues, p.get())
     );
     p->proxy.encoderEvent.connect(
-        BIND_MEM_CB(&Linkbot::Impl::newMotorValues, p.get())
+        BIND_MEM_CB(&Linkbot::Impl::newJointValues, p.get())
+    );
+    p->proxy.accelerometerEvent.connect(
+        BIND_MEM_CB(&Linkbot::Impl::newAccelerometerValues, p.get())
     );
     p->proxy.accelerometerEvent.connect(
         BIND_MEM_CB(&Linkbot::Impl::newAccelValues, p.get())
@@ -99,103 +104,115 @@ Linkbot::~Linkbot () {
     delete m;
 }
 
-void Linkbot::disconnectRobot()
-{
-    m->proxy.disconnect().get();
+std::string Linkbot::serialId () const {
+    return m->serialId;
 }
 
-void Linkbot::connectRobot()
+void Linkbot::connect()
 {
-    auto serviceInfo = m->proxy.connect().get();
+    try {
+        auto serviceInfo = m->proxy.connect().get();
 
-    // Check version before we check if the connection succeeded--the user will
-    // probably want to know to flash the robot, regardless.
-    if (serviceInfo.rpcVersion() != rpc::Version<>::triplet()) {
-        throw VersionMismatch(m->serialId + " RPC version " +
-            to_string(serviceInfo.rpcVersion()) + " != local RPC version " +
-            to_string(rpc::Version<>::triplet()));
-    }
-    else if (serviceInfo.interfaceVersion() != rpc::Version<barobo::Robot>::triplet()) {
-        throw VersionMismatch(m->serialId + " Robot interface version " +
-            to_string(serviceInfo.interfaceVersion()) + " != local Robot interface version " +
-            to_string(rpc::Version<barobo::Robot>::triplet()));
-    }
+        // Check version before we check if the connection succeeded--the user will
+        // probably want to know to flash the robot, regardless.
+        if (serviceInfo.rpcVersion() != rpc::Version<>::triplet()) {
+            throw Error(std::string("RPC version ") +
+                to_string(serviceInfo.rpcVersion()) + " != local RPC version " +
+                to_string(rpc::Version<>::triplet()));
+        }
+        else if (serviceInfo.interfaceVersion() != rpc::Version<barobo::Robot>::triplet()) {
+            throw Error(std::string("Robot interface version ") +
+                to_string(serviceInfo.interfaceVersion()) + " != local Robot interface version " +
+                to_string(rpc::Version<barobo::Robot>::triplet()));
+        }
 
-    if (serviceInfo.connected()) {
-        BOOST_LOG(m->log) << m->serialId << ": connected";
+        if (serviceInfo.connected()) {
+            BOOST_LOG(m->log) << m->serialId << ": connected";
+        }
+        else {
+            throw Error(std::string("connection refused"));
+        }
     }
-    else {
-        throw ConnectionRefused(m->serialId + " refused our connection");
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
+void Linkbot::disconnect()
+{
+    try {
+        m->proxy.disconnect().get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
     }
 }
 
 using namespace std::placeholders; // _1, _2, etc.
 
-void setButtonChangedCallback (ButtonChangedCallback cb, void* userData) {
-    m->buttonChangedCallback =
-        cb
-        ? std::bind(cb, _1, _2, userData)
-        : nullptr;
-}
+void Linkbot::setButtonEventCallback (ButtonEventCallback cb, void* userData) {
+    const bool enable = !!cb;
 
-void setJointsChangedCallback (JointsChangedCallback cb, void* userData) {
-    m->jointsChangedCallback =
-        cb
-        ? std::bind(cb, _1, _2, _3, _4, userData)
-        : nullptr;
-}
-
-void setJointChangedCallback (JointChangedCallback cb, void* userData) {
-    m->jointChangedCallback =
-        cb
-        ? std::bind(cb, _1, _2, userData)
-        : nullptr;
-}
-
-void setAccelChangedCallback (AccelChangedCallback cb, void* userData) {
-    m->accelChangedCallback =
-        cb
-        ? std::bind(cb, _1, _2, _3, userData)
-        : nullptr;
-}
-
-int Linkbot::enableAccelEventCallback()
-{
-#warning Unimplemented stub function in Linkbot
-    BOOST_LOG(m->log) << "Unimplemented stub function in Linkbot";
-}
-
-int Linkbot::enableButtonCallback()
-{
     try {
-        m->proxy.fire(MethodIn::enableButtonEvent{true}).get();
+        m->proxy.fire(MethodIn::enableButtonEvent{enable}).get();
     }
     catch (std::exception& e) {
-        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
-        return -1;
+        throw Error(m->serialId + ": " + e.what());
     }
-    return 0;
+
+    if (enable) {
+        m->buttonEventCallback = std::bind(cb, _1, _2, userData);
+    }
+    else {
+        m->buttonEventCallback = nullptr;
+    }
 }
 
-int Linkbot::enableJointEventCallback()
-{
+void Linkbot::setJointEventCallback (JointEventCallback cb, void* userData) {
+    const bool enable = !!cb;
+    auto granularity = degToRad(float(enable ? 20.0 : 0.0));
+
     try {
         m->proxy.fire(MethodIn::enableEncoderEvent {
-            true, { true, degToRad(float(20.0)) },
-            true, { true, degToRad(float(20.0)) },
-            true, { true, degToRad(float(20.0)) }
+            true, { enable, granularity },
+            true, { enable, granularity },
+            true, { enable, granularity }
         }).get();
     }
     catch (std::exception& e) {
-        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
+        throw Error(m->serialId + ": " + e.what());
+    }
+
+    if (enable) {
+        m->jointEventCallback = std::bind(cb, _1, _2, userData);
+    }
+    else {
+        m->jointEventCallback = nullptr;
     }
 }
 
-std::string Linkbot::getSerialID() const {
-    return m->serialId;
+void Linkbot::setAccelerometerEventCallback (AccelerometerEventCallback cb, void* userData) {
+    const bool enable = !!cb;
+    auto granularity = float(enable ? 0.05 : 0);
+
+    try {
+        m->proxy.fire(MethodIn::enableAccelerometerEvent {
+            enable, granularity
+        }).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+
+    if (enable) {
+        m->accelerometerEventCallback = std::bind(cb, _1, _2, _3, userData);
+    }
+    else {
+        m->accelerometerEventCallback = nullptr;
+    }
 }
 
-int Linkbot::setJointSpeeds (double s0, double s1, double s2) {
+void Linkbot::setJointSpeeds (double s0, double s1, double s2) {
     try {
         auto f0 = m->proxy.fire(MethodIn::setMotorControllerOmega { 0, float(degToRad(s0)) });
         auto f1 = m->proxy.fire(MethodIn::setMotorControllerOmega { 1, float(degToRad(s1)) });
@@ -205,45 +222,11 @@ int Linkbot::setJointSpeeds (double s0, double s1, double s2) {
         f2.get();
     }
     catch (std::exception& e) {
-        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
-        return -1;
+        throw Error(m->serialId + ": " + e.what());
     }
-    return 0;
 }
 
-int Linkbot::disableAccelEventCallback () {
-#warning Unimplemented stub function in Linkbot
-    BOOST_LOG(m->log) << "Unimplemented stub function in Linkbot";
-    return 0;
-}
-
-int Linkbot::disableButtonCallback () {
-    try {
-        m->proxy.fire(MethodIn::enableButtonEvent{false}).get();
-    }
-    catch (std::exception& e) {
-        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
-        return -1;
-    }
-    return 0;
-}
-
-int Linkbot::disableJointEventCallback () {
-    try {
-        m->proxy.fire(MethodIn::enableEncoderEvent {
-            true, { false, 0 },
-            true, { false, 0 },
-            true, { false, 0 }
-        }).get();
-    }
-    catch (std::exception& e) {
-        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
-        return -1;
-    }
-    return 0;
-}
-
-int Linkbot::getJointAngles (double& a0, double& a1, double& a2, int) {
+void Linkbot::getJointAngles (double& a0, double& a1, double& a2, int) {
     try {
         auto values = m->proxy.fire(MethodIn::getEncoderValues{}).get();
         assert(values.values_count >= 3);
@@ -252,13 +235,11 @@ int Linkbot::getJointAngles (double& a0, double& a1, double& a2, int) {
         a2 = radToDeg(values.values[2]);
     }
     catch (std::exception& e) {
-        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
-        return -1;
+        throw Error(m->serialId + ": " + e.what());
     }
-    return 0;
 }
 
-int Linkbot::moveNB (double a0, double a1, double a2) {
+void Linkbot::moveNB (double a0, double a1, double a2) {
     try {
         m->proxy.fire(MethodIn::move {
             true, { barobo_Robot_Goal_Type_RELATIVE, float(degToRad(a0)) },
@@ -267,13 +248,11 @@ int Linkbot::moveNB (double a0, double a1, double a2) {
         }).get();
     }
     catch (std::exception& e) {
-        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
-        return -1;
+        throw Error(m->serialId + ": " + e.what());
     }
-    return 0;
 }
 
-int Linkbot::moveToNB (double a0, double a1, double a2) {
+void Linkbot::moveToNB (double a0, double a1, double a2) {
     try {
         m->proxy.fire(MethodIn::move {
             true, { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a0)) },
@@ -282,54 +261,45 @@ int Linkbot::moveToNB (double a0, double a1, double a2) {
         }).get();
     }
     catch (std::exception& e) {
-        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
-        return -1;
+        throw Error(m->serialId + ": " + e.what());
     }
-    return 0;
 }
 
-int Linkbot::stop () {
+void Linkbot::stop () {
     try {
         m->proxy.fire(MethodIn::stop{}).get();
     }
     catch (std::exception& e) {
-        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
-        return -1;
+        throw Error(m->serialId + ": " + e.what());
     }
-    return 0;
 }
 
-int Linkbot::setColorRGB (int r, int g, int b) {
+void Linkbot::setLedColor (int r, int g, int b) {
     try {
         m->proxy.fire(MethodIn::setLedColor{
             uint32_t(r << 16 | g << 8 | b)
         }).get();
     }
     catch (std::exception& e) {
-        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
-        return -1;
+        throw Error(m->serialId + ": " + e.what());
     }
-    return 0;
 }
 
-int Linkbot::setJointEventThreshold (int, double) {
+void Linkbot::setJointEventThreshold (int, double) {
 #warning Unimplemented stub function in Linkbot
     BOOST_LOG(m->log) << "Unimplemented stub function in Linkbot";
-    return 0;
 }
 
-int Linkbot::setBuzzerFrequencyOn (float freq) {
+void Linkbot::setBuzzerFrequencyOn (float freq) {
     try {
         m->proxy.fire(MethodIn::setBuzzerFrequency{freq}).get();
     }
     catch (std::exception& e) {
-        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
-        return -1;
+        throw Error(m->serialId + ": " + e.what());
     }
-    return 0;
 }
 
-int Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
+void Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
     try {
         auto version = m->proxy.fire(MethodIn::getFirmwareVersion{}).get();
         major = version.major;
@@ -339,8 +309,8 @@ int Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
                            << major << '.' << minor << '.' << patch;
     }
     catch (std::exception& e) {
-        BOOST_LOG(m->log) << m->serialId << ": " << e.what();
-        return -1;
+        throw Error(m->serialId + ": " + e.what());
     }
-    return 0;
 }
+
+} // namespace

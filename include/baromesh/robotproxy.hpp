@@ -31,7 +31,7 @@ public:
     }
 
     void onBroadcast (Broadcast::encoderEvent in) {
-        encoderEvent(in.value, in.value, in.value, 1 << in.encoder);
+        encoderEvent(in.encoder, in.value);
     }
 
     void onBroadcast (Broadcast::accelerometerEvent in) {
@@ -39,8 +39,8 @@ public:
     }
 
     util::Signal<void(int,int)> buttonEvent;
-    util::Signal<void(double,double,double,int)> encoderEvent;
     util::Signal<void(double,double,double,int)> accelerometerEvent;
+    util::Signal<void(int,double)> encoderEvent;
 
 private:
     // A helper function to make a Proxy easier to wire up to a transport
