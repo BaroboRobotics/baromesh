@@ -42,9 +42,15 @@ struct Linkbot::Impl {
         }
     }
 
-    void newJointValues (int jointNo, double anglePosition) {
+    void newEncoderValues (int jointNo, double anglePosition) {
+        if (encoderEventCallback) {
+            encoderEventCallback(jointNo, radToDeg(anglePosition));
+        }
+    }
+
+    void newJointState (int jointNo, int state) {
         if (jointEventCallback) {
-            jointEventCallback(jointNo, radToDeg(anglePosition));
+            jointEventCallback(jointNo, static_cast<JointState>(state));
         }
     }
 
@@ -55,7 +61,8 @@ struct Linkbot::Impl {
     }
 
     std::function<void(int,ButtonState)> buttonEventCallback;
-    std::function<void(int,double)> jointEventCallback;
+    std::function<void(int,double)> encoderEventCallback;
+    std::function<void(int,JointState)> jointEventCallback;
     std::function<void(double,double,double,int)> accelerometerEventCallback;
 };
 
@@ -70,7 +77,10 @@ Linkbot::Linkbot (const std::string& id)
         BIND_MEM_CB(&Linkbot::Impl::newButtonValues, p.get())
     );
     p->proxy.encoderEvent.connect(
-        BIND_MEM_CB(&Linkbot::Impl::newJointValues, p.get())
+        BIND_MEM_CB(&Linkbot::Impl::newEncoderValues, p.get())
+    );
+    p->proxy.jointEvent.connect(
+        BIND_MEM_CB(&Linkbot::Impl::newJointState, p.get())
     );
     p->proxy.accelerometerEvent.connect(
         BIND_MEM_CB(&Linkbot::Impl::newAccelerometerValues, p.get())
@@ -152,7 +162,7 @@ void Linkbot::setButtonEventCallback (ButtonEventCallback cb, void* userData) {
     }
 }
 
-void Linkbot::setJointEventCallback (JointEventCallback cb, void* userData) {
+void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, void* userData) {
     const bool enable = !!cb;
     auto granularity = degToRad(float(enable ? 20.0 : 0.0));
 
@@ -161,6 +171,26 @@ void Linkbot::setJointEventCallback (JointEventCallback cb, void* userData) {
             true, { enable, granularity },
             true, { enable, granularity },
             true, { enable, granularity }
+        }).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+
+    if (enable) {
+        m->encoderEventCallback = std::bind(cb, _1, _2, userData);
+    }
+    else {
+        m->encoderEventCallback = nullptr;
+    }
+}
+
+void Linkbot::setJointEventCallback (JointEventCallback cb, void* userData) {
+    const bool enable = !!cb;
+
+    try {
+        m->proxy.fire(MethodIn::enableJointEvent {
+            enable
         }).get();
     }
     catch (std::exception& e) {
@@ -276,7 +306,7 @@ void Linkbot::setLedColor (int r, int g, int b) {
     }
 }
 
-void Linkbot::setJointEventThreshold (int, double) {
+void Linkbot::setEncoderEventThreshold (int, double) {
 #warning Unimplemented stub function in Linkbot
     BOOST_LOG(m->log) << "Unimplemented stub function in Linkbot";
 }

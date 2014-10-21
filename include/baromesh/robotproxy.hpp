@@ -34,6 +34,10 @@ public:
         encoderEvent(in.encoder, in.value);
     }
 
+    void onBroadcast (Broadcast::jointEvent in) {
+        jointEvent(in.joint, in.event);
+    }
+
     void onBroadcast (Broadcast::accelerometerEvent in) {
         accelerometerEvent(in.x, in.y, in.z, in.timestamp);
     }
@@ -41,6 +45,7 @@ public:
     util::Signal<void(int,int)> buttonEvent;
     util::Signal<void(double,double,double,int)> accelerometerEvent;
     util::Signal<void(int,double)> encoderEvent;
+    util::Signal<void(int,int)> jointEvent;
 
 private:
     // A helper function to make a Proxy easier to wire up to a transport

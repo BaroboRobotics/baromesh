@@ -12,6 +12,12 @@ enum ButtonState {
     DOWN
 };
 
+enum JointState {
+    JOINT_HOLD,
+    JOINT_STOP,
+    JOINT_FAIL
+};
+
 enum MotorDir {
     FORWARD,
     BACKWARD,
@@ -58,20 +64,22 @@ public:
     void moveTo (int mask, double, double, double);
     void moveWait (int mask);
     void setLedColor (int, int, int);
-    void setJointEventThreshold (int, double);
+    void setEncoderEventThreshold (int, double);
     void setJointSpeeds (int mask, double, double, double);
     void stop ();
     void setBuzzerFrequencyOn (float);
     void getVersions (uint32_t&, uint32_t&, uint32_t&);
 
     typedef void (*ButtonEventCallback)(int buttonNo, ButtonState event, void* userData);
-    // JointEventCallback's anglePosition parameter is reported in degrees.
-    typedef void (*JointEventCallback)(int jointNo, double anglePosition, void* userData);
+    // EncoderEventCallback's anglePosition parameter is reported in degrees.
+    typedef void (*EncoderEventCallback)(int jointNo, double anglePosition, void* userData);
+    typedef void (*JointEventCallback)(int jointNo, JointState event, void* userData);
     typedef void (*AccelerometerEventCallback)(double x, double y, double z, void* userData);
 
     // Passing a null pointer as the first parameter of those three functions
     // will disable its respective events.
     void setButtonEventCallback (ButtonEventCallback, void* userData);
+    void setEncoderEventCallback (EncoderEventCallback, void* userData);
     void setJointEventCallback (JointEventCallback, void* userData);
     void setAccelerometerEventCallback (AccelerometerEventCallback, void* userData);
 
