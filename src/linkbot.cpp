@@ -196,39 +196,46 @@ void Linkbot::setAccelerometerEventCallback (AccelerometerEventCallback cb, void
     }
 }
 
-void Linkbot::setJointSpeeds (double s0, double s1, double s2) {
+void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
     try {
-        auto f0 = m->proxy.fire(MethodIn::setMotorControllerOmega { 0, float(degToRad(s0)) });
-        auto f1 = m->proxy.fire(MethodIn::setMotorControllerOmega { 1, float(degToRad(s1)) });
-        auto f2 = m->proxy.fire(MethodIn::setMotorControllerOmega { 2, float(degToRad(s2)) });
-        f0.get();
-        f1.get();
-        f2.get();
+        if(mask & 0x01) {
+            auto f0 = m->proxy.fire(MethodIn::setMotorControllerOmega { 0, float(degToRad(s0)) });
+            f0.get();
+        }
+        if(mask & 0x02) {
+            auto f1 = m->proxy.fire(MethodIn::setMotorControllerOmega { 1, float(degToRad(s1)) });
+            f1.get();
+        }
+        if(mask & 0x04) {
+            auto f2 = m->proxy.fire(MethodIn::setMotorControllerOmega { 2, float(degToRad(s2)) });
+            f2.get();
+        }
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
 }
 
-void Linkbot::getJointAngles (double& a0, double& a1, double& a2, int) {
+void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2, int) {
     try {
         auto values = m->proxy.fire(MethodIn::getEncoderValues{}).get();
         assert(values.values_count >= 3);
         a0 = radToDeg(values.values[0]);
         a1 = radToDeg(values.values[1]);
         a2 = radToDeg(values.values[2]);
+        timestamp = values.timestamp;
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
 }
 
-void Linkbot::moveNB (double a0, double a1, double a2) {
+void Linkbot::move (int mask, double a0, double a1, double a2) {
     try {
         m->proxy.fire(MethodIn::move {
-            true, { barobo_Robot_Goal_Type_RELATIVE, float(degToRad(a0)) },
-            true, { barobo_Robot_Goal_Type_RELATIVE, float(degToRad(a1)) },
-            true, { barobo_Robot_Goal_Type_RELATIVE, float(degToRad(a2)) }
+            bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE, float(degToRad(a0)) },
+            bool(mask&0x02), { barobo_Robot_Goal_Type_RELATIVE, float(degToRad(a1)) },
+            bool(mask&0x04), { barobo_Robot_Goal_Type_RELATIVE, float(degToRad(a2)) }
         }).get();
     }
     catch (std::exception& e) {
@@ -236,12 +243,12 @@ void Linkbot::moveNB (double a0, double a1, double a2) {
     }
 }
 
-void Linkbot::moveToNB (double a0, double a1, double a2) {
+void Linkbot::moveTo (int mask, double a0, double a1, double a2) {
     try {
         m->proxy.fire(MethodIn::move {
-            true, { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a0)) },
-            true, { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a1)) },
-            true, { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a2)) }
+            bool(mask&0x01), { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a0)) },
+            bool(mask&0x02), { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a1)) },
+            bool(mask&0x04), { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a2)) }
         }).get();
     }
     catch (std::exception& e) {
