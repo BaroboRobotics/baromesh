@@ -70,11 +70,11 @@ public:
     void setBuzzerFrequencyOn (float);
     void getVersions (uint32_t&, uint32_t&, uint32_t&);
 
-    typedef void (*ButtonEventCallback)(int buttonNo, ButtonState event, void* userData);
+    typedef void (*ButtonEventCallback)(int buttonNo, ButtonState event, int timestamp, void* userData);
     // EncoderEventCallback's anglePosition parameter is reported in degrees.
-    typedef void (*EncoderEventCallback)(int jointNo, double anglePosition, void* userData);
+    typedef void (*EncoderEventCallback)(int jointNo, double anglePosition, int timestamp, void* userData);
     typedef void (*JointEventCallback)(int jointNo, JointState event, void* userData);
-    typedef void (*AccelerometerEventCallback)(double x, double y, double z, void* userData);
+    typedef void (*AccelerometerEventCallback)(double x, double y, double z, int timestamp, void* userData);
 
     // Passing a null pointer as the first parameter of those three functions
     // will disable its respective events.

@@ -27,11 +27,11 @@ public:
     using Broadcast = rpc::Broadcast<barobo::Robot>;
 
     void onBroadcast (Broadcast::buttonEvent in) {
-        buttonEvent(in.button, in.state);
+        buttonEvent(in.button, in.state, in.timestamp);
     }
 
     void onBroadcast (Broadcast::encoderEvent in) {
-        encoderEvent(in.encoder, in.value);
+        encoderEvent(in.encoder, in.value, in.timestamp);
     }
 
     void onBroadcast (Broadcast::jointEvent in) {
@@ -42,9 +42,9 @@ public:
         accelerometerEvent(in.x, in.y, in.z, in.timestamp);
     }
 
-    util::Signal<void(int,int)> buttonEvent;
+    util::Signal<void(int,int, int)> buttonEvent;
     util::Signal<void(double,double,double,int)> accelerometerEvent;
-    util::Signal<void(int,double)> encoderEvent;
+    util::Signal<void(int,double, int)> encoderEvent;
     util::Signal<void(int,int)> jointEvent;
 
 private:

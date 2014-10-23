@@ -36,15 +36,15 @@ struct Linkbot::Impl {
     std::string serialId;
     robot::Proxy proxy;
 
-    void newButtonValues (int button, int event) {
+    void newButtonValues (int button, int event, int timestamp) {
         if (buttonEventCallback) {
-            buttonEventCallback(button, static_cast<ButtonState>(event));
+            buttonEventCallback(button, static_cast<ButtonState>(event), timestamp);
         }
     }
 
-    void newEncoderValues (int jointNo, double anglePosition) {
+    void newEncoderValues (int jointNo, double anglePosition, int timestamp) {
         if (encoderEventCallback) {
-            encoderEventCallback(jointNo, radToDeg(anglePosition));
+            encoderEventCallback(jointNo, radToDeg(anglePosition), timestamp);
         }
     }
 
@@ -60,8 +60,8 @@ struct Linkbot::Impl {
         }
     }
 
-    std::function<void(int,ButtonState)> buttonEventCallback;
-    std::function<void(int,double)> encoderEventCallback;
+    std::function<void(int, ButtonState, int)> buttonEventCallback;
+    std::function<void(int,double, int)> encoderEventCallback;
     std::function<void(int,JointState)> jointEventCallback;
     std::function<void(double,double,double,int)> accelerometerEventCallback;
 };
@@ -155,7 +155,7 @@ void Linkbot::setButtonEventCallback (ButtonEventCallback cb, void* userData) {
     }
 
     if (enable) {
-        m->buttonEventCallback = std::bind(cb, _1, _2, userData);
+        m->buttonEventCallback = std::bind(cb, _1, _2, _3, userData);
     }
     else {
         m->buttonEventCallback = nullptr;
@@ -178,7 +178,7 @@ void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, void* userData) 
     }
 
     if (enable) {
-        m->encoderEventCallback = std::bind(cb, _1, _2, userData);
+        m->encoderEventCallback = std::bind(cb, _1, _2, _3, userData);
     }
     else {
         m->encoderEventCallback = nullptr;
@@ -219,7 +219,7 @@ void Linkbot::setAccelerometerEventCallback (AccelerometerEventCallback cb, void
     }
 
     if (enable) {
-        m->accelerometerEventCallback = std::bind(cb, _1, _2, _3, userData);
+        m->accelerometerEventCallback = std::bind(cb, _1, _2, _3, _4, userData);
     }
     else {
         m->accelerometerEventCallback = nullptr;
