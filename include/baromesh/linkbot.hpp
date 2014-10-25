@@ -12,9 +12,16 @@ enum ButtonState {
     DOWN
 };
 
+enum FormFactor {
+    FORMFACTOR_I,
+    FORMFACTOR_L,
+    FORMFACTOR_T
+};
+
 enum JointState {
-    JOINT_HOLD,
     JOINT_STOP,
+    JOINT_HOLD,
+    JOINT_MOVING,
     JOINT_FAIL
 };
 
@@ -57,12 +64,20 @@ public:
     // movement functions.
     void drive (int mask, double, double, double);
     void driveTo (int mask, double, double, double);
-    void getJointAngles (int& timestamp, double&, double&, double&, int=10);
     void getAccelerometer (int& timestamp, double&, double&, double&);
+    void getFormFactor(FormFactor & form);
+    void getJointAngles (int& timestamp, double&, double&, double&, int=10);
+    void getJointStates(int& timestamp, 
+                        JointState & s1, 
+                        JointState & s2, 
+                        JointState & s3);
     void move (int mask, double, double, double);
     void moveContinuous (int mask, MotorDir dir1, MotorDir dir2, MotorDir dir3);
     void moveTo (int mask, double, double, double);
-    void moveWait (int mask);
+    /* Debate: Should moveWait be implemented in a higher level? Technically, it
+     * can be implemented with other existing functions, thereby making it not a
+     * member of the set of primitives... */
+    //void moveWait (int mask); 
     void setLedColor (int, int, int);
     void setEncoderEventThreshold (int, double);
     void setJointSpeeds (int mask, double, double, double);
@@ -73,7 +88,7 @@ public:
     typedef void (*ButtonEventCallback)(int buttonNo, ButtonState event, int timestamp, void* userData);
     // EncoderEventCallback's anglePosition parameter is reported in degrees.
     typedef void (*EncoderEventCallback)(int jointNo, double anglePosition, int timestamp, void* userData);
-    typedef void (*JointEventCallback)(int jointNo, JointState event, void* userData);
+    typedef void (*JointEventCallback)(int jointNo, JointState event, int timestamp, void* userData);
     typedef void (*AccelerometerEventCallback)(double x, double y, double z, int timestamp, void* userData);
 
     // Passing a null pointer as the first parameter of those three functions
