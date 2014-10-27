@@ -62,27 +62,27 @@ public:
     // Member functions take angles in degrees.
     // All functions are non-blocking. Use moveWait() to wait for non-blocking
     // movement functions.
-    void drive (int mask, double, double, double);
-    void driveTo (int mask, double, double, double);
-    void getAccelerometer (int& timestamp, double&, double&, double&);
-    void getFormFactor(FormFactor & form);
-    void getJointAngles (int& timestamp, double&, double&, double&, int=10);
-    void getJointStates(int& timestamp, 
+    virtual void drive (int mask, double, double, double);
+    virtual void driveTo (int mask, double, double, double);
+    virtual void getAccelerometer (int& timestamp, double&, double&, double&);
+    virtual void getFormFactor(FormFactor & form);
+    virtual void getJointAngles (int& timestamp, double&, double&, double&, int=10);
+    virtual void getJointStates(int& timestamp, 
                         JointState & s1, 
                         JointState & s2, 
                         JointState & s3);
-    void move (int mask, double, double, double);
-    void moveContinuous (int mask, MotorDir dir1, MotorDir dir2, MotorDir dir3);
-    void moveTo (int mask, double, double, double);
+    virtual void move (int mask, double, double, double);
+    virtual void moveContinuous (int mask, MotorDir dir1, MotorDir dir2, MotorDir dir3);
+    virtual void moveTo (int mask, double, double, double);
     /* Debate: Should moveWait be implemented in a higher level? Technically, it
      * can be implemented with other existing functions, thereby making it not a
      * member of the set of primitives... */
     //void moveWait (int mask); 
-    void setLedColor (int, int, int);
-    void setEncoderEventThreshold (int, double);
-    void setJointSpeeds (int mask, double, double, double);
-    void stop ();
-    void setBuzzerFrequencyOn (float);
+    virtual void setLedColor (int, int, int);
+    virtual void setEncoderEventThreshold (int, double);
+    virtual void setJointSpeeds (int mask, double, double, double);
+    virtual void stop ();
+    virtual void setBuzzerFrequencyOn (float);
     void getVersions (uint32_t&, uint32_t&, uint32_t&);
 
     typedef void (*ButtonEventCallback)(int buttonNo, ButtonState event, int timestamp, void* userData);

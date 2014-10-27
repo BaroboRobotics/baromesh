@@ -193,6 +193,7 @@ void Linkbot::getJointStates(int& timestamp,
     try {
         auto values = m->proxy.fire(MethodIn::getJointStates{}).get();
         assert(values.values_count >= 3);
+        timestamp = values.timestamp;
         s1 = static_cast<JointState>(values.values[0]);
         s2 = static_cast<JointState>(values.values[1]);
         s3 = static_cast<JointState>(values.values[2]);
