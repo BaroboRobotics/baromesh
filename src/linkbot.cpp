@@ -360,6 +360,18 @@ void Linkbot::setLedColor (int r, int g, int b) {
     }
 }
 
+void Linkbot::getLedColor (int& r, int& g, int& b) {
+    try {
+        auto color = m->proxy.fire(MethodIn::getLedColor{}).get();
+        r = 0xff & color.value >> 16;
+        g = 0xff & color.value >> 8;
+        b = 0xff & color.value;
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
 void Linkbot::setEncoderEventThreshold (int, double) {
 #warning Unimplemented stub function in Linkbot
     BOOST_LOG(m->log) << "Unimplemented stub function in Linkbot";

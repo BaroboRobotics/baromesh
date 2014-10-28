@@ -90,6 +90,7 @@ public:
      * member of the set of primitives... */
     //void moveWait (int mask); 
     void setLedColor (int, int, int);
+    void getLedColor (int&, int&, int&);
     void setEncoderEventThreshold (int, double);
     void setJointSpeeds (int mask, double, double, double);
     void stop ();
