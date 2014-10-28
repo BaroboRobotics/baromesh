@@ -171,7 +171,7 @@ void Linkbot::getFormFactor(FormFactor::Type& form)
     }
 }
 
-void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2, int) {
+void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2) {
     try {
         auto values = m->proxy.fire(MethodIn::getEncoderValues{}).get();
         assert(values.values_count >= 3);

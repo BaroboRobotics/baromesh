@@ -77,7 +77,7 @@ public:
     void driveTo (int mask, double, double, double);
     void getAccelerometer (int& timestamp, double&, double&, double&);
     void getFormFactor(FormFactor::Type & form);
-    void getJointAngles (int& timestamp, double&, double&, double&, int=10);
+    void getJointAngles (int& timestamp, double&, double&, double&);
     void getJointStates(int& timestamp, 
                         JointState::Type & s1,
                         JointState::Type & s2,
