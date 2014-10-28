@@ -57,6 +57,7 @@ if(WIN32)
         )
 endif()
 
+option(BAROMESH_BUILD_TESTS "Build libsfp tests" OFF)
 if(BAROMESH_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
