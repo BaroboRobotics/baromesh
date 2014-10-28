@@ -39,7 +39,7 @@ struct Linkbot::Impl {
 
     void newButtonValues (int button, int event, int timestamp) {
         if (buttonEventCallback) {
-            buttonEventCallback(button, static_cast<ButtonState>(event), timestamp);
+            buttonEventCallback(button, static_cast<ButtonState::Type>(event), timestamp);
         }
     }
 
@@ -51,7 +51,7 @@ struct Linkbot::Impl {
 
     void newJointState (int jointNo, int state, int timestamp) {
         if (jointEventCallback) {
-            jointEventCallback(jointNo, static_cast<JointState>(state), timestamp);
+            jointEventCallback(jointNo, static_cast<JointState::Type>(state), timestamp);
         }
     }
 
@@ -61,9 +61,9 @@ struct Linkbot::Impl {
         }
     }
 
-    std::function<void(int, ButtonState, int)> buttonEventCallback;
+    std::function<void(int, ButtonState::Type, int)> buttonEventCallback;
     std::function<void(int,double, int)> encoderEventCallback;
-    std::function<void(int,JointState, int)> jointEventCallback;
+    std::function<void(int,JointState::Type, int)> jointEventCallback;
     std::function<void(double,double,double,int)> accelerometerEventCallback;
 };
 
@@ -160,11 +160,11 @@ void Linkbot::getAccelerometer (int& timestamp, double&, double&, double&)
     #warning Unimplemented stub function in Linkbot
 }
 
-void Linkbot::getFormFactor(FormFactor & form)
+void Linkbot::getFormFactor(FormFactor::Type& form)
 {
     try {
         auto value = m->proxy.fire(MethodIn::getFormFactor{}).get();
-        form = FormFactor(value.value);
+        form = FormFactor::Type(value.value);
     } 
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -186,16 +186,16 @@ void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2
 }
 
 void Linkbot::getJointStates(int& timestamp, 
-                             JointState& s1,
-                             JointState& s2,
-                             JointState& s3)
+                             JointState::Type& s1,
+                             JointState::Type& s2,
+                             JointState::Type& s3)
 {
     try {
         auto values = m->proxy.fire(MethodIn::getJointStates{}).get();
         assert(values.values_count >= 3);
-        s1 = static_cast<JointState>(values.values[0]);
-        s2 = static_cast<JointState>(values.values[1]);
-        s3 = static_cast<JointState>(values.values[2]);
+        s1 = static_cast<JointState::Type>(values.values[0]);
+        s2 = static_cast<JointState::Type>(values.values[1]);
+        s3 = static_cast<JointState::Type>(values.values[2]);
     } 
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -317,7 +317,7 @@ void Linkbot::move (int mask, double a0, double a1, double a2) {
     }
 }
 
-void Linkbot::moveContinuous (int mask, MotorDir dir1, MotorDir dir2, MotorDir dir3)
+void Linkbot::moveContinuous (int mask, MotorDir::Type dir1, MotorDir::Type dir2, MotorDir::Type dir3)
 {
     try {
         #warning Unimplemented stub function in Linkbot
