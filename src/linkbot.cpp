@@ -24,6 +24,7 @@ T radToDeg (T x) { return T(double(x) * 180.0 / M_PI); }
 } // file namespace
 
 using MethodIn = rpc::MethodIn<barobo::Robot>;
+using MethodResult = rpc::MethodResult<barobo::Robot>;
 
 struct Linkbot::Impl {
     Impl (const std::string& id)
@@ -286,17 +287,24 @@ void Linkbot::setAccelerometerEventCallback (AccelerometerEventCallback cb, void
 
 void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
     try {
-        if(mask & 0x01) {
-            auto f0 = m->proxy.fire(MethodIn::setMotorControllerOmega { 0, float(degToRad(s0)) });
-            f0.get();
+        using Future = std::future<MethodResult::setMotorControllerOmega>;
+        std::list<Future> futures;
+
+        uint32_t jointNo = 0;
+        for (auto s : { s0, s1, s2 }) {
+            if (mask & (1 << jointNo)) {
+                auto f = m->proxy.fire(
+                    MethodIn::setMotorControllerOmega {
+                        jointNo, float(degToRad(s))
+                    }
+                );
+                futures.emplace_back(std::move(f));
+            }
+            ++jointNo;
         }
-        if(mask & 0x02) {
-            auto f1 = m->proxy.fire(MethodIn::setMotorControllerOmega { 1, float(degToRad(s1)) });
-            f1.get();
-        }
-        if(mask & 0x04) {
-            auto f2 = m->proxy.fire(MethodIn::setMotorControllerOmega { 2, float(degToRad(s2)) });
-            f2.get();
+
+        for (auto& f : futures) {
+            f.get();
         }
     }
     catch (std::exception& e) {
