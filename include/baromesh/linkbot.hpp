@@ -25,21 +25,14 @@ namespace FormFactor {
     };
 }
 
+// hlh: I got rid of MotorDir. Its values were FORWARD, BACKWARD, NEUTRAL, and
+// HOLD. We were considering merging MotorDir with JointState, as I recall.
 namespace JointState {
     enum Type {
         STOP,
         HOLD,
         MOVING,
         FAIL
-    };
-}
-
-namespace MotorDir {
-    enum Type {
-        FORWARD,
-        BACKWARD,
-        NEUTRAL,
-        HOLD
     };
 }
 
@@ -83,7 +76,9 @@ public:
                         JointState::Type & s2,
                         JointState::Type & s3);
     void move (int mask, double, double, double);
-    void moveContinuous (int mask, MotorDir::Type dir1, MotorDir::Type dir2, MotorDir::Type dir3);
+    // moveContinuous takes three angular speed coefficients. Use -1 to move
+    // a motor backward, +1 to move it forward.
+    void moveContinuous (int mask, double, double, double);
     void moveTo (int mask, double, double, double);
     /* Debate: Should moveWait be implemented in a higher level? Technically, it
      * can be implemented with other existing functions, thereby making it not a

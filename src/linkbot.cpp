@@ -325,10 +325,13 @@ void Linkbot::move (int mask, double a0, double a1, double a2) {
     }
 }
 
-void Linkbot::moveContinuous (int mask, MotorDir::Type dir1, MotorDir::Type dir2, MotorDir::Type dir3)
-{
+void Linkbot::moveContinuous (int mask, double c0, double c1, double c2) {
     try {
-        #warning Unimplemented stub function in Linkbot
+        m->proxy.fire(MethodIn::move {
+            bool(mask&0x01), { barobo_Robot_Goal_Type_INFINITE, float(c0) },
+            bool(mask&0x02), { barobo_Robot_Goal_Type_INFINITE, float(c1) },
+            bool(mask&0x04), { barobo_Robot_Goal_Type_INFINITE, float(c2) }
+        }).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
