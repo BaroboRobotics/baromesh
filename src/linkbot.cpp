@@ -30,6 +30,7 @@ struct Linkbot::Impl {
         : serialId(id)
         , proxy(id)
     {
+        std::cout << "Initializing Linkbot Class..." << std::endl;
     }
 
     mutable boost::log::sources::logger log;
