@@ -73,10 +73,15 @@ int linkbotMoveTo(Linkbot*, int mask, double j1, double j2, double j3);
 #define SET_EVENT_CALLBACK(cbname) \
 int linkbotSet##cbname(Linkbot* l, barobo::cbname cb, void* userData)
 SET_EVENT_CALLBACK(ButtonEventCallback);
-SET_EVENT_CALLBACK(EncoderEventCallback);
+//SET_EVENT_CALLBACK(EncoderEventCallback);
 SET_EVENT_CALLBACK(JointEventCallback);
 SET_EVENT_CALLBACK(AccelerometerEventCallback);
 #undef SET_EVENT_CALLBACK
+
+int linkbotSetEncoderEventCallback(Linkbot* l, 
+                                   barobo::EncoderEventCallback cb,
+                                   float granularity,
+                                   void* userData);
 
 #ifdef __cplusplus
 } // extern "C"

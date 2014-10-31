@@ -221,9 +221,35 @@ void Linkbot::setButtonEventCallback (ButtonEventCallback cb, void* userData) {
     }
 }
 
-void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, void* userData) {
+void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, 
+                                       float granularity, void* userData) 
+{
     const bool enable = !!cb;
-    auto granularity = degToRad(float(enable ? 20.0 : 0.0));
+    granularity = degToRad(granularity);
+
+    try {
+        m->proxy.fire(MethodIn::enableEncoderEvent {
+            true, { enable, granularity },
+            true, { enable, granularity },
+            true, { enable, granularity }
+        }).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+
+    if (enable) {
+        m->encoderEventCallback = std::bind(cb, _1, _2, _3, userData);
+    }
+    else {
+        m->encoderEventCallback = nullptr;
+    }
+}
+
+void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, void* userData) 
+{
+    const bool enable = !!cb;
+    auto granularity = degToRad(enable ? 20.0 : 0);
 
     try {
         m->proxy.fire(MethodIn::enableEncoderEvent {

@@ -97,9 +97,24 @@ int linkbotSet##cbname(Linkbot* l, barobo::cbname cb, void* userData) \
 }
 
 SET_EVENT_CALLBACK(ButtonEventCallback)
-SET_EVENT_CALLBACK(EncoderEventCallback)
+//SET_EVENT_CALLBACK(EncoderEventCallback)
 SET_EVENT_CALLBACK(JointEventCallback)
 SET_EVENT_CALLBACK(AccelerometerEventCallback)
+
+int linkbotSetEncoderEventCallback(Linkbot* l, 
+                                   barobo::EncoderEventCallback cb,
+                                   float granularity,
+                                   void* userData)
+{
+    try { 
+        l->impl.setEncoderEventCallback(cb, granularity, userData); 
+        return 0; 
+    } 
+    catch (std::exception& e) { 
+        fprintf(stderr, "Runtime exception: %s\n", e.what()); 
+        return -1; 
+    } 
+}
 
 
 #undef SET_EVENT_CALLBACK
