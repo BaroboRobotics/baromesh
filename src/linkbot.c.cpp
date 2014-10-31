@@ -1,20 +1,20 @@
 #include "baromesh/linkbot.h"
 #include "baromesh/linkbot.hpp"
 
-struct linkbot_s {
-    linkbot_s (const char* serialId) : impl(serialId)
+struct Linkbot {
+    Linkbot (const char* serialId) : impl(serialId)
     {
     }
     barobo::Linkbot impl;
 };
 
-linkbot_t* Linkbot_new(const char* serialId)
+Linkbot* linkbotNew(const char* serialId)
 {
     
-    return new linkbot_s(serialId);
+    return new Linkbot(serialId);
 }
 
-int Linkbot_connect(linkbot_t* l)
+int linkbotConnect(Linkbot* l)
 {
     try {
         l->impl.connect();
@@ -26,7 +26,7 @@ int Linkbot_connect(linkbot_t* l)
     }
 }
 
-int Linkbot_disconnect(linkbot_t* l)
+int linkbotDisconnect(Linkbot* l)
 {
     try {
         l->impl.disconnect();
@@ -38,33 +38,53 @@ int Linkbot_disconnect(linkbot_t* l)
     }
 }
 
+
+#define LINKBOT_C_WRAPPER_FUNC_IMPL(cpp_name, ...) \
+do \
+{ \
+    try { \
+        l->impl. cpp_name (__VA_ARGS__); \
+        return 0; \
+    } \
+    catch (std::exception& e) { \
+        fprintf(stderr, "Runtime exception: %s\n", e.what()); \
+        return -1; \
+    } \
+} while(0)
+
 /*
-int Linkbot_drive(linkbot_t*, int mask, double j1, double j2, double j3);
-int Linkbot_driveTo(linkbot_t*, int mask, double j1, double j2, double j3);
-int Linkbot_getAccelerometer(linkbot_t*, int*timestamp, double*x, double*y,
+int Linkbot_drive(Linkbot*, int mask, double j1, double j2, double j3);
+int Linkbot_driveTo(Linkbot*, int mask, double j1, double j2, double j3);
+int Linkbot_getAccelerometer(Linkbot*, int*timestamp, double*x, double*y,
                              double*z);
 
-int Linkbot_getFormFactor(linkbot_t*, enum FormFactor*);
-int Linkbot_getJointAngles(linkbot_t*, int*timestamp, double*j1, double*j2,
+int Linkbot_getFormFactor(Linkbot*, enum FormFactor*);
+int Linkbot_getJointAngles(Linkbot*, int*timestamp, double*j1, double*j2,
                            double*j3);
-int Linkbot_getJointStates(linkbot_t*, enum JointState* j1, enum JointState* j2,
-                           enum JointState* j3);
 */
-int Linkbot_move(linkbot_t* l, int mask, double j1, double j2, double j3)
+
+int linkbotGetFormFactor(Linkbot *l, barobo::FormFactor *form)
 {
-    try {
-        l->impl.move(mask, j1, j2, j3);
-        return 0;
-    }
-    catch (std::exception& e) {
-        fprintf(stderr, "Runtime exception: %s\n", e.what());
-        return -1;
-    }
+    LINKBOT_C_WRAPPER_FUNC_IMPL(getFormFactor, *form);
 }
-//int Linkbot_moveTo(linkbot_t*, int mask, double j1, double j2, double j3);
+
+int linkbotGetJointStates(Linkbot *l, int *timestamp, barobo::JointState* j1, barobo::JointState* j2,
+                           barobo::JointState* j3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(getJointStates, *timestamp, *j1, *j2, *j3);
+}
+
+int linkbotMove(Linkbot* l, int mask, double j1, double j2, double j3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(move, mask, j1, j2, j3);
+}
+
+int linkbotMoveTo(Linkbot *l, int mask, double j1, double j2, double j3) {
+    LINKBOT_C_WRAPPER_FUNC_IMPL(moveTo, mask, j1, j2, j3);
+}
 
 #define SET_EVENT_CALLBACK(cbname) \
-int Linkbot_set##cbname(linkbot_t* l, barobo::cbname cb, void* userData) \
+int linkbotSet##cbname(Linkbot* l, barobo::cbname cb, void* userData) \
 { \
     try { \
         l->impl.set##cbname(cb, userData); \
@@ -80,5 +100,6 @@ SET_EVENT_CALLBACK(ButtonEventCallback)
 SET_EVENT_CALLBACK(EncoderEventCallback)
 SET_EVENT_CALLBACK(JointEventCallback)
 SET_EVENT_CALLBACK(AccelerometerEventCallback)
+
 
 #undef SET_EVENT_CALLBACK
