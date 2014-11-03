@@ -63,13 +63,15 @@ int Linkbot_getJointAngles(Linkbot*, int*timestamp, double*j1, double*j2,
                            double*j3);
 */
 
-int linkbotGetFormFactor(Linkbot *l, barobo::FormFactor *form)
+int linkbotGetFormFactor(Linkbot *l, barobo::FormFactor::Type *form)
 {
     LINKBOT_C_WRAPPER_FUNC_IMPL(getFormFactor, *form);
 }
 
-int linkbotGetJointStates(Linkbot *l, int *timestamp, barobo::JointState* j1, barobo::JointState* j2,
-                           barobo::JointState* j3)
+int linkbotGetJointStates(Linkbot *l, int *timestamp, 
+                          barobo::JointState::Type* j1, 
+                          barobo::JointState::Type* j2,
+                          barobo::JointState::Type* j3)
 {
     LINKBOT_C_WRAPPER_FUNC_IMPL(getJointStates, *timestamp, *j1, *j2, *j3);
 }

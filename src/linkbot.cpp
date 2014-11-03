@@ -24,6 +24,7 @@ T radToDeg (T x) { return T(double(x) * 180.0 / M_PI); }
 } // file namespace
 
 using MethodIn = rpc::MethodIn<barobo::Robot>;
+using MethodResult = rpc::MethodResult<barobo::Robot>;
 
 struct Linkbot::Impl {
     Impl (const std::string& id)
@@ -39,7 +40,7 @@ struct Linkbot::Impl {
 
     void newButtonValues (int button, int event, int timestamp) {
         if (buttonEventCallback) {
-            buttonEventCallback(button, static_cast<ButtonState>(event), timestamp);
+            buttonEventCallback(button, static_cast<ButtonState::Type>(event), timestamp);
         }
     }
 
@@ -51,7 +52,7 @@ struct Linkbot::Impl {
 
     void newJointState (int jointNo, int state, int timestamp) {
         if (jointEventCallback) {
-            jointEventCallback(jointNo, static_cast<JointState>(state), timestamp);
+            jointEventCallback(jointNo, static_cast<JointState::Type>(state), timestamp);
         }
     }
 
@@ -61,9 +62,9 @@ struct Linkbot::Impl {
         }
     }
 
-    std::function<void(int, ButtonState, int)> buttonEventCallback;
+    std::function<void(int, ButtonState::Type, int)> buttonEventCallback;
     std::function<void(int,double, int)> encoderEventCallback;
-    std::function<void(int,JointState, int)> jointEventCallback;
+    std::function<void(int,JointState::Type, int)> jointEventCallback;
     std::function<void(double,double,double,int)> accelerometerEventCallback;
 };
 
@@ -160,18 +161,18 @@ void Linkbot::getAccelerometer (int& timestamp, double&, double&, double&)
     #warning Unimplemented stub function in Linkbot
 }
 
-void Linkbot::getFormFactor(FormFactor & form)
+void Linkbot::getFormFactor(FormFactor::Type& form)
 {
     try {
         auto value = m->proxy.fire(MethodIn::getFormFactor{}).get();
-        form = FormFactor(value.value);
+        form = FormFactor::Type(value.value);
     } 
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
 }
 
-void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2, int) {
+void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2) {
     try {
         auto values = m->proxy.fire(MethodIn::getEncoderValues{}).get();
         assert(values.values_count >= 3);
@@ -186,17 +187,16 @@ void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2
 }
 
 void Linkbot::getJointStates(int& timestamp, 
-                             JointState& s1,
-                             JointState& s2,
-                             JointState& s3)
+                             JointState::Type& s1,
+                             JointState::Type& s2,
+                             JointState::Type& s3)
 {
     try {
         auto values = m->proxy.fire(MethodIn::getJointStates{}).get();
         assert(values.values_count >= 3);
-        timestamp = values.timestamp;
-        s1 = static_cast<JointState>(values.values[0]);
-        s2 = static_cast<JointState>(values.values[1]);
-        s3 = static_cast<JointState>(values.values[2]);
+        s1 = static_cast<JointState::Type>(values.values[0]);
+        s2 = static_cast<JointState::Type>(values.values[1]);
+        s3 = static_cast<JointState::Type>(values.values[2]);
     } 
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -313,17 +313,24 @@ void Linkbot::setAccelerometerEventCallback (AccelerometerEventCallback cb, void
 
 void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
     try {
-        if(mask & 0x01) {
-            auto f0 = m->proxy.fire(MethodIn::setMotorControllerOmega { 0, float(degToRad(s0)) });
-            f0.get();
+        using Future = std::future<MethodResult::setMotorControllerOmega>;
+        std::list<Future> futures;
+
+        uint32_t jointNo = 0;
+        for (auto s : { s0, s1, s2 }) {
+            if (mask & (1 << jointNo)) {
+                auto f = m->proxy.fire(
+                    MethodIn::setMotorControllerOmega {
+                        jointNo, float(degToRad(s))
+                    }
+                );
+                futures.emplace_back(std::move(f));
+            }
+            ++jointNo;
         }
-        if(mask & 0x02) {
-            auto f1 = m->proxy.fire(MethodIn::setMotorControllerOmega { 1, float(degToRad(s1)) });
-            f1.get();
-        }
-        if(mask & 0x04) {
-            auto f2 = m->proxy.fire(MethodIn::setMotorControllerOmega { 2, float(degToRad(s2)) });
-            f2.get();
+
+        for (auto& f : futures) {
+            f.get();
         }
     }
     catch (std::exception& e) {
@@ -344,10 +351,13 @@ void Linkbot::move (int mask, double a0, double a1, double a2) {
     }
 }
 
-void Linkbot::moveContinuous (int mask, MotorDir dir1, MotorDir dir2, MotorDir dir3)
-{
+void Linkbot::moveContinuous (int mask, double c0, double c1, double c2) {
     try {
-        #warning Unimplemented stub function in Linkbot
+        m->proxy.fire(MethodIn::move {
+            bool(mask&0x01), { barobo_Robot_Goal_Type_INFINITE, float(c0) },
+            bool(mask&0x02), { barobo_Robot_Goal_Type_INFINITE, float(c1) },
+            bool(mask&0x04), { barobo_Robot_Goal_Type_INFINITE, float(c2) }
+        }).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -381,6 +391,18 @@ void Linkbot::setLedColor (int r, int g, int b) {
         m->proxy.fire(MethodIn::setLedColor{
             uint32_t(r << 16 | g << 8 | b)
         }).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
+void Linkbot::getLedColor (int& r, int& g, int& b) {
+    try {
+        auto color = m->proxy.fire(MethodIn::getLedColor{}).get();
+        r = 0xff & color.value >> 16;
+        g = 0xff & color.value >> 8;
+        b = 0xff & color.value;
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());

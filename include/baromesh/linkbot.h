@@ -5,43 +5,44 @@
 extern "C" {
 #endif
 
-#ifdef __cplusplus
 namespace barobo {
-#endif
-enum ButtonState {
-    UP,
-    DOWN
-};
 
-enum FormFactor {
-    FORMFACTOR_I,
-    FORMFACTOR_L,
-    FORMFACTOR_T
-};
+// Since C++03 does not support enum classes, emulate them using namespaces.
+// Usage example:
+//     ButtonState::Type bs = ButtonState::UP;
+namespace ButtonState {
+    enum Type {
+        UP,
+        DOWN
+    };
+}
 
-enum JointState {
-    JOINT_STOP,
-    JOINT_HOLD,
-    JOINT_MOVING,
-    JOINT_FAIL
-};
+namespace FormFactor {
+    enum Type {
+        I,
+        L,
+        T
+    };
+}
 
-enum MotorDir {
-    FORWARD,
-    BACKWARD,
-    NEUTRAL,
-    HOLD
-};
+// hlh: I got rid of MotorDir. Its values were FORWARD, BACKWARD, NEUTRAL, and
+// HOLD. We were considering merging MotorDir with JointState, as I recall.
+namespace JointState {
+    enum Type {
+        STOP,
+        HOLD,
+        MOVING,
+        FAIL
+    };
+}
 
-typedef void (*ButtonEventCallback)(int buttonNo, barobo::ButtonState event, int timestamp, void* userData);
+typedef void (*ButtonEventCallback)(int buttonNo, ButtonState::Type event, int timestamp, void* userData);
 // EncoderEventCallback's anglePosition parameter is reported in degrees.
 typedef void (*EncoderEventCallback)(int jointNo, double anglePosition, int timestamp, void* userData);
-typedef void (*JointEventCallback)(int jointNo, barobo::JointState event, int timestamp, void* userData);
+typedef void (*JointEventCallback)(int jointNo, JointState::Type event, int timestamp, void* userData);
 typedef void (*AccelerometerEventCallback)(double x, double y, double z, int timestamp, void* userData);
 
-#ifdef __cplusplus
 } // namespace barobo
-#endif
 
 //struct Linkbot;
 typedef struct Linkbot Linkbot;
@@ -51,22 +52,20 @@ Linkbot* linkbotNew(const char* serialId);
 int linkbotConnect(Linkbot*);
 int linkbotDisconnect(Linkbot*);
 
-/*
-int Linkbot_drive(Linkbot*, int mask, double j1, double j2, double j3);
-int Linkbot_driveTo(Linkbot*, int mask, double j1, double j2, double j3);
-int Linkbot_getAccelerometer(Linkbot*, int*timestamp, double*x, double*y,
-                             double*z);
-
-int Linkbot_getFormFactor(Linkbot*, enum FormFactor*);
-int Linkbot_getJointAngles(Linkbot*, int*timestamp, double*j1, double*j2,
-                           double*j3);
-*/
 /* GETTERS */
 
-int linkbotGetFormFactor(Linkbot *l, barobo::FormFactor *form);
-int linkbotGetJointStates(Linkbot*, int *timestamp, barobo::JointState* j1, 
-                          barobo::JointState* j2, barobo::JointState* j3);
+int linkbotGetFormFactor(Linkbot *l, barobo::FormFactor::Type *form);
+int linkbotGetJointStates(Linkbot*, int *timestamp, barobo::JointState::Type *j1, 
+                          barobo::JointState::Type *j2, 
+                          barobo::JointState::Type *j3);
 
+/* MOVEMENT */
+int linkbotMoveContinuous(int mask, 
+                          barobo::JointState::Type d1, 
+                          barobo::JointState::Type d2, 
+                          barobo::JointState::Type d3);
+int linkbotDrive(Linkbot*, int mask, double j1, double j2, double j3);
+int linkbotDriveTo(Linkbot*, int mask, double j1, double j2, double j3);
 int linkbotMove(Linkbot*, int mask, double j1, double j2, double j3);
 int linkbotMoveTo(Linkbot*, int mask, double j1, double j2, double j3);
 
