@@ -21,6 +21,8 @@ endif()
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.54.0 REQUIRED COMPONENTS system log filesystem thread)
 
+find_package(Threads)
+
 set(SOURCES
     src/dongledevicepath.cpp
     src/dongleproxy.cpp
@@ -46,6 +48,7 @@ target_link_libraries(baromesh
     PUBLIC sfp rpc cxx-util
            robot-interface dongle-interface
            ${Boost_LIBRARIES}
+           ${CMAKE_THREAD_LIBS_INIT}
     )
 
 if(WIN32)
@@ -54,6 +57,7 @@ if(WIN32)
         )
 endif()
 
+option(BAROMESH_BUILD_TESTS "Build libsfp tests" OFF)
 if(BAROMESH_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
