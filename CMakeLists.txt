@@ -38,10 +38,7 @@ set_source_files_properties(${SOURCES}
     PROPERTIES COMPILE_FLAGS "-std=c++11")
 
 target_include_directories(baromesh
-    PUBLIC $<TARGET_PROPERTY:sfp,INCLUDE_DIRECTORIES>
-           $<TARGET_PROPERTY:robot-interface,INCLUDE_DIRECTORIES>
-           $<TARGET_PROPERTY:cxx-util,INTERFACE_INCLUDE_DIRECTORIES>
-           ${Boost_INCLUDE_DIRS}
+    PUBLIC ${Boost_INCLUDE_DIRS}
            include
     )
 target_link_libraries(baromesh
