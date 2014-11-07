@@ -24,7 +24,7 @@ public:
     void sendMessage (const uint8_t* bytes, size_t size) {
         BOOST_LOG_NAMED_SCOPE("robot::Transport::sendMessage");
 
-        barobo_Dongle_SerialId serialId;
+        barobo_commontypes_SerialId serialId;
         memcpy(serialId.value, mSerialId.c_str(), 5);
 
         barobo_Dongle_Payload payload;
