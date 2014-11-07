@@ -32,10 +32,6 @@ void lavaLamp (std::string serialId) {
         std::cout << serialId << " barobo.Robot interface version "
                   << serviceInfo.interfaceVersion() << '\n';
 
-        if (!serviceInfo.connected()) {
-            std::cout << serialId << ": connection refused\n";
-            return;
-        }
         std::cout << serialId << ": connected\n";
 
         while (1) {

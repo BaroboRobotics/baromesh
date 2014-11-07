@@ -121,13 +121,6 @@ void Linkbot::connect()
                 to_string(serviceInfo.interfaceVersion()) + " != local Robot interface version " +
                 to_string(rpc::Version<barobo::Robot>::triplet()));
         }
-
-        if (serviceInfo.connected()) {
-            BOOST_LOG(m->log) << m->serialId << ": connected";
-        }
-        else {
-            throw Error(std::string("connection refused"));
-        }
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
