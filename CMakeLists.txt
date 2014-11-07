@@ -43,7 +43,7 @@ target_include_directories(baromesh
     )
 target_link_libraries(baromesh
     PUBLIC sfp rpc cxx-util
-           robot-interface dongle-interface
+           robot-interface dongle-interface daemon-interface
            ${Boost_LIBRARIES}
            ${CMAKE_THREAD_LIBS_INIT}
     )
