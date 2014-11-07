@@ -441,9 +441,9 @@ void Linkbot::moveTo (int mask, double a0, double a1, double a2) {
     }
 }
 
-void Linkbot::stop () {
+void Linkbot::stop (int mask) {
     try {
-        m->proxy.fire(MethodIn::stop{}).get();
+        m->proxy.fire(MethodIn::stop{true, mask}).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());

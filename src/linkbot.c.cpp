@@ -137,6 +137,12 @@ int linkbotMoveTo(Linkbot *l, int mask, double j1, double j2, double j3) {
     LINKBOT_C_WRAPPER_FUNC_IMPL(moveTo, mask, j1, j2, j3);
 }
 
+int linkbotStop(Linkbot *l, int mask) {
+    LINKBOT_C_WRAPPER_FUNC_IMPL(stop, mask);
+}
+
+/* CALLBACKS */
+
 #define SET_EVENT_CALLBACK(cbname) \
 int linkbotSet##cbname(Linkbot* l, barobo::cbname cb, void* userData) \
 { \

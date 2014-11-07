@@ -80,6 +80,7 @@ int linkbotDrive(Linkbot*, int mask, double j1, double j2, double j3);
 int linkbotDriveTo(Linkbot*, int mask, double j1, double j2, double j3);
 int linkbotMove(Linkbot*, int mask, double j1, double j2, double j3);
 int linkbotMoveTo(Linkbot*, int mask, double j1, double j2, double j3);
+int linkbotStop(Linkbot*, int mask);
 
 /* CALLBACKS */
 #define SET_EVENT_CALLBACK(cbname) \

@@ -58,7 +58,7 @@ public:
     void getLedColor (int&, int&, int&);
     void setEncoderEventThreshold (int, double);
     void setJointSpeeds (int mask, double, double, double);
-    void stop ();
+    void stop (int mask = 0x07);
     void setBuzzerFrequencyOn (float);
     void getVersions (uint32_t&, uint32_t&, uint32_t&);
 
