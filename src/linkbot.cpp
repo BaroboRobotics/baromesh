@@ -146,19 +146,69 @@ void Linkbot::disconnect()
 
 using namespace std::placeholders; // _1, _2, etc.
 
-void Linkbot::drive (int mask, double, double, double)
+void Linkbot::drive (int mask, double a0, double a1, double a2)
 {
-    #warning Unimplemented stub function in Linkbot
+    try {
+        m->proxy.fire(MethodIn::move {
+            bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE, 
+                               float(degToRad(a0)),
+                               true, 
+                               barobo_Robot_Goal_Controller_PID
+                             },
+            bool(mask&0x02), { barobo_Robot_Goal_Type_RELATIVE, 
+                               float(degToRad(a1)),
+                               true,
+                               barobo_Robot_Goal_Controller_PID
+                             },
+            bool(mask&0x04), { barobo_Robot_Goal_Type_RELATIVE, 
+                               float(degToRad(a2)),
+                               true,
+                               barobo_Robot_Goal_Controller_PID
+                             }
+        }).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
 }
 
-void Linkbot::driveTo (int mask, double, double, double)
+void Linkbot::driveTo (int mask, double a0, double a1, double a2)
 {
-    #warning Unimplemented stub function in Linkbot
+    try {
+        m->proxy.fire(MethodIn::move {
+            bool(mask&0x01), { barobo_Robot_Goal_Type_ABSOLUTE, 
+                               float(degToRad(a0)),
+                               true, 
+                               barobo_Robot_Goal_Controller_PID
+                             },
+            bool(mask&0x02), { barobo_Robot_Goal_Type_ABSOLUTE, 
+                               float(degToRad(a1)),
+                               true,
+                               barobo_Robot_Goal_Controller_PID
+                             },
+            bool(mask&0x04), { barobo_Robot_Goal_Type_ABSOLUTE, 
+                               float(degToRad(a2)),
+                               true,
+                               barobo_Robot_Goal_Controller_PID
+                             }
+        }).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
 }
 
-void Linkbot::getAccelerometer (int& timestamp, double&, double&, double&)
+void Linkbot::getAccelerometer (int& timestamp, double&x, double&y, double&z)
 {
-    #warning Unimplemented stub function in Linkbot
+    try {
+        auto value = m->proxy.fire(MethodIn::getAccelerometerData{}).get();
+        x = value.x;
+        y = value.y;
+        z = value.z;
+    } 
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
 }
 
 void Linkbot::getFormFactor(FormFactor::Type& form)
@@ -181,6 +231,20 @@ void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2
         a2 = radToDeg(values.values[2]);
         timestamp = values.timestamp;
     }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
+void Linkbot::getJointSpeeds(double&s1, double&s2, double&s3)
+{
+    try {
+        auto values = m->proxy.fire(MethodIn::getMotorControllerOmega{}).get();
+        assert(values.values_count >= 3);
+        s1 = values.values[0];
+        s2 = values.values[1];
+        s3 = values.values[2];
+    } 
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
@@ -249,7 +313,7 @@ void Linkbot::setEncoderEventCallback (EncoderEventCallback cb,
 void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, void* userData) 
 {
     const bool enable = !!cb;
-    auto granularity = degToRad(enable ? 20.0 : 0);
+    float granularity = degToRad(enable ? 20.0 : 0);
 
     try {
         m->proxy.fire(MethodIn::enableEncoderEvent {

@@ -14,6 +14,7 @@ Linkbot* linkbotNew(const char* serialId)
     return new Linkbot(serialId);
 }
 
+/* CONNECTION */
 int linkbotConnect(Linkbot* l)
 {
     try {
@@ -52,20 +53,28 @@ do \
     } \
 } while(0)
 
-/*
-int Linkbot_drive(Linkbot*, int mask, double j1, double j2, double j3);
-int Linkbot_driveTo(Linkbot*, int mask, double j1, double j2, double j3);
-int Linkbot_getAccelerometer(Linkbot*, int*timestamp, double*x, double*y,
-                             double*z);
+/* GETTERS */
 
-int Linkbot_getFormFactor(Linkbot*, enum FormFactor*);
-int Linkbot_getJointAngles(Linkbot*, int*timestamp, double*j1, double*j2,
-                           double*j3);
-*/
+int linkbotGetAccelerometer(Linkbot *l, int *timestamp, double *x, double *y,
+                           double *z)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(getAccelerometer, *timestamp, *x, *y, *z);
+}
+
 
 int linkbotGetFormFactor(Linkbot *l, barobo::FormFactor::Type *form)
 {
     LINKBOT_C_WRAPPER_FUNC_IMPL(getFormFactor, *form);
+}
+
+int linkbotGetJointAngles(Linkbot *l, int *timestamp, double *j1, double *j2, double *j3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(getJointAngles, *timestamp, *j1, *j2, *j3);
+}
+
+int linkbotGetJointSpeeds(Linkbot *l, double *s1, double *s2, double *s3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(getJointSpeeds, *s1, *s2, *s3);
 }
 
 int linkbotGetJointStates(Linkbot *l, int *timestamp, 
@@ -76,7 +85,50 @@ int linkbotGetJointStates(Linkbot *l, int *timestamp,
     LINKBOT_C_WRAPPER_FUNC_IMPL(getJointStates, *timestamp, *j1, *j2, *j3);
 }
 
-int linkbotMove(Linkbot* l, int mask, double j1, double j2, double j3)
+int linkbotGetLedColor(Linkbot *l, int *r, int *g, int *b)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(getLedColor, *r, *g, *b);
+}
+
+/* SETTERS */
+
+int linkbotSetEncoderEventThreshold(Linkbot *l, int jointNo, double thresh)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(setEncoderEventThreshold, jointNo, thresh);
+}
+
+int linkbotSetJointSpeeds(Linkbot *l, int mask, double j1, double j2, 
+                          double j3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(setJointSpeeds, mask, j1, j2, j3);
+}
+
+int linkbotSetBuzzerFrequencyOn(Linkbot *l, float freq)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(setBuzzerFrequencyOn, freq);
+}
+
+/* MOVEMENT */
+
+int linkbotMoveContinuous(Linkbot *l, int mask, 
+                          barobo::JointState::Type d1,
+                          barobo::JointState::Type d2,
+                          barobo::JointState::Type d3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(moveContinuous, mask, d1, d2, d3);
+}
+
+int linkbotDrive(Linkbot *l, int mask, double j1, double j2, double j3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(drive, mask, j1, j2, j3);
+}
+
+int linkbotDriveTo(Linkbot *l, int mask, double j1, double j2, double j3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(driveTo, mask, j1, j2, j3);
+}
+
+int linkbotMove(Linkbot *l, int mask, double j1, double j2, double j3)
 {
     LINKBOT_C_WRAPPER_FUNC_IMPL(move, mask, j1, j2, j3);
 }

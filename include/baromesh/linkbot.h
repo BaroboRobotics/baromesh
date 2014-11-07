@@ -49,18 +49,30 @@ typedef struct Linkbot Linkbot;
 
 Linkbot* linkbotNew(const char* serialId);
 
+/* CONNECTION */
 int linkbotConnect(Linkbot*);
 int linkbotDisconnect(Linkbot*);
 
 /* GETTERS */
-
+int linkbotGetAccelerometer(Linkbot *l, int *timestamp, double *x, double *y, 
+                            double *z);
 int linkbotGetFormFactor(Linkbot *l, barobo::FormFactor::Type *form);
+int linkbotGetJointAngles(Linkbot *l, int* timestamp, double *j1, double *j2, 
+                          double *j3);
+int linkbotGetJointSpeeds(Linkbot *l, double *s1, double *s2, double *s3);
 int linkbotGetJointStates(Linkbot*, int *timestamp, barobo::JointState::Type *j1, 
                           barobo::JointState::Type *j2, 
                           barobo::JointState::Type *j3);
+int linkbotGetLedColor(Linkbot *l, int *r, int *g, int *b);
+
+/* SETTERS */
+int linkbotSetEncoderEventThreshold(Linkbot *l, int jointNo, double thresh);
+int linkbotSetJointSpeeds(Linkbot *l, int mask, double j1, double j2, 
+                          double j3);
+int linkbotSetBuzzerFrequencyOn(Linkbot *l, float freq);
 
 /* MOVEMENT */
-int linkbotMoveContinuous(int mask, 
+int linkbotMoveContinuous(Linkbot *l, int mask, 
                           barobo::JointState::Type d1, 
                           barobo::JointState::Type d2, 
                           barobo::JointState::Type d3);
@@ -69,6 +81,7 @@ int linkbotDriveTo(Linkbot*, int mask, double j1, double j2, double j3);
 int linkbotMove(Linkbot*, int mask, double j1, double j2, double j3);
 int linkbotMoveTo(Linkbot*, int mask, double j1, double j2, double j3);
 
+/* CALLBACKS */
 #define SET_EVENT_CALLBACK(cbname) \
 int linkbotSet##cbname(Linkbot* l, barobo::cbname cb, void* userData)
 SET_EVENT_CALLBACK(ButtonEventCallback);

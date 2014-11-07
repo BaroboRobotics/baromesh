@@ -44,6 +44,7 @@ public:
     void getAccelerometer (int& timestamp, double&, double&, double&);
     void getFormFactor(FormFactor::Type & form);
     void getJointAngles (int& timestamp, double&, double&, double&);
+    void getJointSpeeds(double&, double&, double&);
     void getJointStates(int& timestamp, 
                         JointState::Type & s1,
                         JointState::Type & s2,
