@@ -49,7 +49,7 @@ private:
     boost::log::sources::logger_mt mLog;
 
     const std::string mSerialId;
-    static dongle::Proxy mDongleProxy;
+    dongle::Proxy mDongleProxy;
 };
 
 } // namespace robot

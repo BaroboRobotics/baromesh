@@ -2,6 +2,6 @@
 
 namespace robot {
 
-dongle::Proxy Transport::mDongleProxy;
+//dongle::Proxy Transport::mDongleProxy;
 
 } // namespace robot

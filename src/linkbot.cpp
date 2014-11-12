@@ -146,19 +146,69 @@ void Linkbot::disconnect()
 
 using namespace std::placeholders; // _1, _2, etc.
 
-void Linkbot::drive (int mask, double, double, double)
+void Linkbot::drive (int mask, double a0, double a1, double a2)
 {
-    #warning Unimplemented stub function in Linkbot
+    try {
+        m->proxy.fire(MethodIn::move {
+            bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE, 
+                               float(degToRad(a0)),
+                               true, 
+                               barobo_Robot_Goal_Controller_PID
+                             },
+            bool(mask&0x02), { barobo_Robot_Goal_Type_RELATIVE, 
+                               float(degToRad(a1)),
+                               true,
+                               barobo_Robot_Goal_Controller_PID
+                             },
+            bool(mask&0x04), { barobo_Robot_Goal_Type_RELATIVE, 
+                               float(degToRad(a2)),
+                               true,
+                               barobo_Robot_Goal_Controller_PID
+                             }
+        }).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
 }
 
-void Linkbot::driveTo (int mask, double, double, double)
+void Linkbot::driveTo (int mask, double a0, double a1, double a2)
 {
-    #warning Unimplemented stub function in Linkbot
+    try {
+        m->proxy.fire(MethodIn::move {
+            bool(mask&0x01), { barobo_Robot_Goal_Type_ABSOLUTE, 
+                               float(degToRad(a0)),
+                               true, 
+                               barobo_Robot_Goal_Controller_PID
+                             },
+            bool(mask&0x02), { barobo_Robot_Goal_Type_ABSOLUTE, 
+                               float(degToRad(a1)),
+                               true,
+                               barobo_Robot_Goal_Controller_PID
+                             },
+            bool(mask&0x04), { barobo_Robot_Goal_Type_ABSOLUTE, 
+                               float(degToRad(a2)),
+                               true,
+                               barobo_Robot_Goal_Controller_PID
+                             }
+        }).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
 }
 
-void Linkbot::getAccelerometer (int& timestamp, double&, double&, double&)
+void Linkbot::getAccelerometer (int& timestamp, double&x, double&y, double&z)
 {
-    #warning Unimplemented stub function in Linkbot
+    try {
+        auto value = m->proxy.fire(MethodIn::getAccelerometerData{}).get();
+        x = value.x;
+        y = value.y;
+        z = value.z;
+    } 
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
 }
 
 void Linkbot::getFormFactor(FormFactor::Type& form)
@@ -181,6 +231,20 @@ void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2
         a2 = radToDeg(values.values[2]);
         timestamp = values.timestamp;
     }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
+void Linkbot::getJointSpeeds(double&s1, double&s2, double&s3)
+{
+    try {
+        auto values = m->proxy.fire(MethodIn::getMotorControllerOmega{}).get();
+        assert(values.values_count >= 3);
+        s1 = values.values[0];
+        s2 = values.values[1];
+        s3 = values.values[2];
+    } 
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
@@ -221,9 +285,35 @@ void Linkbot::setButtonEventCallback (ButtonEventCallback cb, void* userData) {
     }
 }
 
-void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, void* userData) {
+void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, 
+                                       float granularity, void* userData) 
+{
     const bool enable = !!cb;
-    auto granularity = degToRad(float(enable ? 20.0 : 0.0));
+    granularity = degToRad(granularity);
+
+    try {
+        m->proxy.fire(MethodIn::enableEncoderEvent {
+            true, { enable, granularity },
+            true, { enable, granularity },
+            true, { enable, granularity }
+        }).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+
+    if (enable) {
+        m->encoderEventCallback = std::bind(cb, _1, _2, _3, userData);
+    }
+    else {
+        m->encoderEventCallback = nullptr;
+    }
+}
+
+void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, void* userData) 
+{
+    const bool enable = !!cb;
+    float granularity = degToRad(enable ? 20.0 : 0);
 
     try {
         m->proxy.fire(MethodIn::enableEncoderEvent {
@@ -287,25 +377,13 @@ void Linkbot::setAccelerometerEventCallback (AccelerometerEventCallback cb, void
 
 void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
     try {
-        using Future = std::future<MethodResult::setMotorControllerOmega>;
-        std::list<Future> futures;
-
-        uint32_t jointNo = 0;
-        for (auto s : { s0, s1, s2 }) {
-            if (mask & (1 << jointNo)) {
-                auto f = m->proxy.fire(
-                    MethodIn::setMotorControllerOmega {
-                        jointNo, float(degToRad(s))
-                    }
-                );
-                futures.emplace_back(std::move(f));
-            }
-            ++jointNo;
-        }
-
-        for (auto& f : futures) {
-            f.get();
-        }
+        barobo_Robot_setMotorControllerOmega_In arg;
+        arg.mask = mask;
+        arg.values_count = 3;
+        arg.values[0] = float(degToRad(s0));
+        arg.values[1] = float(degToRad(s1));
+        arg.values[2] = float(degToRad(s2));
+        m->proxy.fire(arg).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -315,9 +393,15 @@ void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
 void Linkbot::move (int mask, double a0, double a1, double a2) {
     try {
         m->proxy.fire(MethodIn::move {
-            bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE, float(degToRad(a0)) },
-            bool(mask&0x02), { barobo_Robot_Goal_Type_RELATIVE, float(degToRad(a1)) },
-            bool(mask&0x04), { barobo_Robot_Goal_Type_RELATIVE, float(degToRad(a2)) }
+            bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE, 
+                               float(degToRad(a0)),
+                               false},
+            bool(mask&0x02), { barobo_Robot_Goal_Type_RELATIVE, 
+                               float(degToRad(a1)),
+                               false},
+            bool(mask&0x04), { barobo_Robot_Goal_Type_RELATIVE, 
+                               float(degToRad(a2)),
+                               false}
         }).get();
     }
     catch (std::exception& e) {
@@ -351,9 +435,9 @@ void Linkbot::moveTo (int mask, double a0, double a1, double a2) {
     }
 }
 
-void Linkbot::stop () {
+void Linkbot::stop (int mask) {
     try {
-        m->proxy.fire(MethodIn::stop{}).get();
+        m->proxy.fire(MethodIn::stop{true, mask}).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -405,6 +489,23 @@ void Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
         patch = version.patch;
         BOOST_LOG(m->log) << m->serialId << " Firmware version "
                            << major << '.' << minor << '.' << patch;
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
+void Linkbot::writeEeprom(uint32_t address, const uint8_t *data, size_t size)
+{
+    if(size > 128) {
+        throw Error(m->serialId + ": Payload size too large");
+    }
+    try {
+        MethodIn::writeEeprom arg;
+        arg.address = address;
+        memcpy(arg.data.bytes, data, size);
+        arg.data.size = size;
+        m->proxy.fire(arg);
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());

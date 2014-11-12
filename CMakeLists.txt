@@ -30,6 +30,7 @@ set(SOURCES
     src/robotproxy.cpp
     src/robottransport.cpp
     src/linkbot.cpp
+    src/linkbot.c.cpp
     )
 
 add_library(baromesh ${SOURCES})
