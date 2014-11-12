@@ -1,12 +1,18 @@
 #include "baromesh/linkbot.h"
 #include "baromesh/linkbot.hpp"
 
+namespace baromesh {
+
 struct Linkbot {
     Linkbot (const char* serialId) : impl(serialId)
     {
     }
     barobo::Linkbot impl;
 };
+
+}
+
+using namespace baromesh;
 
 Linkbot* linkbotNew(const char* serialId)
 {
@@ -116,6 +122,11 @@ int linkbotMoveContinuous(Linkbot *l, int mask,
                           barobo::JointState::Type d3)
 {
     LINKBOT_C_WRAPPER_FUNC_IMPL(moveContinuous, mask, d1, d2, d3);
+}
+
+int linkbotWriteEeprom(Linkbot *l, unsigned int address, const char *data, unsigned int size)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(writeEeprom, uint32_t(address), (uint8_t*)(data), size_t(size));
 }
 
 int linkbotDrive(Linkbot *l, int mask, double j1, double j2, double j3)

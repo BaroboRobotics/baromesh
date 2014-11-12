@@ -62,6 +62,8 @@ public:
     void setBuzzerFrequencyOn (float);
     void getVersions (uint32_t&, uint32_t&, uint32_t&);
 
+    void writeEeprom(uint32_t address, const uint8_t *data, size_t size);
+
     typedef void (*ButtonEventCallback)(int buttonNo, ButtonState::Type event, int timestamp, void* userData);
     // EncoderEventCallback's anglePosition parameter is reported in degrees.
     typedef void (*EncoderEventCallback)(int jointNo, double anglePosition, int timestamp, void* userData);

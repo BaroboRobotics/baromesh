@@ -1,6 +1,7 @@
 #ifndef BAROMESH_LINKBOT_H_
 #define BAROMESH_LINKBOT_H_
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,53 +46,58 @@ typedef void (*AccelerometerEventCallback)(double x, double y, double z, int tim
 } // namespace barobo
 
 //struct Linkbot;
+namespace baromesh {
 typedef struct Linkbot Linkbot;
+}
 
-Linkbot* linkbotNew(const char* serialId);
+baromesh::Linkbot* linkbotNew(const char* serialId);
 
 /* CONNECTION */
-int linkbotConnect(Linkbot*);
-int linkbotDisconnect(Linkbot*);
+int linkbotConnect(baromesh::Linkbot*);
+int linkbotDisconnect(baromesh::Linkbot*);
+
+/* MISC */
+int linkbotWriteEeprom(baromesh::Linkbot *l, unsigned int address, const char *data, unsigned int size);
 
 /* GETTERS */
-int linkbotGetAccelerometer(Linkbot *l, int *timestamp, double *x, double *y, 
+int linkbotGetAccelerometer(baromesh::Linkbot *l, int *timestamp, double *x, double *y, 
                             double *z);
-int linkbotGetFormFactor(Linkbot *l, barobo::FormFactor::Type *form);
-int linkbotGetJointAngles(Linkbot *l, int* timestamp, double *j1, double *j2, 
+int linkbotGetFormFactor(baromesh::Linkbot *l, barobo::FormFactor::Type *form);
+int linkbotGetJointAngles(baromesh::Linkbot *l, int* timestamp, double *j1, double *j2, 
                           double *j3);
-int linkbotGetJointSpeeds(Linkbot *l, double *s1, double *s2, double *s3);
-int linkbotGetJointStates(Linkbot*, int *timestamp, barobo::JointState::Type *j1, 
+int linkbotGetJointSpeeds(baromesh::Linkbot *l, double *s1, double *s2, double *s3);
+int linkbotGetJointStates(baromesh::Linkbot*, int *timestamp, barobo::JointState::Type *j1, 
                           barobo::JointState::Type *j2, 
                           barobo::JointState::Type *j3);
-int linkbotGetLedColor(Linkbot *l, int *r, int *g, int *b);
+int linkbotGetLedColor(baromesh::Linkbot *l, int *r, int *g, int *b);
 
 /* SETTERS */
-int linkbotSetEncoderEventThreshold(Linkbot *l, int jointNo, double thresh);
-int linkbotSetJointSpeeds(Linkbot *l, int mask, double j1, double j2, 
+int linkbotSetEncoderEventThreshold(baromesh::Linkbot *l, int jointNo, double thresh);
+int linkbotSetJointSpeeds(baromesh::Linkbot *l, int mask, double j1, double j2, 
                           double j3);
-int linkbotSetBuzzerFrequencyOn(Linkbot *l, float freq);
+int linkbotSetBuzzerFrequencyOn(baromesh::Linkbot *l, float freq);
 
 /* MOVEMENT */
-int linkbotMoveContinuous(Linkbot *l, int mask, 
+int linkbotMoveContinuous(baromesh::Linkbot *l, int mask, 
                           barobo::JointState::Type d1, 
                           barobo::JointState::Type d2, 
                           barobo::JointState::Type d3);
-int linkbotDrive(Linkbot*, int mask, double j1, double j2, double j3);
-int linkbotDriveTo(Linkbot*, int mask, double j1, double j2, double j3);
-int linkbotMove(Linkbot*, int mask, double j1, double j2, double j3);
-int linkbotMoveTo(Linkbot*, int mask, double j1, double j2, double j3);
-int linkbotStop(Linkbot*, int mask);
+int linkbotDrive(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
+int linkbotDriveTo(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
+int linkbotMove(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
+int linkbotMoveTo(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
+int linkbotStop(baromesh::Linkbot*, int mask);
 
 /* CALLBACKS */
 #define SET_EVENT_CALLBACK(cbname) \
-int linkbotSet##cbname(Linkbot* l, barobo::cbname cb, void* userData)
+int linkbotSet##cbname(baromesh::Linkbot* l, barobo::cbname cb, void* userData)
 SET_EVENT_CALLBACK(ButtonEventCallback);
 //SET_EVENT_CALLBACK(EncoderEventCallback);
 SET_EVENT_CALLBACK(JointEventCallback);
 SET_EVENT_CALLBACK(AccelerometerEventCallback);
 #undef SET_EVENT_CALLBACK
 
-int linkbotSetEncoderEventCallback(Linkbot* l, 
+int linkbotSetEncoderEventCallback(baromesh::Linkbot* l, 
                                    barobo::EncoderEventCallback cb,
                                    float granularity,
                                    void* userData);

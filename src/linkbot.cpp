@@ -377,25 +377,13 @@ void Linkbot::setAccelerometerEventCallback (AccelerometerEventCallback cb, void
 
 void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
     try {
-        using Future = std::future<MethodResult::setMotorControllerOmega>;
-        std::list<Future> futures;
-
-        uint32_t jointNo = 0;
-        for (auto s : { s0, s1, s2 }) {
-            if (mask & (1 << jointNo)) {
-                auto f = m->proxy.fire(
-                    MethodIn::setMotorControllerOmega {
-                        jointNo, float(degToRad(s))
-                    }
-                );
-                futures.emplace_back(std::move(f));
-            }
-            ++jointNo;
-        }
-
-        for (auto& f : futures) {
-            f.get();
-        }
+        barobo_Robot_setMotorControllerOmega_In arg;
+        arg.mask = mask;
+        arg.values_count = 3;
+        arg.values[0] = float(degToRad(s0));
+        arg.values[1] = float(degToRad(s1));
+        arg.values[2] = float(degToRad(s2));
+        m->proxy.fire(arg).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -405,9 +393,15 @@ void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
 void Linkbot::move (int mask, double a0, double a1, double a2) {
     try {
         m->proxy.fire(MethodIn::move {
-            bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE, float(degToRad(a0)) },
-            bool(mask&0x02), { barobo_Robot_Goal_Type_RELATIVE, float(degToRad(a1)) },
-            bool(mask&0x04), { barobo_Robot_Goal_Type_RELATIVE, float(degToRad(a2)) }
+            bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE, 
+                               float(degToRad(a0)),
+                               false},
+            bool(mask&0x02), { barobo_Robot_Goal_Type_RELATIVE, 
+                               float(degToRad(a1)),
+                               false},
+            bool(mask&0x04), { barobo_Robot_Goal_Type_RELATIVE, 
+                               float(degToRad(a2)),
+                               false}
         }).get();
     }
     catch (std::exception& e) {
@@ -495,6 +489,23 @@ void Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
         patch = version.patch;
         BOOST_LOG(m->log) << m->serialId << " Firmware version "
                            << major << '.' << minor << '.' << patch;
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
+void Linkbot::writeEeprom(uint32_t address, const uint8_t *data, size_t size)
+{
+    if(size > 128) {
+        throw Error(m->serialId + ": Payload size too large");
+    }
+    try {
+        MethodIn::writeEeprom arg;
+        arg.address = address;
+        memcpy(arg.data.bytes, data, size);
+        arg.data.size = size;
+        m->proxy.fire(arg);
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
