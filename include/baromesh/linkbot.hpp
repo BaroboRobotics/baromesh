@@ -58,6 +58,11 @@ public:
     void getLedColor (int&, int&, int&);
     void setEncoderEventThreshold (int, double);
     void setJointSpeeds (int mask, double, double, double);
+    void setJointStates(
+        int mask,
+        JointState::Type s1, double d1,
+        JointState::Type s2, double d2,
+        JointState::Type s3, double d3);
     void stop (int mask = 0x07);
     void setBuzzerFrequencyOn (float);
     void getVersions (uint32_t&, uint32_t&, uint32_t&);

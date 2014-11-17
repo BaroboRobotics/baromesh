@@ -76,12 +76,16 @@ int linkbotSetEncoderEventThreshold(baromesh::Linkbot *l, int jointNo, double th
 int linkbotSetJointSpeeds(baromesh::Linkbot *l, int mask, double j1, double j2, 
                           double j3);
 int linkbotSetBuzzerFrequencyOn(baromesh::Linkbot *l, float freq);
+int linkbotSetJointStates(baromesh::Linkbot *l, int mask, 
+        barobo::JointState::Type s1, double d1,
+        barobo::JointState::Type s2, double d2,
+        barobo::JointState::Type s3, double d3);
 
 /* MOVEMENT */
 int linkbotMoveContinuous(baromesh::Linkbot *l, int mask, 
-                          barobo::JointState::Type d1, 
-                          barobo::JointState::Type d2, 
-                          barobo::JointState::Type d3);
+                          double d1, 
+                          double d2, 
+                          double d3);
 int linkbotDrive(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
 int linkbotDriveTo(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
 int linkbotMove(baromesh::Linkbot*, int mask, double j1, double j2, double j3);

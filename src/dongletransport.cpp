@@ -77,6 +77,13 @@ void Transport::threadMain () {
             mSerial.close();
             mSerial.open(path);
             mSerial.set_option(boost::asio::serial_port_base::baud_rate(kBaudRate));
+            mSerial.set_option(
+                boost::asio::serial_port_base::parity(
+                    boost::asio::serial_port_base::parity::none));
+            mSerial.set_option(boost::asio::serial_port_base::character_size(8));
+            mSerial.set_option(
+                boost::asio::serial_port_base::stop_bits(
+                    boost::asio::serial_port_base::stop_bits::one));
             BOOST_LOG(mLog) << path << " opened";
             asyncRead();
 

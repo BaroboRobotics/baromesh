@@ -114,12 +114,24 @@ int linkbotSetBuzzerFrequencyOn(Linkbot *l, float freq)
     LINKBOT_C_WRAPPER_FUNC_IMPL(setBuzzerFrequencyOn, freq);
 }
 
+int linkbotSetJointStates(Linkbot *l, int mask, 
+        barobo::JointState::Type s1, double d1,
+        barobo::JointState::Type s2, double d2,
+        barobo::JointState::Type s3, double d3
+        )
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(setJointStates, mask, 
+        s1, d1,
+        s2, d2,
+        s3, d3);
+}
+
 /* MOVEMENT */
 
 int linkbotMoveContinuous(Linkbot *l, int mask, 
-                          barobo::JointState::Type d1,
-                          barobo::JointState::Type d2,
-                          barobo::JointState::Type d3)
+                          double d1,
+                          double d2,
+                          double d3)
 {
     LINKBOT_C_WRAPPER_FUNC_IMPL(moveContinuous, mask, d1, d2, d3);
 }
