@@ -427,6 +427,32 @@ void Linkbot::moveTo (int mask, double a0, double a1, double a2) {
     }
 }
 
+void Linkbot::motorPower(int mask, int m1, int m2, int m3)
+{
+    try {
+        m->proxy.fire(MethodIn::move {
+            bool(mask&0x01), { barobo_Robot_Goal_Type_INFINITE, 
+                               float(m1),
+                               true, 
+                               barobo_Robot_Goal_Controller_PID
+                             },
+            bool(mask&0x02), { barobo_Robot_Goal_Type_INFINITE, 
+                               float(m2),
+                               true,
+                               barobo_Robot_Goal_Controller_PID
+                             },
+            bool(mask&0x04), { barobo_Robot_Goal_Type_INFINITE, 
+                               float(m3),
+                               true,
+                               barobo_Robot_Goal_Controller_PID
+                             }
+        }).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
 void Linkbot::stop (int mask) {
     try {
         m->proxy.fire(MethodIn::stop{true, mask}).get();

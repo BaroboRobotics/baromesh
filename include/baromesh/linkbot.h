@@ -88,6 +88,7 @@ int linkbotMoveContinuous(baromesh::Linkbot *l, int mask,
                           double d3);
 int linkbotDrive(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
 int linkbotDriveTo(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
+int linkbotMotorPower(baromesh::Linkbot*, int mask, int m1, int m2, int m3);
 int linkbotMove(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
 int linkbotMoveTo(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
 int linkbotStop(baromesh::Linkbot*, int mask);

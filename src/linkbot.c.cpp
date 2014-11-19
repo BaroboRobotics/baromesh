@@ -160,6 +160,11 @@ int linkbotMoveTo(Linkbot *l, int mask, double j1, double j2, double j3) {
     LINKBOT_C_WRAPPER_FUNC_IMPL(moveTo, mask, j1, j2, j3);
 }
 
+int linkbotMotorPower(Linkbot *l, int mask, int m1, int m2, int m3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(motorPower, mask, m1, m2, m3);
+}
+
 int linkbotStop(Linkbot *l, int mask) {
     LINKBOT_C_WRAPPER_FUNC_IMPL(stop, mask);
 }

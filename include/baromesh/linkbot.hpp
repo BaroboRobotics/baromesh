@@ -54,6 +54,7 @@ public:
     // a motor backward, +1 to move it forward.
     void moveContinuous (int mask, double, double, double);
     void moveTo (int mask, double, double, double);
+    void motorPower(int mask, int m1, int m2, int m3);
     void setLedColor (int, int, int);
     void getLedColor (int&, int&, int&);
     void setEncoderEventThreshold (int, double);
