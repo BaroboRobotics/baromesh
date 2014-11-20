@@ -284,7 +284,7 @@ static int getCOMPort (HDEVINFO devices, PSP_DEVINFO_DATA dev, char *comport, si
 /* Find an attached dongle device and return the COM port name via the output
  * parameter tty. tty is a user-supplied buffer of size len. Return the COM
  * port number, if anyone cares. On error, return -1. */
-int devicePathImpl (char *tty, size_t len) {
+int dongleDevicePathImpl (char *tty, size_t len) {
     /* Get all USB devices that provide a serial or parallel port interface. */
     HDEVINFO devices = SetupDiGetClassDevs(
             &GUID_DEVCLASS_PORTS,

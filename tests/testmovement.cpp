@@ -11,8 +11,11 @@
 
 void testMovement (std::string serialId) {
     double t = 0;
-    barobo::Linkbot linkbot { serialId };
     try {
+        barobo::Linkbot linkbot { serialId };
+
+        std::cout << "Linkbot " << serialId << " constructed\n";
+
         using std::this_thread::sleep_for;
         using std::chrono::seconds;
         using std::chrono::milliseconds;
@@ -56,7 +59,7 @@ void testMovement (std::string serialId) {
         std::cout << std::hex;
         // FIXME: This serial ID should be information baked into e.what() in
         // some cases.
-        std::cout << "(" << serialId << ") error setting color(" << t << "): "
+        std::cout << "(" << serialId << ") error running test routine: "
                   << e.what() << '\n';
     }
 }

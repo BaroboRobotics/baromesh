@@ -1,5 +1,6 @@
-#include "baromesh/dongledevicepath.hpp"
-#include "baromesh/dongleexception.hpp"
+#include "dongledevicepath.hpp"
+
+#include "baromesh/system_error.hpp"
 
 struct usb_dongle_id {
   const char *manufacturer;
@@ -15,21 +16,23 @@ static const usb_dongle_id g_barobo_usb_dongle_ids[] = {
   { "Barobo, Inc.", "Barobo USB-Serial Adapter" }
 };
 
-static int devicePathImpl(char *, size_t);
+static int dongleDevicePathImpl(char *, size_t);
 
-namespace dongle {
+namespace baromesh {
 
-std::string devicePath () {
+std::string dongleDevicePath (boost::system::error_code& ec) {
     // Get the dongle device path, i.e.: /dev/ttyACM0, \\.\COM3, etc.
     char path[64];
-    auto status = devicePathImpl(path, sizeof(path));
+    auto status = dongleDevicePathImpl(path, sizeof(path));
     if (-1 == status) {
-        throw DongleNotFoundException();
+      ec = Status::DONGLE_NOT_FOUND;
+      return {};
     }
+    ec = Status::OK;
     return std::string(path);
 }
 
-}
+} // namespace baromesh
 
 
 /* For convenience. */

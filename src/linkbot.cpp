@@ -1,5 +1,15 @@
+#include "gen-robot.pb.hpp"
+
+#include "iocore.hpp"
+#include "daemon.hpp"
+
 #include "baromesh/linkbot.hpp"
-#include "baromesh/robotproxy.hpp"
+
+#include "rpc/asio/client.hpp"
+#include "sfp/asio/messagequeue.hpp"
+
+#include <boost/asio.hpp>
+#include <boost/asio/use_future.hpp>
 
 #include <boost/log/common.hpp>
 #include <boost/log/sources/logger.hpp>
@@ -29,14 +39,19 @@ using MethodResult = rpc::MethodResult<barobo::Robot>;
 struct Linkbot::Impl {
     Impl (const std::string& id)
         : serialId(id)
-        , proxy(id)
-    {
-    }
+        , client(baromesh::ioCore().ios())
+        , work(baromesh::ioCore().ios())
+    {}
 
     mutable boost::log::sources::logger log;
 
     std::string serialId;
-    robot::Proxy proxy;
+
+    boost::asio::io_service ios;
+    rpc::asio::Client<sfp::asio::MessageQueue<boost::asio::ip::tcp::socket>> client;
+
+    boost::asio::io_service::work work;
+#if 0
 
     void newButtonValues (int button, int event, int timestamp) {
         if (buttonEventCallback) {
@@ -66,6 +81,7 @@ struct Linkbot::Impl {
     std::function<void(int,double, int)> encoderEventCallback;
     std::function<void(int,JointState::Type, int)> jointEventCallback;
     std::function<void(double,double,double,int)> accelerometerEventCallback;
+#endif
 };
 
 Linkbot::Linkbot (const std::string& id)
@@ -75,6 +91,7 @@ Linkbot::Linkbot (const std::string& id)
     // up if any code in the rest of the ctor throws.
     std::unique_ptr<Impl> p { new Linkbot::Impl(id) };
 
+#if 0
     p->proxy.buttonEvent.connect(
         BIND_MEM_CB(&Linkbot::Impl::newButtonValues, p.get())
     );
@@ -87,7 +104,32 @@ Linkbot::Linkbot (const std::string& id)
     p->proxy.accelerometerEvent.connect(
         BIND_MEM_CB(&Linkbot::Impl::newAccelerometerValues, p.get())
     );
+#endif
 
+    // Connect to the daemon and get a 
+    using Tcp = boost::asio::ip::tcp;
+
+    Tcp::resolver resolver { baromesh::ioCore().ios() };
+    auto iter = resolver.resolve(std::string("42000"));
+
+    baromesh::Daemon daemon { baromesh::ioCore().ios() };
+
+    boost::asio::connect(daemon.client().messageQueue().stream(), iter);
+    daemon.client().messageQueue().asyncHandshake(boost::asio::use_future).get();
+    asyncConnect(daemon.client(), std::chrono::milliseconds(100), boost::asio::use_future).get();
+
+    auto epIter = daemon.asyncGetRobotTcpEndpoint(p->serialId, boost::asio::use_future).get();
+
+    BOOST_LOG(p->log) << "TCP endpoint for " << p->serialId << ": " << epIter->endpoint();
+
+    asyncDisconnect(daemon.client(), std::chrono::milliseconds(100), boost::asio::use_future).get();
+    daemon.client().messageQueue().asyncShutdown(boost::asio::use_future).get();
+    daemon.client().messageQueue().stream().close();
+
+#if 0
+    m->client.messageQueue().stream().connect(endpoint);
+    m->client.messageQueue().asyncHandshake(boost::asio::use_future).get();
+#endif
     // Our C++03 API only uses a raw pointer, so transfer ownership from the
     // unique_ptr to the raw pointer. This should always be the last line of
     // the ctor.
@@ -106,6 +148,7 @@ std::string Linkbot::serialId () const {
 
 void Linkbot::connect()
 {
+#if 0
     try {
         auto serviceInfo = m->proxy.connect().get();
 
@@ -125,16 +168,19 @@ void Linkbot::connect()
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
+#endif
 }
 
 void Linkbot::disconnect()
 {
+#if 0
     try {
         m->proxy.disconnect().get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
+#endif
 }
 
 using namespace std::placeholders; // _1, _2, etc.
@@ -156,6 +202,8 @@ void Linkbot::getAccelerometer (int& timestamp, double&, double&, double&)
 
 void Linkbot::getFormFactor(FormFactor::Type& form)
 {
+#if 0
+
     try {
         auto value = m->proxy.fire(MethodIn::getFormFactor{}).get();
         form = FormFactor::Type(value.value);
@@ -163,9 +211,13 @@ void Linkbot::getFormFactor(FormFactor::Type& form)
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
+#endif
+
 }
 
 void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2) {
+#if 0
+
     try {
         auto values = m->proxy.fire(MethodIn::getEncoderValues{}).get();
         assert(values.values_count >= 3);
@@ -177,6 +229,8 @@ void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
+#endif
+
 }
 
 void Linkbot::getJointStates(int& timestamp, 
@@ -184,6 +238,8 @@ void Linkbot::getJointStates(int& timestamp,
                              JointState::Type& s2,
                              JointState::Type& s3)
 {
+#if 0
+
     try {
         auto values = m->proxy.fire(MethodIn::getJointStates{}).get();
         assert(values.values_count >= 3);
@@ -194,9 +250,13 @@ void Linkbot::getJointStates(int& timestamp,
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
+#endif
+
 }
 
 void Linkbot::setButtonEventCallback (ButtonEventCallback cb, void* userData) {
+#if 0
+
     const bool enable = !!cb;
 
     try {
@@ -212,9 +272,13 @@ void Linkbot::setButtonEventCallback (ButtonEventCallback cb, void* userData) {
     else {
         m->buttonEventCallback = nullptr;
     }
+#endif
+
 }
 
 void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, void* userData) {
+#if 0
+
     const bool enable = !!cb;
     auto granularity = degToRad(float(enable ? 20.0 : 0.0));
 
@@ -235,9 +299,13 @@ void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, void* userData) 
     else {
         m->encoderEventCallback = nullptr;
     }
+#endif
+
 }
 
 void Linkbot::setJointEventCallback (JointEventCallback cb, void* userData) {
+#if 0
+
     const bool enable = !!cb;
 
     try {
@@ -255,9 +323,13 @@ void Linkbot::setJointEventCallback (JointEventCallback cb, void* userData) {
     else {
         m->jointEventCallback = nullptr;
     }
+#endif
+
 }
 
 void Linkbot::setAccelerometerEventCallback (AccelerometerEventCallback cb, void* userData) {
+#if 0
+
     const bool enable = !!cb;
     auto granularity = float(enable ? 0.05 : 0);
 
@@ -276,9 +348,13 @@ void Linkbot::setAccelerometerEventCallback (AccelerometerEventCallback cb, void
     else {
         m->accelerometerEventCallback = nullptr;
     }
+#endif
+
 }
 
 void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
+#if 0
+
     try {
         using Future = std::future<MethodResult::setMotorControllerOmega>;
         std::list<Future> futures;
@@ -303,9 +379,13 @@ void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
+#endif
+
 }
 
 void Linkbot::move (int mask, double a0, double a1, double a2) {
+#if 0
+
     try {
         m->proxy.fire(MethodIn::move {
             bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE, float(degToRad(a0)) },
@@ -316,12 +396,16 @@ void Linkbot::move (int mask, double a0, double a1, double a2) {
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
+#endif
+
 }
 
 void Linkbot::moveContinuous (int mask, double c0, double c1, double c2) {
+#if 0
+
     try {
         m->proxy.fire(MethodIn::move {
-            bool(mask&0x01), { barobo_Robot_Goal_Type_INFINITE, float(c0) },
+        bool(mask&0x01), { barobo_Robot_Goal_Type_INFINITE, float(c0) },
             bool(mask&0x02), { barobo_Robot_Goal_Type_INFINITE, float(c1) },
             bool(mask&0x04), { barobo_Robot_Goal_Type_INFINITE, float(c2) }
         }).get();
@@ -329,9 +413,13 @@ void Linkbot::moveContinuous (int mask, double c0, double c1, double c2) {
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
+#endif
+
 }
 
 void Linkbot::moveTo (int mask, double a0, double a1, double a2) {
+#if 0
+
     try {
         m->proxy.fire(MethodIn::move {
             bool(mask&0x01), { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a0)) },
@@ -342,18 +430,26 @@ void Linkbot::moveTo (int mask, double a0, double a1, double a2) {
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
+#endif
+
 }
 
 void Linkbot::stop () {
+#if 0
+
     try {
         m->proxy.fire(MethodIn::stop{}).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
+#endif
+
 }
 
 void Linkbot::setLedColor (int r, int g, int b) {
+#if 0
+
     try {
         m->proxy.fire(MethodIn::setLedColor{
             uint32_t(r << 16 | g << 8 | b)
@@ -362,9 +458,13 @@ void Linkbot::setLedColor (int r, int g, int b) {
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
+#endif
+
 }
 
 void Linkbot::getLedColor (int& r, int& g, int& b) {
+#if 0
+
     try {
         auto color = m->proxy.fire(MethodIn::getLedColor{}).get();
         r = 0xff & color.value >> 16;
@@ -374,6 +474,8 @@ void Linkbot::getLedColor (int& r, int& g, int& b) {
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
+#endif
+
 }
 
 void Linkbot::setEncoderEventThreshold (int, double) {
@@ -382,15 +484,21 @@ void Linkbot::setEncoderEventThreshold (int, double) {
 }
 
 void Linkbot::setBuzzerFrequencyOn (float freq) {
+#if 0
+
     try {
         m->proxy.fire(MethodIn::setBuzzerFrequency{freq}).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
+#endif
+
 }
 
 void Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
+#if 0
+
     try {
         auto version = m->proxy.fire(MethodIn::getFirmwareVersion{}).get();
         major = version.major;
@@ -402,6 +510,7 @@ void Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
+#endif
 }
 
 } // namespace

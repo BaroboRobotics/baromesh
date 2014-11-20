@@ -14,7 +14,7 @@
 static CFTypeRef get_string_prop (io_object_t device, const char *prop);
 static CFTypeRef get_string_prop_r (io_object_t device, const char *prop);
 
-int devicePathImpl (char *buf, size_t len) {
+int dongleDevicePathImpl (char *buf, size_t len) {
   kern_return_t result;
   io_iterator_t it;
 
