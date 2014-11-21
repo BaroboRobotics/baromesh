@@ -41,6 +41,7 @@ struct Linkbot::Impl {
         : serialId(id)
         , client(baromesh::ioCore().ios())
         , work(baromesh::ioCore().ios())
+        , daemon(baromesh::asyncAcquireDaemon(boost::asio::use_future).get())
     {}
 
     mutable boost::log::sources::logger log;
@@ -51,6 +52,8 @@ struct Linkbot::Impl {
     rpc::asio::Client<sfp::asio::MessageQueue<boost::asio::ip::tcp::socket>> client;
 
     boost::asio::io_service::work work;
+
+    std::shared_ptr<baromesh::Daemon> daemon;
 #if 0
 
     void newButtonValues (int button, int event, int timestamp) {
@@ -106,30 +109,13 @@ Linkbot::Linkbot (const std::string& id)
     );
 #endif
 
-    // Connect to the daemon and get a 
-    using Tcp = boost::asio::ip::tcp;
+    auto epIter = p->daemon->asyncResolveSerialId(p->serialId, boost::asio::use_future).get();
 
-    Tcp::resolver resolver { baromesh::ioCore().ios() };
-    auto iter = resolver.resolve(std::string("42000"));
+    BOOST_LOG(p->log) << "connecting to " << p->serialId << " at " << epIter->endpoint();
 
-    baromesh::Daemon daemon { baromesh::ioCore().ios() };
+    boost::asio::connect(p->client.messageQueue().stream(), epIter);
+    p->client.messageQueue().asyncHandshake(boost::asio::use_future).get();
 
-    boost::asio::connect(daemon.client().messageQueue().stream(), iter);
-    daemon.client().messageQueue().asyncHandshake(boost::asio::use_future).get();
-    asyncConnect(daemon.client(), std::chrono::milliseconds(100), boost::asio::use_future).get();
-
-    auto epIter = daemon.asyncGetRobotTcpEndpoint(p->serialId, boost::asio::use_future).get();
-
-    BOOST_LOG(p->log) << "TCP endpoint for " << p->serialId << ": " << epIter->endpoint();
-
-    asyncDisconnect(daemon.client(), std::chrono::milliseconds(100), boost::asio::use_future).get();
-    daemon.client().messageQueue().asyncShutdown(boost::asio::use_future).get();
-    daemon.client().messageQueue().stream().close();
-
-#if 0
-    m->client.messageQueue().stream().connect(endpoint);
-    m->client.messageQueue().asyncHandshake(boost::asio::use_future).get();
-#endif
     // Our C++03 API only uses a raw pointer, so transfer ownership from the
     // unique_ptr to the raw pointer. This should always be the last line of
     // the ctor.
