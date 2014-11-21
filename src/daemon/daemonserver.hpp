@@ -18,7 +18,7 @@
 
 namespace baromesh {
 
-class DaemonServer {
+class DaemonServerImpl : public std::enable_shared_from_this<DaemonServerImpl> {
     using Tcp = boost::asio::ip::tcp;
 
     using MethodIn = rpc::MethodIn<barobo::Daemon>;
@@ -29,23 +29,29 @@ class DaemonServer {
     using ProxyPair = std::pair<ZigbeeClient, TcpPolyServer>;
 
 public:
-    DaemonServer (TcpPolyServer& server, Dongle& dongle)
+    DaemonServerImpl (TcpPolyServer& server, Dongle& dongle)
         : mServer(server)
         , mDongle(dongle)
         , mResolver(mServer.get_io_service())
         , mStrand(mServer.get_io_service())
     {}
 
-    template <class In, class Result = typename rpc::ResultOf<In>::type>
-    Result fire (In&& x) {
-        return onFire(std::forward<In>(x));
+    void destroy () {
+        mResolver.cancel(); // resolver has no ec overload, strange
+        boost::system::error_code ec;
+        for (auto& kv : mRobotProxies) {
+            auto& proxyClient = kv.second.first;
+            auto& proxyServer = kv.second.second;
+            proxyClient.cancel(ec);
+            proxyServer.cancel(ec);
+        }
     }
 
-    MethodResult::getRobotTcpEndpoint onFire (MethodIn::getRobotTcpEndpoint args) {
+    MethodResult::resolveSerialId onFire (MethodIn::resolveSerialId args) {
         auto serialId = std::string(args.serialId.value);
-        BOOST_LOG(mLog) << "firing barobo.Daemon.getRobotTcpEndpoint(" << serialId << ")";
+        BOOST_LOG(mLog) << "firing barobo.Daemon.resolveSerialId(" << serialId << ")";
         
-        MethodResult::getRobotTcpEndpoint result = decltype(result)();
+        MethodResult::resolveSerialId result = decltype(result)();
         try {
             auto iter = mRobotProxies.find(serialId);
             Tcp::endpoint endpoint;
@@ -54,6 +60,9 @@ public:
                 Tcp::resolver::query query {
                     "127.0.0.1", "", boost::asio::ip::resolver_query_base::flags(0)
                 };
+                // FIXME this resolve is synchronous. Make it asynchronous.
+                // This will require us to enable asynchronous method invocation in
+                // ribbon-bridge.
                 endpoint = mResolver.resolve(query)->endpoint();
 
                 BOOST_LOG(mLog) << "Starting new robot proxy on " << endpoint;
@@ -69,12 +78,8 @@ public:
                 auto& proxyServer = iter->second.second;
 
                 boost::asio::spawn(mStrand,
-                    std::bind(&rpc::asio::forwardBroadcastsCoroutine<ZigbeeClient, TcpPolyServer>,
-                        std::ref(proxyClient), std::ref(proxyServer), _1));
-                // FIXME remove this proxy after forwardRequestsCoroutine completes
-                boost::asio::spawn(mStrand,
-                    std::bind(&rpc::asio::forwardRequestsCoroutine<ZigbeeClient, TcpPolyServer>,
-                        std::ref(proxyClient), std::ref(proxyServer), _1));
+                    std::bind(&DaemonServerImpl::proxyCoroutine,
+                        this->shared_from_this(), serialId, _1));
             }
 
             endpoint = iter->second.second.endpoint();
@@ -101,8 +106,34 @@ public:
         return result;
     }
 
-
 private:
+    void proxyCoroutine (std::string serialId, boost::asio::yield_context yield) {
+        try {
+            auto iter = mRobotProxies.find(serialId);
+            if (iter != mRobotProxies.end()) {
+                auto& proxyClient = iter->second.first;
+                auto& proxyServer = iter->second.second;
+
+                boost::asio::spawn(mStrand,
+                    std::bind(&rpc::asio::forwardBroadcastsCoroutine<ZigbeeClient, TcpPolyServer>,
+                        std::ref(proxyClient), std::ref(proxyServer), _1));
+
+                rpc::asio::forwardRequestsCoroutine(proxyClient, proxyServer, yield);
+                BOOST_LOG(mLog) << "DaemonServerImpl::proxyCoroutine completed normally";
+            }
+            else {
+                BOOST_LOG(mLog) << "DaemonServerImpl::proxyCoroutine started for nonexistent connection "
+                                << serialId << ", ignoring";
+            }
+        }
+        catch (boost::system::system_error& e) {
+            BOOST_LOG(mLog) << "Error in DaemonServerImpl::proxyCoroutine for " << serialId
+                            << ": " << e.what();
+        }
+        BOOST_LOG(mLog) << "Destroying proxy for " << serialId;
+        mRobotProxies.erase(serialId);
+    }
+
     mutable boost::log::sources::logger mLog;
 
     TcpPolyServer& mServer;
@@ -112,6 +143,30 @@ private:
     boost::asio::io_service::strand mStrand;
 
     std::map<std::string, ProxyPair> mRobotProxies;
+};
+
+class DaemonServer {
+public:
+    template <class... Args>
+    DaemonServer (Args&&... args)
+        : mImpl(std::make_shared<DaemonServerImpl>(std::forward<Args>(args)...))
+    {}
+
+    // noncopyable
+    DaemonServer (const DaemonServer&) = delete;
+    DaemonServer& operator= (const DaemonServer&) = delete;
+
+    ~DaemonServer () {
+        mImpl->destroy();
+    }
+
+    template <class In, class Result = typename rpc::ResultOf<In>::type>
+    Result fire (In&& x) {
+        return mImpl->onFire(std::forward<In>(x));
+    }
+
+private:
+    std::shared_ptr<DaemonServerImpl> mImpl;
 };
 
 } // namespace baromesh
