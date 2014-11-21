@@ -19,8 +19,8 @@ namespace baromesh {
 
 using namespace std::placeholders;
 
-using GetRobotTcpEndpointHandlerSignature = void(boost::system::error_code, boost::asio::ip::tcp::resolver::iterator);
-using GetRobotTcpEndpointHandler = std::function<GetRobotTcpEndpointHandlerSignature>;
+using ResolveSerialIdHandlerSignature = void(boost::system::error_code, boost::asio::ip::tcp::resolver::iterator);
+using ResolveSerialIdHandler = std::function<ResolveSerialIdHandlerSignature>;
 
 template <class C>
 class DaemonImpl : public std::enable_shared_from_this<DaemonImpl<C>> {
@@ -37,37 +37,37 @@ public:
     C& client () { return mClient; }
 
     template <class Handler>
-    BOOST_ASIO_INITFN_RESULT_TYPE(Handler, GetRobotTcpEndpointHandlerSignature)
-    asyncGetRobotTcpEndpoint (std::string serialId, Handler&& handler) {
+    BOOST_ASIO_INITFN_RESULT_TYPE(Handler, ResolveSerialIdHandlerSignature)
+    asyncResolveSerialId (std::string serialId, Handler&& handler) {
         boost::asio::detail::async_result_init<
-            Handler, GetRobotTcpEndpointHandlerSignature
+            Handler, ResolveSerialIdHandlerSignature
         > init { std::forward<Handler>(handler) };
 
         assert(4 == serialId.size());
-        MethodIn::getRobotTcpEndpoint args = decltype(args)();
+        MethodIn::resolveSerialId args = decltype(args)();
 
         strncpy(args.serialId.value, serialId.data(), 4);
         args.serialId.value[4] = 0;
 
         asyncFire(mClient, args, std::chrono::seconds(2),
-            std::bind(&DaemonImpl::handleGetRobotTcpEndpoint,
+            std::bind(&DaemonImpl::handleResolveSerialId,
                 this->shared_from_this(), init.handler, _1, _2));
 
         return init.result.get();
     }
 
 private:
-    void handleGetRobotTcpEndpoint (GetRobotTcpEndpointHandler handler,
+    void handleResolveSerialId (ResolveSerialIdHandler handler,
         boost::system::error_code ec,
-        MethodResult::getRobotTcpEndpoint result) {
+        MethodResult::resolveSerialId result) {
         try {
             if (ec) {
-                BOOST_LOG(mLog) << "getRobotTcpEndpoint reported error: " << ec.message();
+                BOOST_LOG(mLog) << "resolveSerialId reported error: " << ec.message();
                 throw boost::system::system_error(ec);
             }
 
             if (!result.has_endpoint) {
-                BOOST_LOG(mLog) << "getRobotTcpEndpoint result has no endpoint";
+                BOOST_LOG(mLog) << "resolveSerialId result has no endpoint";
                 throw boost::system::system_error(Status::NO_ROBOT_ENDPOINT);
             }
 
@@ -133,9 +133,9 @@ public:
     boost::asio::io_service& get_io_service () { return client().get_io_service(); }
 
     template <class Handler>
-    BOOST_ASIO_INITFN_RESULT_TYPE(Handler, GetRobotTcpEndpointHandlerSignature)
-    asyncGetRobotTcpEndpoint (std::string serialId, Handler&& handler) {
-        return mImpl->asyncGetRobotTcpEndpoint(serialId, std::forward<Handler>(handler));
+    BOOST_ASIO_INITFN_RESULT_TYPE(Handler, ResolveSerialIdHandlerSignature)
+    asyncResolveSerialId (std::string serialId, Handler&& handler) {
+        return mImpl->asyncResolveSerialId(serialId, std::forward<Handler>(handler));
     }
 
 private:
