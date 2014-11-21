@@ -29,6 +29,7 @@ static const int kBaudRate = 230400;
 void dongleCoroutine (boost::asio::io_service& ios, boost::asio::yield_context yield) {
     boost::log::sources::logger log;
     try {
+        BOOST_LOG(log) << "Waiting for dongle";
         boost::asio::steady_timer donglePollTimer { ios };
         std::string devicePath;
         boost::system::error_code ec;
@@ -41,6 +42,7 @@ void dongleCoroutine (boost::asio::io_service& ios, boost::asio::yield_context y
 
         BOOST_LOG(log) << "Dongle detected at " << devicePath;
 
+
         baromesh::Dongle dongle { ios };
 
         auto& stream = dongle.client().messageQueue().stream();
@@ -52,8 +54,27 @@ void dongleCoroutine (boost::asio::io_service& ios, boost::asio::yield_context y
 
         Tcp::resolver resolver { ios };
         auto iter = resolver.async_resolve(std::string("42000"), yield);
-        
-        rpc::asio::TcpPolyServer server  { ios, *iter };
+        auto server = std::make_shared<rpc::asio::TcpPolyServer>(ios, *iter);
+
+        // Now that we're all connected up, queue up an asynchronous operation
+        // that should in theory never complete. The only time this code should
+        // execute, then, is when there's a dongle read error. In that case, we
+        // want to shut the server operations down as well, and wait for a
+        // dongle to appear in the OS environment again.
+        baromesh::Dongle::MessageQueue nullMq { dongle, "...." };
+        uint8_t buf[1];
+        nullMq.asyncReceive(boost::asio::buffer(buf),
+            [server] (boost::system::error_code ec, size_t) {
+                boost::log::sources::logger log;
+                if (!ec) {
+                    BOOST_LOG(log) << "Actually read something from serial ID \"....\" . "
+                                   << "That should be impossible.";
+                }
+                else {
+                    BOOST_LOG(log) << "Dongle error: " << ec.message();
+                }
+                server->cancel(ec);
+            });
 
         rpc::asio::TcpPolyServer::RequestId requestId;
         barobo_rpc_Request request;
@@ -62,22 +83,22 @@ void dongleCoroutine (boost::asio::io_service& ios, boost::asio::yield_context y
             BOOST_LOG(log) << "DaemonServer awaiting connection";
             // Refuse requests with Status::NOT_CONNECTED until we get a CONNECT
             // request.
-            std::tie(requestId, request) = processRequestsCoro(server,
+            std::tie(requestId, request) = processRequestsCoro(*server,
                 std::bind(&rpc::asio::rejectIfNotConnectCoro<rpc::asio::TcpPolyServer>,
-                    std::ref(server), _1, _2, _3), yield);
+                    std::ref(*server), _1, _2, _3), yield);
 
             // Reply with barobo::Daemon's version information.
-            asyncReply(server, requestId, rpc::ServiceInfo::create<barobo::Daemon>(), yield);
+            asyncReply(*server, requestId, rpc::ServiceInfo::create<barobo::Daemon>(), yield);
             BOOST_LOG(log) << "DaemonServer connection received";
 
-            baromesh::DaemonServer daemon { server, dongle };
+            baromesh::DaemonServer daemon { *server, dongle };
 
-            std::tie(requestId, request) = processRequestsCoro(server,
+            std::tie(requestId, request) = processRequestsCoro(*server,
                 std::bind(&rpc::asio::serveIfNotDisconnectCoro<rpc::asio::TcpPolyServer, barobo::Daemon, baromesh::DaemonServer>,
-                    std::ref(server), std::ref(daemon), _1, _2, _3), yield);
+                    std::ref(*server), std::ref(daemon), _1, _2, _3), yield);
 
             BOOST_LOG(log) << "DaemonServer received disconnection request";
-            asyncReply(server, requestId, rpc::Status::OK, yield);
+            asyncReply(*server, requestId, rpc::Status::OK, yield);
         }
     }
     catch (boost::system::system_error& e) {
