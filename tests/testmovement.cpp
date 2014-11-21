@@ -80,7 +80,6 @@ int main(int argc, char** argv) {
 
     std::vector<std::thread> testThreads;
 
-    std::this_thread::sleep_for(std::chrono::seconds(1));
     for (auto s : serialIds) {
         testThreads.emplace_back(testMovement, s);
     }
