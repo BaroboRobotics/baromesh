@@ -3,6 +3,8 @@
 
 #include "gen-dongle.pb.hpp"
 
+#include "baromesh/system_error.hpp"
+
 #include "rpc/asio/client.hpp"
 
 #include <functional>
@@ -36,6 +38,27 @@ public:
         : mClient(std::forward<Args>(args)...)
         , mStrand(mClient.get_io_service())
     {}
+
+    void cancel (boost::system::error_code& ec) {
+        voidHandlers(boost::asio::error::operation_aborted);
+        mClient.cancel(ec);
+    }
+
+    void cancelMessageQueue (std::string serialId) {
+        std::lock_guard<std::mutex> lock { mReceiveDataMutex };
+        auto iter = mReceiveData.find(serialId);
+        if (iter != mReceiveData.end()) {
+            auto& data = iter->second;
+            // FIXME code duplication with voidHandlers
+            while (data.ops.size()) {
+                auto op = data.ops.front();
+                auto& handler = op.second;
+                data.ops.pop();
+                mClient.get_io_service().post(
+                    std::bind(handler, boost::asio::error::operation_aborted, 0));
+            }
+        }
+    }
 
     RpcClient& client () { return mClient; }
 
@@ -218,43 +241,93 @@ template <class D>
 class DongleMessageQueue {
 public:
     DongleMessageQueue (D& dongle, std::string serialId)
-        : mDongle(dongle)
+        : mDongle(dongle.impl())
         , mSerialId(serialId)
+        , mIos(dongle.get_io_service())
     {
-        auto success = mDongle.registerMessageQueue(mSerialId);
+        auto d = mDongle.lock();
+        assert(d);
+        auto success = d->registerMessageQueue(mSerialId);
         assert(success);
         (void)success;
     }
 
     ~DongleMessageQueue () {
-        auto success = mDongle.unregisterMessageQueue(mSerialId);
-        assert(success);
-        (void)success;
+        boost::system::error_code ec;
+        cancel(ec);
+        auto dongle = mDongle.lock();
+        if (dongle) {
+            auto success = dongle->unregisterMessageQueue(mSerialId);
+            assert(success);
+            (void)success;
+        }
     }
 
     // noncopyable
     DongleMessageQueue (const DongleMessageQueue&) = delete;
     DongleMessageQueue& operator= (const DongleMessageQueue&) = delete;
 
+    void cancel () {
+        boost::system::error_code ec;
+        cancel(ec);
+        if (ec) {
+            throw boost::system::system_error(ec);
+        }
+    }
+
+    void cancel (boost::system::error_code&) {
+        auto dongle = mDongle.lock();
+        if (dongle) {
+            dongle->cancelMessageQueue(mSerialId);
+        }
+    }
+
     boost::asio::io_service& get_io_service () {
-        return mDongle.get_io_service();
+        return mIos;
     }
 
     template <class Handler>
     BOOST_ASIO_INITFN_RESULT_TYPE(Handler, SendHandlerSignature)
     asyncSend (boost::asio::const_buffer buffer, Handler&& handler) {
-        return mDongle.asyncSendTo(mSerialId, buffer, std::forward<Handler>(handler));
+        boost::asio::detail::async_result_init<
+            Handler, SendHandlerSignature
+        > init { std::forward<Handler>(handler) };
+        auto& realHandler = init.handler;
+
+        auto dongle = mDongle.lock();
+        if (dongle) {
+            dongle->asyncSendTo(mSerialId, buffer, realHandler);
+        }
+        else {
+            mIos.post(std::bind(realHandler, Status::DONGLE_NOT_FOUND));
+        }
+
+        return init.result.get();
     }
 
     template <class Handler>
     BOOST_ASIO_INITFN_RESULT_TYPE(Handler, ReceiveHandlerSignature)
     asyncReceive (boost::asio::mutable_buffer buffer, Handler&& handler) {
-        return mDongle.asyncReceiveFrom(mSerialId, buffer, std::forward<Handler>(handler));
+        boost::asio::detail::async_result_init<
+            Handler, ReceiveHandlerSignature
+        > init { std::forward<Handler>(handler) };
+        auto& realHandler = init.handler;
+
+        auto dongle = mDongle.lock();
+        if (dongle) {
+            dongle->asyncReceiveFrom(mSerialId, buffer, realHandler);
+        }
+        else {
+            mIos.post(std::bind(realHandler, Status::DONGLE_NOT_FOUND, 0));
+        }
+
+        return init.result.get();
     }
 
 private:
-    D& mDongle;
+    std::weak_ptr<typename D::Impl> mDongle;
     std::string mSerialId;
+    boost::asio::io_service& mIos;
 };
     
 template <class C>
@@ -270,6 +343,23 @@ public:
         : mImpl(std::make_shared<Impl>(std::forward<Args>(args)...))
     {}
 
+    ~BasicDongle () {
+        boost::system::error_code ec;
+        cancel(ec);
+    }
+
+    void cancel () {
+        boost::system::error_code ec;
+        cancel(ec);
+        if (ec) {
+            throw boost::system::system_error(ec);
+        }
+    }
+
+    void cancel (boost::system::error_code& ec) {
+        mImpl->cancel(ec);
+    }
+
     // noncopyable
     BasicDongle (const BasicDongle&) = delete;
     BasicDongle& operator= (const BasicDongle&) = delete;
@@ -277,25 +367,9 @@ public:
     Client& client () { return mImpl->client(); }
     boost::asio::io_service& get_io_service () { return client().get_io_service(); }
 
-    template <class Handler>
-    BOOST_ASIO_INITFN_RESULT_TYPE(Handler, SendHandlerSignature)
-    asyncSendTo (std::string serialId, boost::asio::const_buffer buffer, Handler&& handler) {
-        return mImpl->asyncSendTo(serialId, buffer, std::forward<Handler>(handler));
-    }
-
-    template <class Handler>
-    BOOST_ASIO_INITFN_RESULT_TYPE(Handler, ReceiveHandlerSignature)
-    asyncReceiveFrom (std::string serialId, boost::asio::mutable_buffer buffer, Handler&& handler) {
-        return mImpl->asyncReceiveFrom(serialId, buffer, std::forward<Handler>(handler));
-    }
-
 private:
-    bool registerMessageQueue (std::string serialId) {
-        return mImpl->registerMessageQueue(serialId);
-    }
-
-    bool unregisterMessageQueue (std::string serialId) {
-        return mImpl->unregisterMessageQueue(serialId);
+    std::shared_ptr<Impl> impl () {
+        return mImpl;
     }
 
     std::shared_ptr<Impl> mImpl;
