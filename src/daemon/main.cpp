@@ -10,10 +10,20 @@
 #include "rpc/asio/tcppolyserver.hpp"
 
 #include "util/hexdump.hpp"
+//#include "util/log.hpp"
 #include "util/monospawn.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/asio/spawn.hpp>
+
+#include <boost/log/common.hpp>
+#include <boost/log/expressions.hpp>
+#include <boost/log/attributes/timer.hpp>
+#include <boost/log/sources/logger.hpp>
+#include <boost/log/support/date_time.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
+#include <boost/log/utility/setup/file.hpp>
+#include <boost/log/utility/setup/console.hpp>
 
 #include <functional>
 #include <iostream>
@@ -28,6 +38,8 @@ static const int kBaudRate = 230400;
 
 void dongleCoroutine (boost::asio::io_service& ios, boost::asio::yield_context yield) {
     boost::log::sources::logger log;
+    log.add_attribute("Title", boost::log::attributes::constant<std::string>("DONGLECORO"));
+
     try {
         BOOST_LOG(log) << "Waiting for dongle";
         boost::asio::steady_timer donglePollTimer { ios };
@@ -43,7 +55,9 @@ void dongleCoroutine (boost::asio::io_service& ios, boost::asio::yield_context y
         BOOST_LOG(log) << "Dongle detected at " << devicePath;
 
 
-        baromesh::Dongle dongle { ios };
+        boost::log::sources::logger dongleClLog;
+        dongleClLog.add_attribute("Title", boost::log::attributes::constant<std::string>("DONGLE-CL"));
+        baromesh::Dongle dongle { ios, dongleClLog };
 
         auto& stream = dongle.client().messageQueue().stream();
         stream.open(devicePath);
@@ -54,18 +68,24 @@ void dongleCoroutine (boost::asio::io_service& ios, boost::asio::yield_context y
 
         Tcp::resolver resolver { ios };
         auto iter = resolver.async_resolve(std::string("42000"), yield);
-        auto server = std::make_shared<rpc::asio::TcpPolyServer>(ios, *iter);
+        boost::log::sources::logger daemonSvLog;
+        daemonSvLog.add_attribute("Title", boost::log::attributes::constant<std::string>("DAEMON-SV"));
+        auto server = std::make_shared<rpc::asio::TcpPolyServer>(ios, daemonSvLog);
+        server->listen(*iter);
 
         // Now that we're all connected up, queue up an asynchronous operation
         // that should in theory never complete. The only time this code should
         // execute, then, is when there's a dongle read error. In that case, we
         // want to shut the server operations down as well, and wait for a
         // dongle to appear in the OS environment again.
-        baromesh::Dongle::MessageQueue nullMq { dongle, "...." };
+        auto mqLog = log;
+        mqLog.add_attribute("SerialId", boost::log::attributes::constant<std::string>("...."));
+        baromesh::Dongle::MessageQueue nullMq { ios, mqLog };
+        nullMq.setRoute(dongle, "....");
+
         uint8_t buf[1];
         nullMq.asyncReceive(boost::asio::buffer(buf),
-            [server] (boost::system::error_code ec, size_t) {
-                boost::log::sources::logger log;
+            [server, log] (boost::system::error_code ec, size_t) mutable {
                 if (!ec) {
                     BOOST_LOG(log) << "Actually read something from serial ID \"....\" . "
                                    << "That should be impossible.";
@@ -80,25 +100,10 @@ void dongleCoroutine (boost::asio::io_service& ios, boost::asio::yield_context y
         barobo_rpc_Request request;
 
         while (true) {
-            BOOST_LOG(log) << "DaemonServer awaiting connection";
-            // Refuse requests with Status::NOT_CONNECTED until we get a CONNECT
-            // request.
-            std::tie(requestId, request) = processRequestsCoro(*server,
-                std::bind(&rpc::asio::rejectIfNotConnectCoro<rpc::asio::TcpPolyServer>,
-                    std::ref(*server), _1, _2, _3), yield);
-
-            // Reply with barobo::Daemon's version information.
-            asyncReply(*server, requestId, rpc::ServiceInfo::create<barobo::Daemon>(), yield);
-            BOOST_LOG(log) << "DaemonServer connection received";
-
-            baromesh::DaemonServer daemon { *server, dongle };
-
-            std::tie(requestId, request) = processRequestsCoro(*server,
-                std::bind(&rpc::asio::serveIfNotDisconnectCoro<rpc::asio::TcpPolyServer, barobo::Daemon, baromesh::DaemonServer>,
-                    std::ref(*server), std::ref(daemon), _1, _2, _3), yield);
-
-            BOOST_LOG(log) << "DaemonServer received disconnection request";
-            asyncReply(*server, requestId, rpc::Status::OK, yield);
+            BOOST_LOG(daemonSvLog) << "awaiting connection";
+            baromesh::DaemonServer daemon { *server, dongle, daemonSvLog };
+            asyncRunServer(*server, daemon, yield);
+            BOOST_LOG(daemonSvLog) << "disconnected";
         }
     }
     catch (boost::system::system_error& e) {
@@ -108,9 +113,48 @@ void dongleCoroutine (boost::asio::io_service& ios, boost::asio::yield_context y
     boost::asio::spawn(ios, std::bind(&dongleCoroutine, std::ref(ios), _1));
 }
 
+static void initializeLoggingCore () {
+    namespace expr = boost::log::expressions;
+    namespace keywords = boost::log::keywords;
+    namespace attrs = boost::log::attributes;
+
+    boost::log::add_common_attributes();
+
+    auto core = boost::log::core::get();
+    core->add_global_attribute("Timeline", attrs::timer());
+    core->add_global_attribute("Scope", attrs::named_scope());
+
+    boost::log::formatter formatter =
+        expr::stream
+            << "[T+" << expr::attr<attrs::timer::value_type>("Timeline") << "]"
+            << "[thread=" << expr::attr<attrs::current_thread_id::value_type>("ThreadID") << "]"
+            << expr::if_ (expr::has_attr<std::string>("SerialId")) [
+                expr::stream << "[robot=" << expr::attr<std::string>("SerialId") << "]"
+            ] // .else_ []
+            //<< "[" << expr::attr<attrs::named_scope::value_type>("Scope") << "]"
+            << " " << expr::attr<std::string>("Title")
+            << " " << expr::attr<std::string>("Protocol")
+            << expr::if_ (expr::has_attr<std::string>("RequestId")) [
+                expr::stream << "[RequestId=" << expr::attr<std::string>("RequestId") << "]"
+            ]
+            << " " << expr::smessage;
+
+    boost::log::add_file_log(
+        keywords::file_name = "baromeshd.log",
+        keywords::auto_flush = true
+    )->set_formatter(formatter);
+
+    boost::log::add_console_log(
+        std::clog,
+        keywords::auto_flush = true
+    )->set_formatter(formatter);
+}
+
+
 int main (int argc, char** argv) try {
     util::Monospawn sentinel { "baromeshd", std::chrono::seconds(1) };
-    // TODO initialize logging core
+
+    initializeLoggingCore();
     boost::log::sources::logger log;
     boost::asio::io_service ios;
 

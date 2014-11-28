@@ -28,10 +28,10 @@ class DaemonImpl : public std::enable_shared_from_this<DaemonImpl<C>> {
     using MethodResult = rpc::MethodResult<barobo::Daemon>;
 
 public:
-    template <class... Args>
-    explicit DaemonImpl (Args&&... args)
-        : mClient(std::forward<Args>(args)...)
+    explicit DaemonImpl (boost::asio::io_service& ios, boost::log::sources::logger log)
+        : mClient(ios, log)
         , mResolver(mClient.get_io_service())
+        , mLog(log)
     {}
 
     C& client () { return mClient; }
@@ -108,10 +108,10 @@ private:
         }
     }
 
-    mutable boost::log::sources::logger mLog;
-
     C mClient;
     boost::asio::ip::tcp::resolver mResolver;
+
+    mutable boost::log::sources::logger mLog;
 };
 
 template <class C>

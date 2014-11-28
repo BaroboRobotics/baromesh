@@ -14,13 +14,15 @@ std::shared_ptr<Daemon> daemonInstance () {
     std::lock_guard<std::mutex> lock { mutex };
 
     boost::log::sources::logger log;
+    log.add_attribute("Title", boost::log::attributes::constant<std::string>("DAEMON"));
+
     static std::weak_ptr<Daemon> d;
 
     auto p = d.lock();
     if (!p) {
         BOOST_LOG(log) << "Creating daemon singleton";
         // TODO, spawn daemon coroutine
-        p = std::make_shared<Daemon>(ioCore().ios());
+        p = std::make_shared<Daemon>(ioCore().ios(), log);
         d = p;
     }
     BOOST_LOG(log) << p.use_count() << " daemon pointers exist";

@@ -7,6 +7,8 @@
 
 #include "rpc/asio/client.hpp"
 
+#include <boost/asio/spawn.hpp>
+
 #include <functional>
 #include <memory>
 #include <queue>
@@ -24,8 +26,10 @@ using namespace std::placeholders;
 template <class RpcClient>
 class DongleImpl : public std::enable_shared_from_this<DongleImpl<RpcClient>> {
     struct ReceiveData {
+        ReceiveData (boost::log::sources::logger lg) : log(lg) {}
         std::queue<std::pair<boost::asio::mutable_buffer, ReceiveHandler>> ops;
         std::queue<std::vector<uint8_t>> inbox;
+        boost::log::sources::logger log;
     };
 
     using MethodIn = rpc::MethodIn<barobo::Dongle>;
@@ -33,10 +37,10 @@ class DongleImpl : public std::enable_shared_from_this<DongleImpl<RpcClient>> {
     using Broadcast = rpc::Broadcast<barobo::Dongle>;
 
 public:
-    template <class... Args>
-    DongleImpl (Args&&... args)
-        : mClient(std::forward<Args>(args)...)
+    DongleImpl (boost::asio::io_service& ios, boost::log::sources::logger log)
+        : mClient(ios, log)
         , mStrand(mClient.get_io_service())
+        , mLog(log)
     {}
 
     void cancel (boost::system::error_code& ec) {
@@ -62,9 +66,9 @@ public:
 
     RpcClient& client () { return mClient; }
 
-    bool registerMessageQueue (std::string serialId) {
+    bool registerMessageQueue (std::string serialId, boost::log::sources::logger log) {
         std::lock_guard<std::mutex> lock { mReceiveDataMutex };
-        return mReceiveData.insert(std::make_pair(serialId, ReceiveData())).second;
+        return mReceiveData.insert(std::make_pair(serialId, ReceiveData(log))).second;
     }
 
     bool unregisterMessageQueue (std::string serialId) {
@@ -109,6 +113,8 @@ public:
         > init { std::forward<Handler>(handler) };
         auto& realHandler = init.handler;
 
+        //BOOST_LOG(mLog) << "Shitting on " << serialId << "'s receive request";
+        //mClient.get_io_service().post(std::bind(realHandler, Status::DONGLE_NOT_FOUND, 0));
         auto self = this->shared_from_this();
         mStrand.post([self, this, serialId, buffer, realHandler] () {
             {
@@ -135,12 +141,13 @@ public:
         auto serialId = std::string(broadcast.serialId.value);
         auto iter = mReceiveData.find(serialId);
         if (iter != mReceiveData.end()) {
+            BOOST_LOG(mLog) << "received message destined for " << serialId;
             auto& inbox = iter->second.inbox;
             auto& payload = broadcast.payload.value;
             inbox.push(std::vector<uint8_t>(payload.bytes, payload.bytes + payload.size));
         }
         else {
-            BOOST_LOG(mLog) << "Dongle discarding message destined for unregistered serial ID "
+            BOOST_LOG(mLog) << "discarding message destined for unregistered serial ID "
                             << serialId;
         }
     }
@@ -150,6 +157,8 @@ private:
         std::lock_guard<std::mutex> lock { mReceiveDataMutex };
         for (auto& kv : mReceiveData) {
             auto& data = kv.second;
+            BOOST_LOG(data.log) << "posting ready receive operations (ops: "
+                                << data.ops.size() << ", inbox: " << data.inbox.size() << ")";
             while (data.inbox.size() && data.ops.size()) {
                 auto op = data.ops.front();
                 data.ops.pop();
@@ -166,6 +175,7 @@ private:
                       : make_error_code(boost::asio::error::message_size);
                 data.inbox.pop();
 
+                BOOST_LOG(data.log) << "copied " << nCopied << " bytes";
                 mClient.get_io_service().post(std::bind(handler, ec, nCopied));
             }
         }
@@ -192,11 +202,13 @@ private:
 
     void receiveCoroutine (boost::asio::yield_context yield) {
         try {
+            BOOST_LOG(mLog) << "receive coroutine starting";
             rpc::ComponentBroadcastUnion<barobo::Dongle> argument;
             while (thereArePendingOperations()) {
                 auto broadcast = mClient.asyncReceiveBroadcast(yield);
                 auto status = decodeBroadcastPayload(argument, broadcast.id, broadcast.payload);
                 if (!hasError(status)) {
+                    BOOST_LOG(mLog) << "received broadcast";
                     status = invokeBroadcast(*this, argument, broadcast.id);
                     postReceives();
                 }
@@ -226,8 +238,6 @@ private:
         }
     }
 
-    mutable boost::log::sources::logger mLog;
-
     bool mReceiveCoroutineRunning = false;
 
     RpcClient mClient;
@@ -235,21 +245,18 @@ private:
 
     std::map<std::string, ReceiveData> mReceiveData;
     std::mutex mReceiveDataMutex;
+
+    mutable boost::log::sources::logger mLog;
 };
 
 template <class D>
 class DongleMessageQueue {
 public:
-    DongleMessageQueue (D& dongle, std::string serialId)
-        : mDongle(dongle.impl())
-        , mSerialId(serialId)
-        , mIos(dongle.get_io_service())
+    DongleMessageQueue (boost::asio::io_service& ios, boost::log::sources::logger log)
+        : mIos(ios)
+        , mLog(log)
     {
-        auto d = mDongle.lock();
-        assert(d);
-        auto success = d->registerMessageQueue(mSerialId);
-        assert(success);
-        (void)success;
+        mLog.add_attribute("Protocol", boost::log::attributes::constant<std::string>("DMQ"));
     }
 
     ~DongleMessageQueue () {
@@ -324,10 +331,23 @@ public:
         return init.result.get();
     }
 
+    void setRoute (D& dongle, std::string serialId) {
+        mDongle = dongle.impl();
+        auto d = mDongle.lock();
+        assert(d);
+        auto success = d->registerMessageQueue(serialId, mLog);
+        assert(success);
+        (void)success;
+
+        mSerialId = serialId;
+    }
+
 private:
     std::weak_ptr<typename D::Impl> mDongle;
     std::string mSerialId;
     boost::asio::io_service& mIos;
+
+    mutable boost::log::sources::logger mLog;
 };
     
 template <class C>
