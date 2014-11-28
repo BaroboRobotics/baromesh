@@ -4,6 +4,7 @@
 #include "daemon.hpp"
 
 #include "baromesh/linkbot.hpp"
+#include "baromesh/error.hpp"
 
 #include "rpc/asio/client.hpp"
 #include "sfp/asio/messagequeue.hpp"
@@ -31,6 +32,9 @@ T degToRad (T x) { return T(double(x) * M_PI / 180.0); }
 template <class T>
 T radToDeg (T x) { return T(double(x) * 180.0 / M_PI); }
 
+constexpr static const
+std::chrono::milliseconds kRequestTimeout { 10000 };
+
 } // file namespace
 
 using MethodIn = rpc::MethodIn<barobo::Robot>;
@@ -39,7 +43,7 @@ using MethodResult = rpc::MethodResult<barobo::Robot>;
 struct Linkbot::Impl {
     Impl (const std::string& id)
         : serialId(id)
-        , client(baromesh::ioCore().ios())
+        , client(baromesh::ioCore().ios(), log)
         , work(baromesh::ioCore().ios())
         , daemon(baromesh::asyncAcquireDaemon(boost::asio::use_future).get())
     {}
@@ -134,9 +138,8 @@ std::string Linkbot::serialId () const {
 
 void Linkbot::connect()
 {
-#if 0
     try {
-        auto serviceInfo = m->proxy.connect().get();
+        auto serviceInfo = asyncConnect(m->client, kRequestTimeout, boost::asio::use_future).get();
 
         // Check version before we check if the connection succeeded--the user will
         // probably want to know to flash the robot, regardless.
@@ -154,7 +157,6 @@ void Linkbot::connect()
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
-#endif
 }
 
 void Linkbot::disconnect()
