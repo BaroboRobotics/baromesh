@@ -57,7 +57,6 @@ public:
     }
 
     // All member functions may throw a barobo::Error exception on failure.
-
     void connect ();
     void disconnect ();
 
