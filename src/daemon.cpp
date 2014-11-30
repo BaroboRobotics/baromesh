@@ -3,10 +3,17 @@
 
 #include <boost/asio/spawn.hpp>
 
+#include <chrono>
 #include <memory>
 #include <mutex>
 
 namespace baromesh {
+
+namespace {
+
+static const std::chrono::milliseconds kDaemonConnectTimeout { 200 };
+
+}
 
 // Get a shared pointer to the daemon singleton. If the singleton does not
 // already exist, create it. If all shared_ptrs returned from this function
@@ -62,7 +69,7 @@ void asyncAcquireDaemonImpl (AcquireDaemonHandler handler) {
                         auto iter = resolver.async_resolve(std::string("42000"), yield);
                         boost::asio::async_connect(d->client().messageQueue().stream(), iter, yield);
                         d->client().messageQueue().asyncHandshake(yield);
-                        asyncConnect(d->client(), std::chrono::milliseconds(100), yield);
+                        asyncConnect(d->client(), kDaemonConnectTimeout, yield);
                         BOOST_LOG(log) << "Connected to daemon";
                         postAcquires(boost::system::error_code(), d);
                     }
