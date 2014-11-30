@@ -1,38 +1,12 @@
 #ifndef BAROMESH_LINKBOT_HPP
 #define BAROMESH_LINKBOT_HPP
 
+#include "baromesh/linkbot.h"
+
 #include <string>
+#include <stdint.h>
 
 namespace barobo {
-
-// Since C++03 does not support enum classes, emulate them using namespaces.
-// Usage example:
-//     ButtonState::Type bs = ButtonState::UP;
-namespace ButtonState {
-    enum Type {
-        UP,
-        DOWN
-    };
-}
-
-namespace FormFactor {
-    enum Type {
-        I,
-        L,
-        T
-    };
-}
-
-// hlh: I got rid of MotorDir. Its values were FORWARD, BACKWARD, NEUTRAL, and
-// HOLD. We were considering merging MotorDir with JointState, as I recall.
-namespace JointState {
-    enum Type {
-        STOP,
-        HOLD,
-        MOVING,
-        FAIL
-    };
-}
 
 /* A C++03-compatible Linkbot API. */
 class Linkbot {
@@ -68,6 +42,7 @@ public:
     void getAccelerometer (int& timestamp, double&, double&, double&);
     void getFormFactor(FormFactor::Type & form);
     void getJointAngles (int& timestamp, double&, double&, double&);
+    void getJointSpeeds(double&, double&, double&);
     void getJointStates(int& timestamp, 
                         JointState::Type & s1,
                         JointState::Type & s2,
@@ -77,17 +52,21 @@ public:
     // a motor backward, +1 to move it forward.
     void moveContinuous (int mask, double, double, double);
     void moveTo (int mask, double, double, double);
-    /* Debate: Should moveWait be implemented in a higher level? Technically, it
-     * can be implemented with other existing functions, thereby making it not a
-     * member of the set of primitives... */
-    //void moveWait (int mask); 
+    void motorPower(int mask, int m1, int m2, int m3);
     void setLedColor (int, int, int);
     void getLedColor (int&, int&, int&);
     void setEncoderEventThreshold (int, double);
     void setJointSpeeds (int mask, double, double, double);
-    void stop ();
+    void setJointStates(
+        int mask,
+        JointState::Type s1, double d1,
+        JointState::Type s2, double d2,
+        JointState::Type s3, double d3);
+    void stop (int mask = 0x07);
     void setBuzzerFrequencyOn (float);
     void getVersions (uint32_t&, uint32_t&, uint32_t&);
+
+    void writeEeprom(uint32_t address, const uint8_t *data, size_t size);
 
     typedef void (*ButtonEventCallback)(int buttonNo, ButtonState::Type event, int timestamp, void* userData);
     // EncoderEventCallback's anglePosition parameter is reported in degrees.
@@ -98,6 +77,7 @@ public:
     // Passing a null pointer as the first parameter of those three functions
     // will disable its respective events.
     void setButtonEventCallback (ButtonEventCallback, void* userData);
+    void setEncoderEventCallback (EncoderEventCallback, float granularity, void* userData);
     void setEncoderEventCallback (EncoderEventCallback, void* userData);
     void setJointEventCallback (JointEventCallback, void* userData);
     void setAccelerometerEventCallback (AccelerometerEventCallback, void* userData);

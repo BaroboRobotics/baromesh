@@ -25,6 +25,7 @@ find_package(Threads)
 
 set(LIBRARY_SOURCES
     src/linkbot.cpp
+    src/linkbot.c.cpp
     src/system_error.cpp
     src/iocore.cpp
     src/daemon.cpp
