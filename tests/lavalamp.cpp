@@ -1,41 +1,32 @@
-#include "baromesh/robotproxy.hpp"
+#include "baromesh/linkbot.hpp"
 
 #include <algorithm>
+#include <iostream>
+#include <chrono>
+#include <thread>
+
+#include <cassert>
 
 #undef M_PI
 #define M_PI 3.14159265358979323846
 
-void sendNewColor(robot::Proxy &robotProxy, double tim) {
+void sendNewColor(barobo::Linkbot& linkbot, double tim) {
     uint32_t red, green, blue;
     red = (sin(tim) + 1) * 127;
     green = (sin(tim + 2 * M_PI / 3) + 1) * 127;
     blue = (sin(tim + 4 * M_PI / 4) + 1) * 127;
-    auto future = robotProxy.fire(rpc::MethodIn<barobo::Robot>::setLedColor{red << 16 | green << 8 | blue});
-    //printf("sent request\n");
-    future.get();
-    //printf("got reply\n");
+    linkbot.setLedColor(red, green, blue);
 }
 
 void lavaLamp (std::string serialId) {
     double t = 0;
-    robot::Proxy robotProxy { serialId };
+    barobo::Linkbot linkbot { serialId };
     try {
-        auto serviceInfo = robotProxy.connect().get();
-
-        std::cout << "Local RPC version "
-                  << rpc::Version<>::triplet() << '\n';
-        std::cout << "Local barobo.Robot interface version "
-                  << rpc::Version<barobo::Robot>::triplet() << '\n';
-
-        std::cout << serialId << " RPC version "
-                  << serviceInfo.rpcVersion() << '\n';
-        std::cout << serialId << " barobo.Robot interface version "
-                  << serviceInfo.interfaceVersion() << '\n';
-
+        linkbot.connect();
         std::cout << serialId << ": connected\n";
 
         while (1) {
-            sendNewColor(robotProxy, t);
+            sendNewColor(linkbot, t);
             t += 0.05;
         }
     }

@@ -7,7 +7,6 @@
 #include "sfp/asio/messagequeue.hpp"
 
 #include <boost/asio.hpp>
-#include <boost/asio/spawn.hpp>
 
 #include <boost/log/common.hpp>
 #include <boost/log/sources/logger.hpp>

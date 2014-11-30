@@ -40,6 +40,8 @@ std::chrono::milliseconds kRequestTimeout { 10000 };
 using MethodIn = rpc::MethodIn<barobo::Robot>;
 using MethodResult = rpc::MethodResult<barobo::Robot>;
 
+using boost::asio::use_future;
+
 struct Linkbot::Impl {
     Impl (const std::string& id)
         : serialId(id)
@@ -436,18 +438,14 @@ void Linkbot::stop () {
 }
 
 void Linkbot::setLedColor (int r, int g, int b) {
-#if 0
-
     try {
-        m->proxy.fire(MethodIn::setLedColor{
+        asyncFire(m->client, MethodIn::setLedColor{
             uint32_t(r << 16 | g << 8 | b)
-        }).get();
+        }, kRequestTimeout, use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
     }
-#endif
-
 }
 
 void Linkbot::getLedColor (int& r, int& g, int& b) {

@@ -7,8 +7,6 @@
 
 #include "rpc/asio/client.hpp"
 
-#include <boost/asio/spawn.hpp>
-
 #include <functional>
 #include <memory>
 #include <queue>
@@ -124,7 +122,7 @@ public:
                 iter->second.ops.push(std::make_pair(buffer, realHandler));
             }
             postReceives();
-            startReceiveCoroutine();
+            startReceivePump();
         });
 
         return init.result.get();
@@ -181,13 +179,12 @@ private:
         }
     }
 
-    void startReceiveCoroutine () {
-        if (mReceiveCoroutineRunning) {
+    void startReceivePump () {
+        if (mReceivePumpRunning) {
             return;
         }
-        mReceiveCoroutineRunning = true;
-        boost::asio::spawn(mStrand, std::bind(&DongleImpl::receiveCoroutine,
-            this->shared_from_this(), _1));
+        mReceivePumpRunning = true;
+        receivePump();
     }
 
     bool thereArePendingOperations () {
@@ -200,28 +197,35 @@ private:
             });
     }
 
-    void receiveCoroutine (boost::asio::yield_context yield) {
-        try {
-            BOOST_LOG(mLog) << "receive coroutine starting";
+    void receivePump () {
+        if (thereArePendingOperations()) {
+            mClient.asyncReceiveBroadcast(mStrand.wrap(
+                std::bind(&DongleImpl::handleReceive,
+                    this->shared_from_this(), _1, _2)));
+        }
+    }
+
+    void handleReceive (boost::system::error_code ec, barobo_rpc_Broadcast broadcast) {
+        if (!ec) {
             rpc::ComponentBroadcastUnion<barobo::Dongle> argument;
-            while (thereArePendingOperations()) {
-                auto broadcast = mClient.asyncReceiveBroadcast(yield);
-                auto status = decodeBroadcastPayload(argument, broadcast.id, broadcast.payload);
-                if (!hasError(status)) {
-                    BOOST_LOG(mLog) << "received broadcast";
-                    status = invokeBroadcast(*this, argument, broadcast.id);
-                    postReceives();
-                }
-                if (hasError(status)) {
-                    throw rpc::Error(status);
-                }
+            auto status = decodeBroadcastPayload(argument, broadcast.id, broadcast.payload);
+            if (!hasError(status)) {
+                BOOST_LOG(mLog) << "received broadcast";
+                status = invokeBroadcast(*this, argument, broadcast.id);
+                postReceives();
+                receivePump();
+            }
+            if (hasError(status)) {
+                ec = status;
+                BOOST_LOG(mLog) << "Dongle broadcast invocation error: " << ec.message();
+                voidHandlers(ec);
             }
         }
-        catch (boost::system::system_error& e) {
-            BOOST_LOG(mLog) << "Error in Dongle receive coroutine: " << e.what();
-            voidHandlers(e.code());
+        else {
+            BOOST_LOG(mLog) << "Dongle receive broadcast error: " << ec.message();
+            voidHandlers(ec);
         }
-        mReceiveCoroutineRunning = false;
+        mReceivePumpRunning = false;
     }
 
     void voidHandlers (boost::system::error_code ec) {
@@ -238,7 +242,7 @@ private:
         }
     }
 
-    bool mReceiveCoroutineRunning = false;
+    bool mReceivePumpRunning = false;
 
     RpcClient mClient;
     boost::asio::io_service::strand mStrand;
@@ -283,6 +287,7 @@ public:
     }
 
     void cancel (boost::system::error_code&) {
+        BOOST_LOG(mLog) << "Cancelling message queue for " << mSerialId;
         auto dongle = mDongle.lock();
         if (dongle) {
             dongle->cancelMessageQueue(mSerialId);

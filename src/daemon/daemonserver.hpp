@@ -21,7 +21,16 @@ namespace baromesh {
 class DaemonServerImpl : public std::enable_shared_from_this<DaemonServerImpl> {
     using Tcp = boost::asio::ip::tcp;
     using TcpPolyServer = rpc::asio::TcpPolyServer;
-    using ProxyPair = std::pair<ZigbeeClient, TcpPolyServer>;
+
+    struct ProxyData {
+        ProxyData (boost::asio::io_service& ios, boost::log::sources::logger log)
+            : client(ios, log)
+            , server(ios, log)
+        {}
+
+        ZigbeeClient client;
+        TcpPolyServer server;
+    };
 
 public:
     using Interface = barobo::Daemon;
@@ -40,8 +49,8 @@ public:
         mResolver.cancel(); // resolver has no ec overload, strange
         boost::system::error_code ec;
         for (auto& kv : mRobotProxies) {
-            auto& proxyClient = kv.second.first;
-            auto& proxyServer = kv.second.second;
+            auto& proxyClient = kv.second->client;
+            auto& proxyServer = kv.second->server;
             proxyClient.cancel(ec);
             proxyServer.cancel(ec);
         }
@@ -69,26 +78,23 @@ public:
                 boost::log::sources::logger pxLog;
                 pxLog.add_attribute("Title", boost::log::attributes::constant<std::string>("PROXY"));
                 pxLog.add_attribute("SerialId", boost::log::attributes::constant<std::string>(serialId));
+                auto proxy = std::make_shared<ProxyData>(mServer.get_io_service(), pxLog);
                 bool success;
-                std::tie(iter, success) = mRobotProxies.emplace(std::piecewise_construct,
-                    std::forward_as_tuple(serialId),
-                    std::forward_as_tuple(std::piecewise_construct,
-                        std::forward_as_tuple(mServer.get_io_service(), pxLog),
-                        std::forward_as_tuple(mServer.get_io_service(), pxLog)));
+                std::tie(iter, success) = mRobotProxies.insert(std::make_pair(serialId, proxy));
                 assert(success);
 
-                auto& proxyClient = iter->second.first;
-                auto& proxyServer = iter->second.second;
+                auto& proxyClient = iter->second->client;
+                auto& proxyServer = iter->second->server;
 
                 proxyClient.messageQueue().setRoute(mDongle, serialId);
                 proxyServer.listen(endpoint);
 
                 asyncRunProxy(proxyClient, proxyServer, mStrand.wrap(
                     std::bind(&DaemonServerImpl::handleProxyFinished,
-                        this->shared_from_this(), serialId, _1)));
+                        this->shared_from_this(), serialId, proxy, _1)));
             }
 
-            endpoint = iter->second.second.endpoint();
+            endpoint = iter->second->server.endpoint();
             BOOST_LOG(mLog) << "Using proxy server for " << serialId
                             << " at " << endpoint;
 
@@ -113,7 +119,9 @@ public:
     }
 
 private:
-    void handleProxyFinished (std::string serialId, boost::system::error_code ec) {
+    void handleProxyFinished (std::string serialId,
+                              std::shared_ptr<ProxyData>,
+                              boost::system::error_code ec) {
         BOOST_LOG(mLog) << "Proxy for " << serialId << " finished with " << ec.message();
         auto nErased = mRobotProxies.erase(serialId);
         BOOST_LOG(mLog) << "Proxy for " << serialId
@@ -127,7 +135,7 @@ private:
     Tcp::resolver mResolver;
     boost::asio::io_service::strand mStrand;
 
-    std::map<std::string, ProxyPair> mRobotProxies;
+    std::map<std::string, std::shared_ptr<ProxyData>> mRobotProxies;
 
     mutable boost::log::sources::logger mLog;
 };

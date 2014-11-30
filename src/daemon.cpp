@@ -1,6 +1,8 @@
 #include "daemon.hpp"
 #include "iocore.hpp"
 
+#include <boost/asio/spawn.hpp>
+
 #include <memory>
 #include <mutex>
 

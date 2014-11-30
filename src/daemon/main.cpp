@@ -14,7 +14,7 @@
 #include "util/monospawn.hpp"
 
 #include <boost/asio.hpp>
-#include <boost/asio/spawn.hpp>
+#include <boost/asio/use_future.hpp>
 
 #include <boost/log/common.hpp>
 #include <boost/log/expressions.hpp>
@@ -28,27 +28,28 @@
 #include <functional>
 #include <iostream>
 #include <string>
+#include <thread>
+#include <chrono>
 
 using namespace std::placeholders;
 
 using Tcp = boost::asio::ip::tcp;
 using TcpMessageQueue = sfp::asio::MessageQueue<Tcp::socket>;
 
+using boost::asio::use_future;
+
 static const int kBaudRate = 230400;
 
-void dongleCoroutine (boost::asio::io_service& ios, boost::asio::yield_context yield) {
+void runDongle (boost::asio::io_service& ios) {
     boost::log::sources::logger log;
     log.add_attribute("Title", boost::log::attributes::constant<std::string>("DONGLECORO"));
 
     try {
         BOOST_LOG(log) << "Waiting for dongle";
-        boost::asio::steady_timer donglePollTimer { ios };
-        std::string devicePath;
         boost::system::error_code ec;
-        devicePath = baromesh::dongleDevicePath(ec);
+        auto devicePath = baromesh::dongleDevicePath(ec);
         while (ec) {
-            donglePollTimer.expires_from_now(std::chrono::milliseconds(200));
-            donglePollTimer.async_wait(yield);
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
             devicePath = baromesh::dongleDevicePath(ec);
         }
 
@@ -63,11 +64,11 @@ void dongleCoroutine (boost::asio::io_service& ios, boost::asio::yield_context y
         stream.open(devicePath);
         stream.set_option(boost::asio::serial_port_base::baud_rate(kBaudRate));
 
-        dongle.client().messageQueue().asyncHandshake(yield);
-        asyncConnect(dongle.client(), std::chrono::milliseconds(100), yield);
+        dongle.client().messageQueue().asyncHandshake(use_future).get();
+        asyncConnect(dongle.client(), std::chrono::milliseconds(100), use_future).get();
 
         Tcp::resolver resolver { ios };
-        auto iter = resolver.async_resolve(std::string("42000"), yield);
+        auto iter = resolver.resolve(std::string("42000"));
         boost::log::sources::logger daemonSvLog;
         daemonSvLog.add_attribute("Title", boost::log::attributes::constant<std::string>("DAEMON-SV"));
         auto server = std::make_shared<rpc::asio::TcpPolyServer>(ios, daemonSvLog);
@@ -102,15 +103,15 @@ void dongleCoroutine (boost::asio::io_service& ios, boost::asio::yield_context y
         while (true) {
             BOOST_LOG(daemonSvLog) << "awaiting connection";
             baromesh::DaemonServer daemon { *server, dongle, daemonSvLog };
-            asyncRunServer(*server, daemon, yield);
+            asyncRunServer(*server, daemon, use_future).get();
             BOOST_LOG(daemonSvLog) << "disconnected";
         }
     }
     catch (boost::system::system_error& e) {
-        BOOST_LOG(log) << "Error in dongle coroutine: " << e.what();
+        BOOST_LOG(log) << "runDongle: " << e.what();
     }
-    BOOST_LOG(log) << "Restarting dongle coroutine";
-    boost::asio::spawn(ios, std::bind(&dongleCoroutine, std::ref(ios), _1));
+    // recurse
+    runDongle(ios);
 }
 
 static void initializeLoggingCore () {
@@ -157,6 +158,9 @@ int main (int argc, char** argv) try {
     initializeLoggingCore();
     boost::log::sources::logger log;
     boost::asio::io_service ios;
+    boost::optional<boost::asio::io_service::work> work {
+        boost::in_place(std::ref(ios))
+    };
 
 #if 0 // TODO
     // Make a deadman switch to stop the daemon if we get an exclusive
@@ -165,16 +169,26 @@ int main (int argc, char** argv) try {
     producerLock.asyncLock([&] (boost::system::error_code ec) {
         if (!ec) {
             BOOST_LOG(log) << "No more baromesh producers, exiting";
+            work = boost::none;
             ios.stop();
         }
     });
 #endif
 
-    boost::asio::spawn(ios, std::bind(&dongleCoroutine, std::ref(ios), _1));
+    std::thread ioThread {
+        [&] () {
+            boost::system::error_code ec;
+            auto nHandlers = ios.run(ec);
+            BOOST_LOG(log) << "Event loop executed " << nHandlers << " handlers -- " << ec.message();
+        }
+    };
 
-    boost::system::error_code ec;
-    auto nHandlers = ios.run(ec);
-    BOOST_LOG(log) << "Event loop executed " << nHandlers << " handlers -- " << ec.message();
+    runDongle(ios);
+
+    // currently not reached
+    work = boost::none;
+    ios.stop();
+    ioThread.join();
 }
 catch (util::Monospawn::DuplicateProcess& e) {
     boost::log::sources::logger log;
