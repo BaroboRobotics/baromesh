@@ -98,6 +98,7 @@ Linkbot::Linkbot (const std::string& id)
     // up if any code in the rest of the ctor throws.
     std::unique_ptr<Impl> p { new Linkbot::Impl(id) };
 
+#warning TODO: handle broadcasts in Linkbot class
 #if 0
     p->proxy.buttonEvent.connect(
         BIND_MEM_CB(&Linkbot::Impl::newButtonValues, p.get())
@@ -283,10 +284,14 @@ void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
     try {
         barobo_Robot_setMotorControllerOmega_In arg;
         arg.mask = mask;
-        arg.values_count = 3;
-        arg.values[0] = float(degToRad(s0));
-        arg.values[1] = float(degToRad(s1));
-        arg.values[2] = float(degToRad(s2));
+        arg.values_count = 0;
+        int jointFlag = 0x01;
+        for (auto& s : { s0, s1, s2 }) {
+            if (jointFlag & mask) {
+                arg.values[arg.values_count++] = float(degToRad(s));
+            }
+            jointFlag <<= 1;
+        }
         asyncFire(m->client, arg, kRequestTimeout, use_future).get();
     }
     catch (std::exception& e) {
@@ -315,7 +320,7 @@ void Linkbot::setJointStates(
     barobo_Robot_Goal_Type goalType[3];
     barobo_Robot_Goal_Controller controllerType[3];
     JointState::Type jointStates[3];
-    double coefficients[3];
+    float coefficients[3];
     jointStates[0] = s1;
     jointStates[1] = s2;
     jointStates[2] = s3;
@@ -429,9 +434,9 @@ void Linkbot::move (int mask, double a0, double a1, double a2) {
 void Linkbot::moveContinuous (int mask, double c0, double c1, double c2) {
     try {
         asyncFire(m->client, MethodIn::move {
-            bool(mask&0x01), { barobo_Robot_Goal_Type_INFINITE, float(c0) },
-            bool(mask&0x02), { barobo_Robot_Goal_Type_INFINITE, float(c1) },
-            bool(mask&0x04), { barobo_Robot_Goal_Type_INFINITE, float(c2) }
+            bool(mask&0x01), { barobo_Robot_Goal_Type_INFINITE, float(c0), false },
+            bool(mask&0x02), { barobo_Robot_Goal_Type_INFINITE, float(c1), false },
+            bool(mask&0x04), { barobo_Robot_Goal_Type_INFINITE, float(c2), false }
         }, kRequestTimeout, use_future).get();
     }
     catch (std::exception& e) {
@@ -480,7 +485,7 @@ void Linkbot::motorPower(int mask, int m1, int m2, int m3)
 
 void Linkbot::stop (int mask) {
     try {
-        asyncFire(m->client, MethodIn::stop{true, mask}, kRequestTimeout, use_future).get();
+        asyncFire(m->client, MethodIn::stop{true, static_cast<uint32_t>(mask)}, kRequestTimeout, use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
