@@ -66,7 +66,7 @@ void asyncAcquireDaemonImpl (AcquireDaemonHandler handler) {
                     try {
                         // TODO: what to do about gracefully disconnecting? Do we care?
                         boost::asio::ip::tcp::resolver resolver { ioCore().ios() };
-                        auto iter = resolver.async_resolve(std::string("42000"), yield);
+                        auto iter = resolver.async_resolve(decltype(resolver)::query("localhost", "42000"), yield);
                         boost::asio::async_connect(d->client().messageQueue().stream(), iter, yield);
                         d->client().messageQueue().asyncHandshake(yield);
                         asyncConnect(d->client(), kDaemonConnectTimeout, yield);
