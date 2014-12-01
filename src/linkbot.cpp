@@ -39,10 +39,12 @@ std::chrono::milliseconds kRequestTimeout { 10000 };
 
 using MethodIn = rpc::MethodIn<barobo::Robot>;
 using MethodResult = rpc::MethodResult<barobo::Robot>;
+using Broadcast = rpc::Broadcast<barobo::Robot>;
 
 using boost::asio::use_future;
 
 struct Linkbot::Impl {
+    using Interface = barobo::Robot;
     Impl (const std::string& id)
         : serialId(id)
         , client(baromesh::ioCore().ios(), log)
@@ -57,31 +59,39 @@ struct Linkbot::Impl {
     boost::asio::io_service ios;
     rpc::asio::Client<sfp::asio::MessageQueue<boost::asio::ip::tcp::socket>> client;
 
+    std::future<void> clientFinishedFuture;
+
     boost::asio::io_service::work work;
 
     std::shared_ptr<baromesh::Daemon> daemon;
 
-    void newButtonValues (int button, int event, int timestamp) {
+    template <class B>
+    void broadcast (B&& args) {
+        onBroadcast(std::forward<B>(args));
+    }
+
+    void onBroadcast (Broadcast::buttonEvent b) {
         if (buttonEventCallback) {
-            buttonEventCallback(button, static_cast<ButtonState::Type>(event), timestamp);
+            buttonEventCallback(b.button, static_cast<ButtonState::Type>(b.state), b.timestamp);
         }
     }
 
-    void newEncoderValues (int jointNo, double anglePosition, int timestamp) {
+    void onBroadcast (Broadcast::encoderEvent b) {
         if (encoderEventCallback) {
-            encoderEventCallback(jointNo, radToDeg(anglePosition), timestamp);
+            encoderEventCallback(b.encoder, radToDeg(b.value), b.timestamp);
         }
     }
 
-    void newJointState (int jointNo, int state, int timestamp) {
-        if (jointEventCallback) {
-            jointEventCallback(jointNo, static_cast<JointState::Type>(state), timestamp);
-        }
-    }
-
-    void newAccelerometerValues(double x, double y, double z, int timestamp) {
+    void onBroadcast (Broadcast::accelerometerEvent b) {
         if (accelerometerEventCallback) {
-            accelerometerEventCallback(x, y, z, timestamp);
+            accelerometerEventCallback(b.x, b.y, b.z, b.timestamp);
+        }
+    }
+
+    void onBroadcast (Broadcast::jointEvent b) {
+        if (jointEventCallback) {
+#warning b.state is barobo_rpc_Robot_JointEventType, which has different values from JointState::Type!!!
+            jointEventCallback(b.joint, static_cast<JointState::Type>(b.event), b.timestamp);
         }
     }
 
@@ -98,28 +108,14 @@ Linkbot::Linkbot (const std::string& id)
     // up if any code in the rest of the ctor throws.
     std::unique_ptr<Impl> p { new Linkbot::Impl(id) };
 
-#warning TODO: handle broadcasts in Linkbot class
-#if 0
-    p->proxy.buttonEvent.connect(
-        BIND_MEM_CB(&Linkbot::Impl::newButtonValues, p.get())
-    );
-    p->proxy.encoderEvent.connect(
-        BIND_MEM_CB(&Linkbot::Impl::newEncoderValues, p.get())
-    );
-    p->proxy.jointEvent.connect(
-        BIND_MEM_CB(&Linkbot::Impl::newJointState, p.get())
-    );
-    p->proxy.accelerometerEvent.connect(
-        BIND_MEM_CB(&Linkbot::Impl::newAccelerometerValues, p.get())
-    );
-#endif
-
     auto epIter = p->daemon->asyncResolveSerialId(p->serialId, use_future).get();
 
     BOOST_LOG(p->log) << "connecting to " << p->serialId << " at " << epIter->endpoint();
 
     boost::asio::connect(p->client.messageQueue().stream(), epIter);
     p->client.messageQueue().asyncHandshake(use_future).get();
+
+    p->clientFinishedFuture = asyncRunClient(p->client, *p, use_future);
 
     // Our C++03 API only uses a raw pointer, so transfer ownership from the
     // unique_ptr to the raw pointer. This should always be the last line of
@@ -128,6 +124,15 @@ Linkbot::Linkbot (const std::string& id)
 }
 
 Linkbot::~Linkbot () {
+    if (m->clientFinishedFuture.valid()) {
+        try {
+            m->client.cancel();
+            m->clientFinishedFuture.get();
+        }
+        catch (boost::system::system_error& e) {
+            BOOST_LOG(m->log) << "asyncRunClient finished with: " << e.what();
+        }
+    }
     // This should probably be the only line in Linkbot's dtor. Let Impl's
     // subobjects clean themselves up.
     delete m;
