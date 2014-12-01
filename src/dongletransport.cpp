@@ -15,6 +15,7 @@ void Transport::startReaderThread () {
     try {
         std::thread t { &Transport::threadMain, this };
         mThread.swap(t);
+        t.join();
     }
     catch (...) {
         throw ThreadError(std::current_exception());

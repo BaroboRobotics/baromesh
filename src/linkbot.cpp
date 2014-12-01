@@ -31,6 +31,7 @@ struct Linkbot::Impl {
         : serialId(id)
         , proxy(id)
     {
+        std::cout << "Impl Cons" << std::endl;
     }
 
     mutable boost::log::sources::logger log;
@@ -71,27 +72,36 @@ struct Linkbot::Impl {
 Linkbot::Linkbot (const std::string& id)
     : m(nullptr)
 {
+    std::cout << "Linkbot Cons Begin" << std::endl;
     // By using a unique_ptr, we can guarantee that our Impl will get cleaned
     // up if any code in the rest of the ctor throws.
-    std::unique_ptr<Impl> p { new Linkbot::Impl(id) };
+    //std::unique_ptr<Impl> p { new Linkbot::Impl(id) };
+    auto p = new Linkbot::Impl(id);
 
+    std::cout << "Linkbot Cons 1" << std::endl;
     p->proxy.buttonEvent.connect(
-        BIND_MEM_CB(&Linkbot::Impl::newButtonValues, p.get())
+        BIND_MEM_CB(&Linkbot::Impl::newButtonValues, p)
     );
+    std::cout << "Linkbot Cons 2" << std::endl;
     p->proxy.encoderEvent.connect(
-        BIND_MEM_CB(&Linkbot::Impl::newEncoderValues, p.get())
+        BIND_MEM_CB(&Linkbot::Impl::newEncoderValues, p)
     );
+    std::cout << "Linkbot Cons 3" << std::endl;
     p->proxy.jointEvent.connect(
-        BIND_MEM_CB(&Linkbot::Impl::newJointState, p.get())
+        BIND_MEM_CB(&Linkbot::Impl::newJointState, p)
     );
+    std::cout << "Linkbot Cons 4" << std::endl;
     p->proxy.accelerometerEvent.connect(
-        BIND_MEM_CB(&Linkbot::Impl::newAccelerometerValues, p.get())
+        BIND_MEM_CB(&Linkbot::Impl::newAccelerometerValues, p)
     );
 
     // Our C++03 API only uses a raw pointer, so transfer ownership from the
     // unique_ptr to the raw pointer. This should always be the last line of
     // the ctor.
-    m = p.release();
+    std::cout << "Linkbot Cons 5" << std::endl;
+    //m = p.release();
+    m = p;
+    std::cout << "Linkbot Cons End " << std::endl;
 }
 
 Linkbot::~Linkbot () {

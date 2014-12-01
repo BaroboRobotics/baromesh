@@ -16,7 +16,6 @@ using namespace baromesh;
 
 Linkbot* linkbotNew(const char* serialId)
 {
-    
     return new Linkbot(serialId);
 }
 

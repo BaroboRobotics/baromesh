@@ -24,6 +24,7 @@ namespace dongle {
 class Proxy : public rpc::AsyncProxy<Proxy, barobo::Dongle> {
 public:
     Proxy () {
+        std::cout << "Proxy Cons." << std::endl;
         mTransport.sigMessageReceived.connect(
             BIND_MEM_CB(&Proxy::deliverMessage, this));
         mTransport.sigDisconnected.connect(
@@ -32,7 +33,9 @@ public:
             BIND_MEM_CB(&Proxy::connecting, this));
         mTransport.sigConnected.connect(
             BIND_MEM_CB(&Proxy::connected, this));
+        std::cout << "Start reader thread..." << std::endl;
         mTransport.startReaderThread();
+        std::cout << "Proxy Cons done." << std::endl;
     }
 
     void disconnected () {

@@ -86,6 +86,7 @@ private:
     sfp::Context mSfpContext;
     std::atomic<bool> mKillThread = { false };
     std::thread mThread;
+    std::string mDevicePath;
 };
 
 } // namespace dongle
