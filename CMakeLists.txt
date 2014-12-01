@@ -47,12 +47,6 @@ target_link_libraries(baromesh
            ${CMAKE_THREAD_LIBS_INIT}
     )
 
-if(WIN32)
-    target_link_libraries(baromesh
-        PRIVATE setupapi
-        )
-endif()
-
 set(DAEMON_SOURCES
     src/daemon/main.cpp
     src/daemon/dongledevicepath.cpp
@@ -72,6 +66,12 @@ target_link_libraries(baromeshd
             ${Boost_LIBRARIES}
             ${CMAKE_THREAD_LIBS_INIT}
    )
+
+if(WIN32)
+    target_link_libraries(baromeshd
+        PRIVATE setupapi ws2_32 mswsock
+        )
+endif()
 
 option(BAROMESH_BUILD_TESTS "Build baromesh tests" OFF)
 if(BAROMESH_BUILD_TESTS)
