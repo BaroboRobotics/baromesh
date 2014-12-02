@@ -66,9 +66,12 @@ void asyncAcquireDaemonImpl (AcquireDaemonHandler handler) {
                     try {
                         // TODO: what to do about gracefully disconnecting? Do we care?
                         boost::asio::ip::tcp::resolver resolver { ioCore().ios() };
-                        auto iter = resolver.async_resolve(decltype(resolver)::query("localhost", "42000"), yield);
+                        auto iter = resolver.async_resolve(decltype(resolver)::query("127.0.0.1", "42000"), yield);
+                        BOOST_LOG(log) << "Resolved daemon's TCP endpoint";
                         boost::asio::async_connect(d->client().messageQueue().stream(), iter, yield);
+                        BOOST_LOG(log) << "Connected to daemon's TCP endpoint";
                         d->client().messageQueue().asyncHandshake(yield);
+                        BOOST_LOG(log) << "Shook hands with the daemon";
                         asyncConnect(d->client(), kDaemonConnectTimeout, yield);
                         BOOST_LOG(log) << "Connected to daemon";
                         postAcquires(boost::system::error_code(), d);

@@ -62,17 +62,23 @@ public:
         
         MethodResult::resolveSerialId result = decltype(result)();
         try {
+            BOOST_LOG(mLog) << "searching for proxy for " << serialId;
             auto iter = mRobotProxies.find(serialId);
             Tcp::endpoint endpoint;
             if (mRobotProxies.end() == iter) {
+                BOOST_LOG(mLog) << "No proxy exists, buiding resolver query";
                 // Bind to a random, free local port.
-                Tcp::resolver::query query {
-                    "127.0.0.1", "", boost::asio::ip::resolver_query_base::flags(0)
-                };
+                //Tcp::resolver::query query {
+                //    "127.0.0.1", "", boost::asio::ip::resolver_query_base::flags(0)
+                //};
                 // FIXME this resolve is synchronous. Make it asynchronous.
                 // This will require us to enable asynchronous method invocation in
                 // ribbon-bridge.
-                endpoint = mResolver.resolve(query)->endpoint();
+                BOOST_LOG(mLog) << "Resolving 127.0.0.1:any port";
+                auto epIter = mResolver.resolve(decltype(mResolver)::query("127.0.0.1", "",
+                    boost::asio::ip::resolver_query_base::flags(0)));
+                BOOST_LOG(mLog) << "Resolved to iterator";
+                endpoint = epIter->endpoint();
 
                 BOOST_LOG(mLog) << "Starting new robot proxy on " << endpoint;
                 boost::log::sources::logger pxLog;

@@ -25,6 +25,8 @@
 #include <boost/log/utility/setup/file.hpp>
 #include <boost/log/utility/setup/console.hpp>
 
+#include <boost/scope_exit.hpp>
+
 #include <functional>
 #include <iostream>
 #include <string>
@@ -62,13 +64,18 @@ void runDongle (boost::asio::io_service& ios) {
 
         auto& stream = dongle.client().messageQueue().stream();
         stream.open(devicePath);
+        BOOST_SCOPE_EXIT(&stream, &log, devicePath) {
+            boost::system::error_code ec;
+            stream.close(ec);
+            BOOST_LOG(log) << "Closed " << devicePath << ": " << ec.message();
+        } BOOST_SCOPE_EXIT_END
         stream.set_option(boost::asio::serial_port_base::baud_rate(kBaudRate));
 
         dongle.client().messageQueue().asyncHandshake(use_future).get();
         asyncConnect(dongle.client(), std::chrono::milliseconds(100), use_future).get();
 
         Tcp::resolver resolver { ios };
-        auto iter = resolver.resolve(std::string("42000"));
+        auto iter = resolver.resolve(decltype(resolver)::query("127.0.0.1", "42000"));
         boost::log::sources::logger daemonSvLog;
         daemonSvLog.add_attribute("Title", boost::log::attributes::constant<std::string>("DAEMON-SV"));
         auto server = std::make_shared<rpc::asio::TcpPolyServer>(ios, daemonSvLog);
