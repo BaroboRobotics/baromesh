@@ -41,6 +41,7 @@ using TcpMessageQueue = sfp::asio::MessageQueue<Tcp::socket>;
 using boost::asio::use_future;
 
 static const int kBaudRate = 230400;
+static const std::chrono::milliseconds kKeepaliveTimeout { 500 };
 
 void runDongle (boost::asio::io_service& ios) {
     boost::log::sources::logger log;
@@ -60,9 +61,9 @@ void runDongle (boost::asio::io_service& ios) {
 
         boost::log::sources::logger dongleClLog;
         dongleClLog.add_attribute("Title", boost::log::attributes::constant<std::string>("DONGLE-CL"));
-        baromesh::Dongle dongle { ios, dongleClLog };
+        auto dongle = std::make_shared<baromesh::Dongle>(ios, dongleClLog);
 
-        auto& stream = dongle.client().messageQueue().stream();
+        auto& stream = dongle->client().messageQueue().stream();
         stream.open(devicePath);
         BOOST_SCOPE_EXIT(&stream, &log, devicePath) {
             boost::system::error_code ec;
@@ -71,8 +72,8 @@ void runDongle (boost::asio::io_service& ios) {
         } BOOST_SCOPE_EXIT_END
         stream.set_option(boost::asio::serial_port_base::baud_rate(kBaudRate));
 
-        dongle.client().messageQueue().asyncHandshake(use_future).get();
-        asyncConnect(dongle.client(), std::chrono::milliseconds(100), use_future).get();
+        dongle->client().messageQueue().asyncHandshake(use_future).get();
+        asyncConnect(dongle->client(), std::chrono::milliseconds(100), use_future).get();
 
         Tcp::resolver resolver { ios };
         auto iter = resolver.resolve(decltype(resolver)::query("127.0.0.1", "42000"));
@@ -89,11 +90,17 @@ void runDongle (boost::asio::io_service& ios) {
         auto mqLog = log;
         mqLog.add_attribute("SerialId", boost::log::attributes::constant<std::string>("...."));
         baromesh::Dongle::MessageQueue nullMq { ios, mqLog };
-        nullMq.setRoute(dongle, "....");
+        nullMq.setRoute(*dongle, "....");
+
+        auto stopTheWorld = [dongle, server, log] (boost::system::error_code ec) mutable {
+            BOOST_LOG(log) << "Stopping the world with: " << ec.message();
+            server->close(ec);
+            dongle->close(ec);
+        };
 
         uint8_t buf[1];
         nullMq.asyncReceive(boost::asio::buffer(buf),
-            [server, log] (boost::system::error_code ec, size_t) mutable {
+            [log, stopTheWorld] (boost::system::error_code ec, size_t) mutable {
                 if (!ec) {
                     BOOST_LOG(log) << "Actually read something from serial ID \"....\" . "
                                    << "That should be impossible.";
@@ -101,15 +108,20 @@ void runDongle (boost::asio::io_service& ios) {
                 else {
                     BOOST_LOG(log) << "Dongle error: " << ec.message();
                 }
-                server->cancel(ec);
+                stopTheWorld(ec);
             });
+
+        // So that takes care of linux. Windows XP's implementation of IOCP is
+        // too stupid to notify us when a serial read fails because of a device
+        // unplugged, so ping the dongle periodically.
+        asyncKeepalive(dongle->client().messageQueue(), kKeepaliveTimeout, stopTheWorld);
 
         rpc::asio::TcpPolyServer::RequestId requestId;
         barobo_rpc_Request request;
 
         while (true) {
             BOOST_LOG(daemonSvLog) << "awaiting connection";
-            baromesh::DaemonServer daemon { *server, dongle, daemonSvLog };
+            baromesh::DaemonServer daemon { *server, *dongle, daemonSvLog };
             asyncRunServer(*server, daemon, use_future).get();
             BOOST_LOG(daemonSvLog) << "disconnected";
         }
