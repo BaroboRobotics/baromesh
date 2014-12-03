@@ -5,7 +5,7 @@ void ServiceMain(int argc, char** argv);
 void ControlHandler(DWORD request);
 }
 
-int startService() 
+int main(int argc, char** argv) 
 { 
     SERVICE_TABLE_ENTRY ServiceTable[2];
     ServiceTable[0].lpServiceName = "baromeshd";
@@ -15,15 +15,18 @@ int startService()
     ServiceTable[1].lpServiceProc = NULL;
     // Start the control dispatcher thread for our service
     StartServiceCtrlDispatcher(ServiceTable);  
+    return 0;
 }
 
 void ServiceMain(int argc, char** argv) 
 { 
+    SERVICE_STATUS ServiceStatus; 
+    SERVICE_STATUS_HANDLE hStatus; 
     int error; 
  
     ServiceStatus.dwServiceType        = SERVICE_WIN32; 
     ServiceStatus.dwCurrentState       = SERVICE_START_PENDING; 
-    ServiceStatus.dwControlsAccepted   = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
+    ServiceStatus.dwControlsAccepted   = 0; //SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
     ServiceStatus.dwWin32ExitCode      = 0; 
     ServiceStatus.dwServiceSpecificExitCode = 0; 
     ServiceStatus.dwCheckPoint         = 0; 
@@ -44,28 +47,18 @@ void ServiceMain(int argc, char** argv)
  
     MEMORYSTATUS memory;
     // The worker loop of a service
-    while (ServiceStatus.dwCurrentState == SERVICE_RUNNING)
-	{
-		char buffer[16];
-		GlobalMemoryStatus(&memory);
-		sprintf(buffer, "%d", memory.dwAvailPhys);
-		int result = WriteToLog(buffer);
-		if (result)
-		{
-			ServiceStatus.dwCurrentState       = SERVICE_STOPPED; 
-			ServiceStatus.dwWin32ExitCode      = -1; 
-			SetServiceStatus(hStatus, &ServiceStatus);
-			return;
-		}
+    runDongle();
 
-		Sleep(SLEEP_TIME);
-	}
+    ServiceStatus.dwCurrentState       = SERVICE_STOPPED; 
+    ServiceStatus.dwWin32ExitCode      = 0; 
+    SetServiceStatus(hStatus, &ServiceStatus);
     return; 
 }
  
 // Control handler function
 void ControlHandler(DWORD request) 
 { 
+    #if 0
     switch(request) 
     { 
         case SERVICE_CONTROL_STOP: 
@@ -90,7 +83,8 @@ void ControlHandler(DWORD request)
  
     // Report current status
     SetServiceStatus (hStatus,  &ServiceStatus);
- 
+
+    #endif
     return; 
 } 
 

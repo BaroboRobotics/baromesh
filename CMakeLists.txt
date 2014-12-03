@@ -50,6 +50,7 @@ target_link_libraries(baromesh
 set(DAEMON_SOURCES
     src/daemon/main.cpp
     src/daemon/dongledevicepath.cpp
+    src/daemon/rundongle.cpp
     src/system_error.cpp
     )
 
