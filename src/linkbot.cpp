@@ -126,7 +126,7 @@ Linkbot::Linkbot (const std::string& id)
 Linkbot::~Linkbot () {
     if (m->clientFinishedFuture.valid()) {
         try {
-            m->client.cancel();
+            m->client.close();
             m->clientFinishedFuture.get();
         }
         catch (boost::system::system_error& e) {
