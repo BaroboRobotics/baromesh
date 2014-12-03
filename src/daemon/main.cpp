@@ -146,7 +146,8 @@ static void initializeLoggingCore () {
 
     boost::log::formatter formatter =
         expr::stream
-            << "[T+" << expr::attr<attrs::timer::value_type>("Timeline") << "]"
+            //<< "[T+" << expr::attr<attrs::timer::value_type>("Timeline") << "]"
+            << expr::attr<unsigned int>("LineID") << ": "
             << "[thread=" << expr::attr<attrs::current_thread_id::value_type>("ThreadID") << "]"
             << expr::if_ (expr::has_attr<std::string>("SerialId")) [
                 expr::stream << "[robot=" << expr::attr<std::string>("SerialId") << "]"
