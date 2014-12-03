@@ -42,8 +42,22 @@ using boost::asio::use_future;
 
 static const int kBaudRate = 230400;
 static const std::chrono::milliseconds kKeepaliveTimeout { 500 };
+static bool serviceActive = true;
+
+using ServiceFunc = std::function<void()>;
+
+#ifdef _WIN32
+#include "daemonservice/win32.cpp"
+#elif defined(__linux__)
+#include "daemonservice/linux.cpp"
+#elif defined(__APPLE__) && defined(__MACH__)
+#include "daemonservice/osx.cpp"
+#else
+#error No dongledevicepath.cpp available for this platform.
+#endif
 
 void runDongle (boost::asio::io_service& ios) {
+    if(!serviceActive) return;
     boost::log::sources::logger log;
     log.add_attribute("Title", boost::log::attributes::constant<std::string>("DONGLECORO"));
 
@@ -119,12 +133,16 @@ void runDongle (boost::asio::io_service& ios) {
         rpc::asio::TcpPolyServer::RequestId requestId;
         barobo_rpc_Request request;
 
-        while (true) {
+        /* dko: This need not be a loop. If we run baromeshd as a service, the
+         * service can terminate as soon as all connected entities disconnect.
+         * */
+        //while (true) {
             BOOST_LOG(daemonSvLog) << "awaiting connection";
             baromesh::DaemonServer daemon { *server, *dongle, daemonSvLog };
             asyncRunServer(*server, daemon, use_future).get();
             BOOST_LOG(daemonSvLog) << "disconnected";
-        }
+            return;
+        //}
     }
     catch (boost::system::system_error& e) {
         BOOST_LOG(log) << "runDongle: " << e.what();
@@ -173,7 +191,8 @@ static void initializeLoggingCore () {
 
 
 int main (int argc, char** argv) try {
-    util::Monospawn sentinel { "baromeshd", std::chrono::seconds(1) };
+    // dko No longer needed as baromeshd is to become a legit service
+    //util::Monospawn sentinel { "baromeshd", std::chrono::seconds(1) };
 
     initializeLoggingCore();
     boost::log::sources::logger log;
