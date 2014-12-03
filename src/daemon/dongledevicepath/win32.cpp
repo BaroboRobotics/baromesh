@@ -294,7 +294,7 @@ int dongleDevicePathImpl (char *tty, size_t len) {
 
     if (INVALID_HANDLE_VALUE == devices) {
         win32_error(_T("SetupDiGetClassDevs"), GetLastError());
-        exit(1);
+        return -1;
     }
 
     /* Now iterate over each device in the COM port interface class. */
@@ -303,13 +303,13 @@ int dongleDevicePathImpl (char *tty, size_t len) {
     DWORD i = 0;
     BOOL b = SetupDiEnumDeviceInfo(devices, i, &dev);
     DWORD err = 0;
-    int ret = -1;
+    int portNo = -1;
     while (b) {
         if (isDongle(devices, &dev)) {
-            ret = getCOMPort(devices, &dev, tty, len);
-            if (-1 == ret) {
+            portNo = getCOMPort(devices, &dev, tty, len);
+            if (-1 == portNo) {
                 fprintf(stderr, "Found dongle, but could not get COM port\n");
-                exit(1);
+                return -1;
             }
             /* Found the dongle. */
             break;
@@ -322,14 +322,14 @@ int dongleDevicePathImpl (char *tty, size_t len) {
     }
     if (ERROR_SUCCESS != err && ERROR_NO_MORE_ITEMS != err) {
         win32_error(_T("SetupDiEnumDeviceInfo"), GetLastError());
-        exit(1);
+        return -1;
     }
 
     /* Done with our COM port devices. */
     if (!SetupDiDestroyDeviceInfoList(devices)) {
         win32_error(_T("SetupDiDestroyDeviceInfoList"), GetLastError());
-        exit(1);
+        return -1;
     }
 
-    return ret;
+    return portNo;
 }
