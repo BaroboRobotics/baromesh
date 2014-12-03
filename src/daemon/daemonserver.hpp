@@ -46,13 +46,17 @@ public:
     {}
 
     void destroy () {
-        mResolver.cancel(); // resolver has no ec overload, strange
         boost::system::error_code ec;
+        close(ec);
+    }
+
+    void close (boost::system::error_code& ec) {
+        mResolver.cancel(); // resolver has no ec overload, strange
         for (auto& kv : mRobotProxies) {
             auto& proxyClient = kv.second->client;
             auto& proxyServer = kv.second->server;
-            proxyClient.cancel(ec);
-            proxyServer.cancel(ec);
+            proxyClient.close(ec);
+            proxyServer.close(ec);
         }
     }
 
@@ -141,6 +145,14 @@ private:
     Tcp::resolver mResolver;
     boost::asio::io_service::strand mStrand;
 
+    // FIXME mRobotProxies needs to be protected by a mutex, unless we can
+    // guarantee that all accesses take place on the same strand. That is
+    // currently not the case, but since our io_services are all single-
+    // threaded at the moment, there is an implicit strand which makes this
+    // safe, for now. If we want to be able to support multiple threads
+    // calling io_service::run simultaneously, this needs to be protected
+    // by a mutex, or we need to implement asynchronous fire implementations,
+    // which will permit us to use a strand to synchronize access to mRobotProxies.
     std::map<std::string, std::shared_ptr<ProxyData>> mRobotProxies;
 
     mutable boost::log::sources::logger mLog;

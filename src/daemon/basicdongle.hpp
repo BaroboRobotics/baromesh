@@ -41,12 +41,24 @@ public:
         , mLog(log)
     {}
 
-    void cancel (boost::system::error_code& ec) {
-        voidHandlers(boost::asio::error::operation_aborted);
-        mClient.cancel(ec);
+    void close (boost::system::error_code& ec) {
+        mClient.close(ec);
     }
 
-    void cancelMessageQueue (std::string serialId) {
+    RpcClient& client () { return mClient; }
+
+    // Tell the Dongle object to maintain an incoming messages buffer for the
+    // given serial ID, and store any messages destined thereto therein (by
+    // default, the Dongle object will ignore any messages destined for a
+    // "closed" serial ID). Return false if the buffer already exists, true
+    // otherwise.
+    bool openMessageQueue (std::string serialId, boost::log::sources::logger log) {
+        std::lock_guard<std::mutex> lock { mReceiveDataMutex };
+        return mReceiveData.insert(std::make_pair(serialId, ReceiveData(log))).second;
+    }
+
+    // Remove the incoming messages buffer for the given serial ID, if one exists.
+    void closeMessageQueue (std::string serialId) {
         std::lock_guard<std::mutex> lock { mReceiveDataMutex };
         auto iter = mReceiveData.find(serialId);
         if (iter != mReceiveData.end()) {
@@ -59,19 +71,8 @@ public:
                 mClient.get_io_service().post(
                     std::bind(handler, boost::asio::error::operation_aborted, 0));
             }
+            mReceiveData.erase(iter);
         }
-    }
-
-    RpcClient& client () { return mClient; }
-
-    bool registerMessageQueue (std::string serialId, boost::log::sources::logger log) {
-        std::lock_guard<std::mutex> lock { mReceiveDataMutex };
-        return mReceiveData.insert(std::make_pair(serialId, ReceiveData(log))).second;
-    }
-
-    bool unregisterMessageQueue (std::string serialId) {
-        std::lock_guard<std::mutex> lock { mReceiveDataMutex };
-        return !!mReceiveData.erase(serialId);
     }
 
     template <class Handler>
@@ -265,32 +266,26 @@ public:
 
     ~DongleMessageQueue () {
         boost::system::error_code ec;
-        cancel(ec);
-        auto dongle = mDongle.lock();
-        if (dongle) {
-            auto success = dongle->unregisterMessageQueue(mSerialId);
-            assert(success);
-            (void)success;
-        }
+        close(ec);
     }
 
     // noncopyable
     DongleMessageQueue (const DongleMessageQueue&) = delete;
     DongleMessageQueue& operator= (const DongleMessageQueue&) = delete;
 
-    void cancel () {
+    void close () {
         boost::system::error_code ec;
-        cancel(ec);
+        close(ec);
         if (ec) {
             throw boost::system::system_error(ec);
         }
     }
 
-    void cancel (boost::system::error_code&) {
-        BOOST_LOG(mLog) << "Cancelling message queue for " << mSerialId;
+    void close (boost::system::error_code&) {
+        BOOST_LOG(mLog) << "Closing message queue for " << mSerialId;
         auto dongle = mDongle.lock();
         if (dongle) {
-            dongle->cancelMessageQueue(mSerialId);
+            dongle->closeMessageQueue(mSerialId);
         }
     }
 
@@ -340,7 +335,7 @@ public:
         mDongle = dongle.impl();
         auto d = mDongle.lock();
         assert(d);
-        auto success = d->registerMessageQueue(serialId, mLog);
+        auto success = d->openMessageQueue(serialId, mLog);
         assert(success);
         (void)success;
 
@@ -370,19 +365,19 @@ public:
 
     ~BasicDongle () {
         boost::system::error_code ec;
-        cancel(ec);
+        close(ec);
     }
 
-    void cancel () {
+    void close () {
         boost::system::error_code ec;
-        cancel(ec);
+        close(ec);
         if (ec) {
             throw boost::system::system_error(ec);
         }
     }
 
-    void cancel (boost::system::error_code& ec) {
-        mImpl->cancel(ec);
+    void close (boost::system::error_code& ec) {
+        mImpl->close(ec);
     }
 
     // noncopyable
