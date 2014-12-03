@@ -74,6 +74,16 @@ if(WIN32)
         )
 endif()
 
+if(WIN32)
+    set(dest .)
+elseif(APPLE)
+    set(dest Contents/MacOS)
+else()
+    set(dest bin)
+endif()
+
+install(TARGETS baromeshd DESTINATION ${dest})
+
 option(BAROMESH_BUILD_TESTS "Build baromesh tests" OFF)
 if(BAROMESH_BUILD_TESTS)
     enable_testing()
