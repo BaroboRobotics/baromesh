@@ -7,13 +7,11 @@
 #include <memory>
 #include <mutex>
 
+#include <cstdlib>
+
 namespace baromesh {
 
-namespace {
-
 static const std::chrono::milliseconds kDaemonConnectTimeout { 200 };
-
-}
 
 // Get a shared pointer to the daemon singleton. If the singleton does not
 // already exist, create it. If all shared_ptrs returned from this function
@@ -21,6 +19,19 @@ static const std::chrono::milliseconds kDaemonConnectTimeout { 200 };
 std::shared_ptr<Daemon> daemonInstance () {
     static std::mutex mutex;
     std::lock_guard<std::mutex> lock { mutex };
+
+    bool enable = false;
+    if (const auto enableStr = std::getenv("BAROMESH_LOG_ENABLE")) {
+        try {
+            enable = std::stoi(enableStr);
+        }
+        catch (std::exception& e) {
+            boost::log::sources::logger log;
+            BOOST_LOG(log) << "BAROMESH_LOG_ENABLE environment variable is set,"
+                           << " but not a numeric value: " << e.what();
+        }
+    }
+    boost::log::core::get()->set_logging_enabled(enable);
 
     boost::log::sources::logger log;
     log.add_attribute("Title", boost::log::attributes::constant<std::string>("DAEMON"));
