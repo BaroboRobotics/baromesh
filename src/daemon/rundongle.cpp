@@ -27,7 +27,9 @@
 
 #include <boost/scope_exit.hpp>
 
+#include <exception>
 #include <functional>
+#include <future>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -41,13 +43,38 @@ using TcpMessageQueue = sfp::asio::MessageQueue<Tcp::socket>;
 using boost::asio::use_future;
 
 static const int kBaudRate = 230400;
+static const std::chrono::milliseconds kDongleDevicePathPollTimeout { 500 };
 static const std::chrono::milliseconds kKeepaliveTimeout { 500 };
-static bool serviceActive = true;
 
-void startService();
+struct StopDaemon : std::exception {
+    const char* what () const noexcept override {
+        return "Daemon going dooooown";
+    }
+};
 
-void runDongle (boost::asio::io_service& ios) {
-    if(!serviceActive) return;
+static void runDongle (boost::asio::io_service& ios) {
+    // We employ two different strategies for a graceful shutdown. Here is the
+    // first strategy. During the dongle detection phase, we will need to check
+    // for some shutdown flag for every poll we make. A future-based approach
+    // works nicely here. A std::future<void> made from a std::promise<void>
+    // can have three states: not ready, ready with a value, and ready with an
+    // exception. We can map these three states to:
+    //   not ready = SIGTERM not raised
+    //   ready with exception = SIGTERM raised
+    //   ready with value = SIGTERM signal handler cancelled
+    auto deadmanPromise = std::promise<void>();
+    auto deadmanSwitch = deadmanPromise.get_future();
+
+    boost::asio::signal_set sigTerm { ios, SIGTERM };
+    sigTerm.async_wait([&deadmanPromise] (boost::system::error_code ec, int) {
+        if (!ec) {
+            deadmanPromise.set_exception(std::make_exception_ptr(StopDaemon()));
+        }
+        else {
+            deadmanPromise.set_value();
+        }
+    });
+
     boost::log::sources::logger log;
     log.add_attribute("Title", boost::log::attributes::constant<std::string>("DONGLECORO"));
 
@@ -56,12 +83,17 @@ void runDongle (boost::asio::io_service& ios) {
         boost::system::error_code ec;
         auto devicePath = baromesh::dongleDevicePath(ec);
         while (ec) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            auto status = deadmanSwitch.wait_for(kDongleDevicePathPollTimeout);
+            if (std::future_status::ready == status) {
+                // Given that we haven't called sigTerm.cancel(), this next
+                // line should be equivalent to throwing StopDaemon.
+                deadmanSwitch.get();
+                assert(false); // not reached
+            }
             devicePath = baromesh::dongleDevicePath(ec);
         }
 
         BOOST_LOG(log) << "Dongle detected at " << devicePath;
-
 
         boost::log::sources::logger dongleClLog;
         dongleClLog.add_attribute("Title", boost::log::attributes::constant<std::string>("DONGLE-CL"));
@@ -75,6 +107,23 @@ void runDongle (boost::asio::io_service& ios) {
             BOOST_LOG(log) << "Closed " << devicePath << ": " << ec.message();
         } BOOST_SCOPE_EXIT_END
         stream.set_option(boost::asio::serial_port_base::baud_rate(kBaudRate));
+
+        // We have a dongle! We need to switch shutdown strategies.
+        sigTerm.cancel();
+        deadmanSwitch.get();
+        deadmanPromise = decltype(deadmanPromise)();
+        deadmanSwitch = deadmanPromise.get_future();
+
+        sigTerm.async_wait([dongle, &deadmanPromise] (boost::system::error_code ec, int) {
+            if (!ec) {
+                // FIXME wait, am I thread-safe? Probably not...
+                dongle->close(ec);
+                deadmanPromise.set_exception(std::make_exception_ptr(StopDaemon()));
+            }
+            else {
+                deadmanPromise.set_value();
+            }
+        });
 
         dongle->client().messageQueue().asyncHandshake(use_future).get();
         asyncConnect(dongle->client(), std::chrono::milliseconds(100), use_future).get();
@@ -120,26 +169,44 @@ void runDongle (boost::asio::io_service& ios) {
         // unplugged, so ping the dongle periodically.
         asyncKeepalive(dongle->client().messageQueue(), kKeepaliveTimeout, stopTheWorld);
 
-        rpc::asio::TcpPolyServer::RequestId requestId;
-        barobo_rpc_Request request;
+        // And make sure SIGTERM stops the daemon.
+        sigTerm.cancel();
+        deadmanSwitch.get();
+        deadmanPromise = decltype(deadmanPromise)();
+        deadmanSwitch = deadmanPromise.get_future();
+
+        sigTerm.async_wait([stopTheWorld, &deadmanPromise] (boost::system::error_code ec, int) mutable {
+            if (!ec) {
+                // FIXME wait, am I thread-safe? Probably not...
+                stopTheWorld(ec);
+                deadmanPromise.set_exception(std::make_exception_ptr(StopDaemon()));
+            }
+            else {
+                deadmanPromise.set_value();
+            }
+        });
 
         /* dko: This need not be a loop. If we run baromeshd as a service, the
          * service can terminate as soon as all connected entities disconnect.
          * */
-        //while (true) {
+        while (true) {
             BOOST_LOG(daemonSvLog) << "awaiting connection";
             baromesh::DaemonServer daemon { *server, *dongle, daemonSvLog };
             asyncRunServer(*server, daemon, use_future).get();
             BOOST_LOG(daemonSvLog) << "disconnected";
-            return;
-        //}
+        }
     }
     catch (boost::system::system_error& e) {
         BOOST_LOG(log) << "runDongle: " << e.what();
     }
-    // recurse
-    runDongle(ios);
+
+    if (deadmanSwitch.valid()) {
+        sigTerm.cancel();
+        deadmanSwitch.get();
+    }
 }
+
+
 
 static void initializeLoggingCore () {
     namespace expr = boost::log::expressions;
@@ -180,29 +247,18 @@ static void initializeLoggingCore () {
 }
 
 
-int runDongle (void) try {
+
+void runDongle () try {
     // dko No longer needed as baromeshd is to become a legit service
     //util::Monospawn sentinel { "baromeshd", std::chrono::seconds(1) };
 
     initializeLoggingCore();
     boost::log::sources::logger log;
+
     boost::asio::io_service ios;
     boost::optional<boost::asio::io_service::work> work {
         boost::in_place(std::ref(ios))
     };
-
-#if 0 // TODO
-    // Make a deadman switch to stop the daemon if we get an exclusive
-    // producer lock.
-    util::asio::TmpFileLock producerLock { ios };
-    producerLock.asyncLock([&] (boost::system::error_code ec) {
-        if (!ec) {
-            BOOST_LOG(log) << "No more baromesh producers, exiting";
-            work = boost::none;
-            ios.stop();
-        }
-    });
-#endif
 
     std::thread ioThread {
         [&] () {
@@ -212,9 +268,15 @@ int runDongle (void) try {
         }
     };
 
-    runDongle(ios);
+    try {
+        while (true) {
+            runDongle(ios);
+        }
+    }
+    catch (StopDaemon& e) {
+        BOOST_LOG(log) << "runDongle stopped";
+    }
 
-    // currently not reached
     work = boost::none;
     ios.stop();
     ioThread.join();
