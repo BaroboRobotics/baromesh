@@ -1,90 +1,98 @@
+#include "rundongle.hpp"
+
 #include <windows.h>
 
+#include <csignal>
+#include <cstdlib>
+
 extern "C" {
-void ServiceMain(int argc, char** argv);
-void ControlHandler(DWORD request);
+void serviceMain (int argc, char** argv);
+void ControlHandler (DWORD request);
 }
 
-int main(int argc, char** argv) 
-{ 
-    SERVICE_TABLE_ENTRY ServiceTable[2];
-    ServiceTable[0].lpServiceName = "baromeshd";
-    ServiceTable[0].lpServiceProc = (LPSERVICE_MAIN_FUNCTION)ServiceMain;
+int main (int argc, char** argv)
+{
+    // If there's a bug in the rest of the Windows service code, it's useful
+    // to be able to start the daemon manually for testing.
+    if (argc > 1) {
+        runDongle();
+        return 0;
+    }
+    SERVICE_TABLE_ENTRY serviceTable[2];
+    serviceTable[0].lpServiceName = "baromeshd";
+    serviceTable[0].lpServiceProc = (LPSERVICE_MAIN_FUNCTION)serviceMain;
 
-    ServiceTable[1].lpServiceName = NULL;
-    ServiceTable[1].lpServiceProc = NULL;
+    serviceTable[1].lpServiceName = NULL;
+    serviceTable[1].lpServiceProc = NULL;
     // Start the control dispatcher thread for our service
-    StartServiceCtrlDispatcher(ServiceTable);  
+    StartServiceCtrlDispatcher(serviceTable);
     return 0;
 }
 
-void ServiceMain(int argc, char** argv) 
-{ 
-    SERVICE_STATUS ServiceStatus; 
-    SERVICE_STATUS_HANDLE hStatus; 
-    int error; 
- 
-    ServiceStatus.dwServiceType        = SERVICE_WIN32; 
-    ServiceStatus.dwCurrentState       = SERVICE_START_PENDING; 
-    ServiceStatus.dwControlsAccepted   = 0; //SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
-    ServiceStatus.dwWin32ExitCode      = 0; 
-    ServiceStatus.dwServiceSpecificExitCode = 0; 
-    ServiceStatus.dwCheckPoint         = 0; 
-    ServiceStatus.dwWaitHint           = 0; 
- 
-    hStatus = RegisterServiceCtrlHandler(
-		"baromeshd", 
-		(LPHANDLER_FUNCTION)ControlHandler); 
-    if (hStatus == (SERVICE_STATUS_HANDLE)0) 
-    { 
+SERVICE_STATUS& serviceStatus () {
+    static SERVICE_STATUS s;
+    return s;
+}
+
+SERVICE_STATUS_HANDLE& serviceStatusHandle () {
+    static SERVICE_STATUS_HANDLE h;
+    return h;
+}
+
+void updateServiceStatus () {
+    auto rc = SetServiceStatus(serviceStatusHandle(), &serviceStatus());
+    if (!rc) {
+        // Report an error somehow?
+    }
+}
+
+void reportStoppedService () {
+    serviceStatus().dwCurrentState = SERVICE_STOPPED;
+    serviceStatus().dwWin32ExitCode = 0;
+    serviceStatus().dwWaitHint = 0;
+    updateServiceStatus();
+}
+
+void serviceMain (int argc, char** argv)
+{
+    serviceStatusHandle() = RegisterServiceCtrlHandler(
+        "baromeshd",
+        (LPHANDLER_FUNCTION)ControlHandler);
+    if (serviceStatusHandle() == (SERVICE_STATUS_HANDLE)0)
+    {
         // Registering Control Handler failed
-        return; 
-    }  
+        return;
+    }
 
     // We report the running status to SCM. 
-    ServiceStatus.dwCurrentState = SERVICE_RUNNING; 
-    SetServiceStatus (hStatus, &ServiceStatus);
- 
-    MEMORYSTATUS memory;
-    // The worker loop of a service
-    runDongle();
+    serviceStatus().dwServiceType        = SERVICE_WIN32_OWN_PROCESS;
+    serviceStatus().dwCurrentState       = SERVICE_RUNNING;
+    serviceStatus().dwControlsAccepted   = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN;
+    serviceStatus().dwWin32ExitCode      = 0;
+    serviceStatus().dwServiceSpecificExitCode = 0;
+    serviceStatus().dwCheckPoint         = 0;
+    serviceStatus().dwWaitHint           = 0;
+    updateServiceStatus();
 
-    ServiceStatus.dwCurrentState       = SERVICE_STOPPED; 
-    ServiceStatus.dwWin32ExitCode      = 0; 
-    SetServiceStatus(hStatus, &ServiceStatus);
-    return; 
+    std::atexit(reportStoppedService);
+    runDongle();
 }
  
 // Control handler function
 void ControlHandler(DWORD request) 
 { 
-    #if 0
     switch(request) 
     { 
-        case SERVICE_CONTROL_STOP: 
-            //WriteToLog("Monitoring stopped.");
-
-            ServiceStatus.dwWin32ExitCode = 0; 
-            ServiceStatus.dwCurrentState  = SERVICE_STOPPED; 
-            SetServiceStatus (hStatus, &ServiceStatus);
-            return; 
- 
+        case SERVICE_CONTROL_STOP:
+            // fall-through
         case SERVICE_CONTROL_SHUTDOWN: 
-            //WriteToLog("Monitoring stopped.");
-
-            ServiceStatus.dwWin32ExitCode = 0; 
-            ServiceStatus.dwCurrentState  = SERVICE_STOPPED; 
-            SetServiceStatus (hStatus, &ServiceStatus);
-            return; 
-        
+            serviceStatus().dwCurrentState  = SERVICE_STOP_PENDING;
+            serviceStatus().dwWaitHint = 3000; // We should be stopped w/i 3 seconds
+            std::raise(SIGTERM);
+            break;
         default:
             break;
-    } 
- 
-    // Report current status
-    SetServiceStatus (hStatus,  &ServiceStatus);
-
-    #endif
-    return; 
+    }
+    updateServiceStatus();
 } 
 
