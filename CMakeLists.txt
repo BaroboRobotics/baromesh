@@ -60,6 +60,7 @@ set_source_files_properties(${DAEMON_SOURCES}
 target_include_directories(baromeshd
     PRIVATE ${Boost_INCLUDE_DIRS}
             include
+            src/daemon
     )
 target_link_libraries(baromeshd
     PRIVATE sfp rpc cxx-util
