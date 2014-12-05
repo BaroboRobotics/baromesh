@@ -11,7 +11,6 @@
 #include "rpc/asio/tcppolyserver.hpp"
 
 #include "util/hexdump.hpp"
-//#include "util/log.hpp"
 #include "util/monospawn.hpp"
 
 #include <boost/asio.hpp>
@@ -44,12 +43,6 @@ using TcpMessageQueue = sfp::asio::MessageQueue<Tcp::socket>;
 using boost::asio::use_future;
 
 static const int kBaudRate = 230400;
-
-struct StopDaemon : std::exception {
-    const char* what () const noexcept override {
-        return "Daemon going dooooown";
-    }
-};
 
 // return true for "run me again", false for stop
 static bool runDongle (boost::asio::io_service& ios, Breaker& breaker) {
