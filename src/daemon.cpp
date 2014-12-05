@@ -11,7 +11,6 @@
 
 namespace baromesh {
 
-static const std::chrono::milliseconds kDaemonConnectTimeout { 200 };
 
 // Get a shared pointer to the daemon singleton. If the singleton does not
 // already exist, create it. If all shared_ptrs returned from this function
@@ -50,6 +49,7 @@ std::shared_ptr<Daemon> daemonInstance () {
 }
 
 void asyncAcquireDaemonImpl (AcquireDaemonHandler handler) {
+    std::chrono::milliseconds kDaemonConnectTimeout { 200 };
     static boost::asio::io_service::strand strand { ioCore().ios() };
     static std::queue<AcquireDaemonHandler> handlerQueue;
 

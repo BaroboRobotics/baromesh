@@ -44,8 +44,6 @@ using TcpMessageQueue = sfp::asio::MessageQueue<Tcp::socket>;
 using boost::asio::use_future;
 
 static const int kBaudRate = 230400;
-static const std::chrono::milliseconds kDongleDevicePathPollTimeout { 500 };
-static const std::chrono::milliseconds kKeepaliveTimeout { 500 };
 
 struct StopDaemon : std::exception {
     const char* what () const noexcept override {
@@ -55,6 +53,8 @@ struct StopDaemon : std::exception {
 
 // return true for "run me again", false for stop
 static bool runDongle (boost::asio::io_service& ios, Breaker& breaker) {
+    std::chrono::milliseconds kDongleDevicePathPollTimeout { 500 };
+    std::chrono::milliseconds kKeepaliveTimeout { 500 };
     boost::log::sources::logger log;
     log.add_attribute("Title", boost::log::attributes::constant<std::string>("DONGLECORO"));
 
