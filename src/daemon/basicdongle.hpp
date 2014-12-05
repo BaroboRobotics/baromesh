@@ -112,15 +112,17 @@ public:
         > init { std::forward<Handler>(handler) };
         auto& realHandler = init.handler;
 
-        //BOOST_LOG(mLog) << "Shitting on " << serialId << "'s receive request";
-        //mClient.get_io_service().post(std::bind(realHandler, Status::DONGLE_NOT_FOUND, 0));
         auto self = this->shared_from_this();
         mStrand.post([self, this, serialId, buffer, realHandler] () {
             {
                 std::lock_guard<std::mutex> lock { mReceiveDataMutex };
                 auto iter = mReceiveData.find(serialId);
-                assert(iter != mReceiveData.end());
-                iter->second.ops.push(std::make_pair(buffer, realHandler));
+                if (mReceiveData.end() == iter) {
+                    mClient.get_io_service().post(std::bind(realHandler, Status::UNREGISTERED_SERIALID, 0));
+                }
+                else {
+                    iter->second.ops.push(std::make_pair(buffer, realHandler));
+                }
             }
             postReceives();
             startReceivePump();
