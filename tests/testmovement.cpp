@@ -11,8 +11,11 @@
 
 void testMovement (std::string serialId) {
     double t = 0;
-    barobo::Linkbot linkbot { serialId };
     try {
+        barobo::Linkbot linkbot { serialId };
+
+        std::cout << "Linkbot " << serialId << " constructed\n";
+
         using std::this_thread::sleep_for;
         using std::chrono::seconds;
         using std::chrono::milliseconds;
@@ -50,13 +53,13 @@ void testMovement (std::string serialId) {
 
         std::cout << "moving forward slowly 200 degrees\n";
         // Note: not setting joint speeds.
-        linkbot.move(0x04 | 0x01, 200, 0, -200);
+        linkbot.move(jointMask, 200, 0, -200);
     }
     catch (std::exception& e) {
         std::cout << std::hex;
         // FIXME: This serial ID should be information baked into e.what() in
         // some cases.
-        std::cout << "(" << serialId << ") error setting color(" << t << "): "
+        std::cout << "(" << serialId << ") error running test routine: "
                   << e.what() << '\n';
     }
 }
@@ -77,7 +80,6 @@ int main(int argc, char** argv) {
 
     std::vector<std::thread> testThreads;
 
-    std::this_thread::sleep_for(std::chrono::seconds(1));
     for (auto s : serialIds) {
         testThreads.emplace_back(testMovement, s);
     }

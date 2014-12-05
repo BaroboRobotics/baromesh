@@ -19,46 +19,73 @@ endif()
 # projects we'll want to use shared libraries and defined -DBOOST_ALL_DYN_LINK
 # or the like.
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.54.0 REQUIRED COMPONENTS system log filesystem thread)
+find_package(Boost 1.54.0 REQUIRED COMPONENTS system log filesystem thread coroutine context)
 
 find_package(Threads)
 
-set(SOURCES
-    src/dongledevicepath.cpp
-    src/dongleproxy.cpp
-    src/dongletransport.cpp
-    src/robotproxy.cpp
-    src/robottransport.cpp
+set(LIBRARY_SOURCES
     src/linkbot.cpp
     src/linkbot.c.cpp
+    src/system_error.cpp
+    src/iocore.cpp
+    src/daemon.cpp
     )
 
-add_library(baromesh ${SOURCES})
+add_library(baromesh ${LIBRARY_SOURCES})
 
-set_source_files_properties(${SOURCES}
+set_source_files_properties(${LIBRARY_SOURCES}
     PROPERTIES COMPILE_FLAGS "-std=c++11")
 
 target_include_directories(baromesh
-    PUBLIC $<TARGET_PROPERTY:sfp,INCLUDE_DIRECTORIES>
-           $<TARGET_PROPERTY:robot-interface,INCLUDE_DIRECTORIES>
-           $<TARGET_PROPERTY:cxx-util,INTERFACE_INCLUDE_DIRECTORIES>
-           ${Boost_INCLUDE_DIRS}
+    PUBLIC ${Boost_INCLUDE_DIRS}
            include
     )
 target_link_libraries(baromesh
     PUBLIC sfp rpc cxx-util
-           robot-interface dongle-interface
+           robot-interface daemon-interface
            ${Boost_LIBRARIES}
            ${CMAKE_THREAD_LIBS_INIT}
     )
 
+set(DAEMON_SOURCES
+    src/daemon/main.cpp
+    src/daemon/dongledevicepath.cpp
+    src/daemon/rundongle.cpp
+    src/system_error.cpp
+    )
+
+add_executable(baromeshd ${DAEMON_SOURCES})
+set_source_files_properties(${DAEMON_SOURCES}
+    PROPERTIES COMPILE_FLAGS "-std=c++11")
+target_include_directories(baromeshd
+    PRIVATE ${Boost_INCLUDE_DIRS}
+            include
+            src/daemon
+    )
+target_link_libraries(baromeshd
+    PRIVATE sfp rpc cxx-util
+            dongle-interface daemon-interface
+            ${Boost_LIBRARIES}
+            ${CMAKE_THREAD_LIBS_INIT}
+   )
+
 if(WIN32)
-    target_link_libraries(baromesh
-        PRIVATE setupapi
+    target_link_libraries(baromeshd
+        PRIVATE setupapi ws2_32 mswsock
         )
 endif()
 
-option(BAROMESH_BUILD_TESTS "Build libsfp tests" OFF)
+if(WIN32)
+    set(dest .)
+elseif(APPLE)
+    set(dest Contents/MacOS)
+else()
+    set(dest bin)
+endif()
+
+install(TARGETS baromeshd DESTINATION ${dest})
+
+option(BAROMESH_BUILD_TESTS "Build baromesh tests" OFF)
 if(BAROMESH_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)

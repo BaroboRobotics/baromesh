@@ -1,15 +1,14 @@
-#ifndef BAROMESH_ERROR_HPP
-#define BAROMESH_ERROR_HPP
+#ifndef BAROBO_ERROR_HPP
+#define BAROBO_ERROR_HPP
 
 #include <stdexcept>
 
 namespace barobo {
 
-class Error : public std::runtime_error {
-public:
-	explicit Error (std::string what) : std::runtime_error(what) {}
+struct Error : std::runtime_error {
+    explicit Error (std::string s) : std::runtime_error(s) {}
 };
 
-} // namespace barobo
+}
 
 #endif

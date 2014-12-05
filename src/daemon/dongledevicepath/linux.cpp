@@ -10,7 +10,7 @@
 #include <ctype.h>
 #include <unistd.h>
 
-int devicePathImpl (char *buf, size_t len) {
+int dongleDevicePathImpl (char *buf, size_t len) {
   const char* sysfs = getenv("SYSFS_PATH");
   if (!sysfs) {
     sysfs = "/sys";

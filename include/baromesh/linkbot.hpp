@@ -1,7 +1,6 @@
 #ifndef BAROMESH_LINKBOT_HPP
 #define BAROMESH_LINKBOT_HPP
 
-#include "baromesh/error.hpp"
 #include "baromesh/linkbot.h"
 
 #include <string>
@@ -32,7 +31,6 @@ public:
     }
 
     // All member functions may throw a barobo::Error exception on failure.
-
     void connect ();
     void disconnect ();
 
