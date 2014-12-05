@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 2.8.12) 
 project(baromesh CXX)
 
+set(VERSION_MAJOR 0)
+set(VERSION_MINOR 1)
+set(VERSION_PATCH 0)
+set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
+
 ##############################################################################
 # Boost
 
@@ -46,6 +51,12 @@ target_link_libraries(baromesh
            ${Boost_LIBRARIES}
            ${CMAKE_THREAD_LIBS_INIT}
     )
+
+set_target_properties(baromesh PROPERTIES
+    VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
+    SOVERSION ${VERSION_MAJOR}
+    MACOSX_RPATH ON
+)
 
 set(DAEMON_SOURCES
     src/daemon/main.cpp
