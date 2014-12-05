@@ -11,7 +11,6 @@
 #include "rpc/asio/tcppolyserver.hpp"
 
 #include "util/hexdump.hpp"
-//#include "util/log.hpp"
 #include "util/monospawn.hpp"
 
 #include <boost/asio.hpp>
@@ -46,12 +45,6 @@ using boost::asio::use_future;
 static const int kBaudRate = 230400;
 static const std::chrono::milliseconds kDongleDevicePathPollTimeout { 500 };
 static const std::chrono::milliseconds kKeepaliveTimeout { 500 };
-
-struct StopDaemon : std::exception {
-    const char* what () const noexcept override {
-        return "Daemon going dooooown";
-    }
-};
 
 // return true for "run me again", false for stop
 static bool runDongle (boost::asio::io_service& ios, Breaker& breaker) {
