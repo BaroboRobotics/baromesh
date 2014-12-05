@@ -13,6 +13,8 @@ std::string ErrorCategory::message (int ev) const noexcept {
         ITEM(DONGLE_NOT_FOUND)
         ITEM(PORT_OUT_OF_RANGE)
         ITEM(NO_ROBOT_ENDPOINT)
+
+        ITEM(UNREGISTERED_SERIALID)
 #undef ITEM
         default: return "(unknown status)";
     }

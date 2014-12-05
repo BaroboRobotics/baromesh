@@ -7,7 +7,9 @@ enum class Status {
     OK,
     DONGLE_NOT_FOUND,
     PORT_OUT_OF_RANGE,
-    NO_ROBOT_ENDPOINT
+    NO_ROBOT_ENDPOINT,
+
+    UNREGISTERED_SERIALID
 };
 
 } // namespace baromesh

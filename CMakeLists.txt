@@ -50,6 +50,7 @@ target_link_libraries(baromesh
 set(DAEMON_SOURCES
     src/daemon/main.cpp
     src/daemon/dongledevicepath.cpp
+    src/daemon/rundongle.cpp
     src/system_error.cpp
     )
 
@@ -59,6 +60,7 @@ set_source_files_properties(${DAEMON_SOURCES}
 target_include_directories(baromeshd
     PRIVATE ${Boost_INCLUDE_DIRS}
             include
+            src/daemon
     )
 target_link_libraries(baromeshd
     PRIVATE sfp rpc cxx-util
@@ -72,6 +74,16 @@ if(WIN32)
         PRIVATE setupapi ws2_32 mswsock
         )
 endif()
+
+if(WIN32)
+    set(dest .)
+elseif(APPLE)
+    set(dest Contents/MacOS)
+else()
+    set(dest bin)
+endif()
+
+install(TARGETS baromeshd DESTINATION ${dest})
 
 option(BAROMESH_BUILD_TESTS "Build baromesh tests" OFF)
 if(BAROMESH_BUILD_TESTS)
