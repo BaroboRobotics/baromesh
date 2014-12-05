@@ -1,3 +1,4 @@
+#include "breaker.hpp"
 #include "daemonserver.hpp"
 #include "dongledevicepath.hpp"
 
@@ -52,45 +53,30 @@ struct StopDaemon : std::exception {
     }
 };
 
-static void runDongle (boost::asio::io_service& ios) {
-    // We employ two different strategies for a graceful shutdown. Here is the
-    // first strategy. During the dongle detection phase, we will need to check
-    // for some shutdown flag for every poll we make. A future-based approach
-    // works nicely here. A std::future<void> made from a std::promise<void>
-    // can have three states: not ready, ready with a value, and ready with an
-    // exception. We can map these three states to:
-    //   not ready = SIGTERM not raised
-    //   ready with exception = SIGTERM raised
-    //   ready with value = SIGTERM signal handler cancelled
-    auto deadmanPromise = std::promise<void>();
-    auto deadmanSwitch = deadmanPromise.get_future();
-
-    boost::asio::signal_set sigTerm { ios, SIGTERM };
-    sigTerm.async_wait([&deadmanPromise] (boost::system::error_code ec, int) {
-        if (!ec) {
-            deadmanPromise.set_exception(std::make_exception_ptr(StopDaemon()));
-        }
-        else {
-            deadmanPromise.set_value();
-        }
-    });
-
+// return true for "run me again", false for stop
+static bool runDongle (boost::asio::io_service& ios, Breaker& breaker) {
     boost::log::sources::logger log;
     log.add_attribute("Title", boost::log::attributes::constant<std::string>("DONGLECORO"));
 
+    std::atomic<bool> continueRunning = { true };
+
     try {
         BOOST_LOG(log) << "Waiting for dongle";
-        boost::system::error_code ec;
-        auto devicePath = baromesh::dongleDevicePath(ec);
-        while (ec) {
-            auto status = deadmanSwitch.wait_for(kDongleDevicePathPollTimeout);
-            if (std::future_status::ready == status) {
-                // Given that we haven't called sigTerm.cancel(), this next
-                // line should be equivalent to throwing StopDaemon.
-                deadmanSwitch.get();
-                assert(false); // not reached
-            }
+        std::string devicePath;
+        boost::asio::steady_timer timer { ios };
+        {
+            auto killswitch = Breaker::Killswitch(breaker, [&timer, &continueRunning] () {
+                continueRunning = false;
+                timer.cancel();
+            });
+
+            boost::system::error_code ec;
             devicePath = baromesh::dongleDevicePath(ec);
+            while (ec) {
+                timer.expires_from_now(kDongleDevicePathPollTimeout);
+                timer.wait();
+                devicePath = baromesh::dongleDevicePath(ec);
+            }
         }
 
         BOOST_LOG(log) << "Dongle detected at " << devicePath;
@@ -108,25 +94,15 @@ static void runDongle (boost::asio::io_service& ios) {
         } BOOST_SCOPE_EXIT_END
         stream.set_option(boost::asio::serial_port_base::baud_rate(kBaudRate));
 
-        // We have a dongle! We need to switch shutdown strategies.
-        sigTerm.cancel();
-        deadmanSwitch.get();
-        deadmanPromise = decltype(deadmanPromise)();
-        deadmanSwitch = deadmanPromise.get_future();
+        {
+            auto killswitch = Breaker::Killswitch(breaker, [dongle, &continueRunning] () {
+                continueRunning = false;
+                dongle->close();
+            });
 
-        sigTerm.async_wait([dongle, &deadmanPromise] (boost::system::error_code ec, int) {
-            if (!ec) {
-                // FIXME wait, am I thread-safe? Probably not...
-                dongle->close(ec);
-                deadmanPromise.set_exception(std::make_exception_ptr(StopDaemon()));
-            }
-            else {
-                deadmanPromise.set_value();
-            }
-        });
-
-        dongle->client().messageQueue().asyncHandshake(use_future).get();
-        asyncConnect(dongle->client(), std::chrono::milliseconds(100), use_future).get();
+            dongle->client().messageQueue().asyncHandshake(use_future).get();
+            asyncConnect(dongle->client(), std::chrono::milliseconds(100), use_future).get();
+        }
 
         Tcp::resolver resolver { ios };
         auto iter = resolver.resolve(decltype(resolver)::query("127.0.0.1", "42000"));
@@ -145,7 +121,8 @@ static void runDongle (boost::asio::io_service& ios) {
         baromesh::Dongle::MessageQueue nullMq { ios, mqLog };
         nullMq.setRoute(*dongle, "....");
 
-        auto stopTheWorld = [dongle, server, log] (boost::system::error_code ec) mutable {
+        auto stopTheWorld = [dongle, server] (boost::system::error_code ec) {
+            boost::log::sources::logger log;
             BOOST_LOG(log) << "Stopping the world with: " << ec.message();
             server->close(ec);
             dongle->close(ec);
@@ -153,7 +130,8 @@ static void runDongle (boost::asio::io_service& ios) {
 
         uint8_t buf[1];
         nullMq.asyncReceive(boost::asio::buffer(buf),
-            [log, stopTheWorld] (boost::system::error_code ec, size_t) mutable {
+            [stopTheWorld] (boost::system::error_code ec, size_t) {
+                boost::log::sources::logger log;
                 if (!ec) {
                     BOOST_LOG(log) << "Actually read something from serial ID \"....\" . "
                                    << "That should be impossible.";
@@ -169,41 +147,29 @@ static void runDongle (boost::asio::io_service& ios) {
         // unplugged, so ping the dongle periodically.
         asyncKeepalive(dongle->client().messageQueue(), kKeepaliveTimeout, stopTheWorld);
 
-        // And make sure SIGTERM stops the daemon.
-        sigTerm.cancel();
-        deadmanSwitch.get();
-        deadmanPromise = decltype(deadmanPromise)();
-        deadmanSwitch = deadmanPromise.get_future();
-
-        sigTerm.async_wait([stopTheWorld, &deadmanPromise] (boost::system::error_code ec, int) mutable {
-            if (!ec) {
-                // FIXME wait, am I thread-safe? Probably not...
+        {
+            auto killswitch = Breaker::Killswitch(breaker, [&continueRunning, stopTheWorld] () {
+                continueRunning = false;
+                boost::system::error_code ec;
                 stopTheWorld(ec);
-                deadmanPromise.set_exception(std::make_exception_ptr(StopDaemon()));
-            }
-            else {
-                deadmanPromise.set_value();
-            }
-        });
+            });
 
-        /* dko: This need not be a loop. If we run baromeshd as a service, the
-         * service can terminate as soon as all connected entities disconnect.
-         * */
-        while (true) {
-            BOOST_LOG(daemonSvLog) << "awaiting connection";
-            baromesh::DaemonServer daemon { *server, *dongle, daemonSvLog };
-            asyncRunServer(*server, daemon, use_future).get();
-            BOOST_LOG(daemonSvLog) << "disconnected";
+            /* dko: This need not be a loop. If we run baromeshd as a service, the
+             * service can terminate as soon as all connected entities disconnect.
+             * */
+            while (continueRunning) {
+                BOOST_LOG(daemonSvLog) << "awaiting connection";
+                baromesh::DaemonServer daemon { *server, *dongle, daemonSvLog };
+                asyncRunServer(*server, daemon, use_future).get();
+                BOOST_LOG(daemonSvLog) << "disconnected";
+            }
         }
     }
     catch (boost::system::system_error& e) {
         BOOST_LOG(log) << "runDongle: " << e.what();
     }
 
-    if (deadmanSwitch.valid()) {
-        sigTerm.cancel();
-        deadmanSwitch.get();
-    }
+    return continueRunning;
 }
 
 
@@ -216,7 +182,7 @@ static void initializeLoggingCore () {
     boost::log::add_common_attributes();
 
     auto core = boost::log::core::get();
-    core->add_global_attribute("Timeline", attrs::timer());
+    //core->add_global_attribute("Timeline", attrs::timer());
     core->add_global_attribute("Scope", attrs::named_scope());
 
     boost::log::formatter formatter =
@@ -268,18 +234,16 @@ void runDongle () try {
         }
     };
 
-    try {
-        while (true) {
-            runDongle(ios);
-        }
+    Breaker breaker { ios, SIGINT, SIGTERM };
+    while (runDongle(ios, breaker)) {
+        BOOST_LOG(log) << "runDongle stopped, restarting";
     }
-    catch (StopDaemon& e) {
-        BOOST_LOG(log) << "runDongle stopped";
-    }
+    BOOST_LOG(log) << "runDongle stopped, shutting down";
 
     work = boost::none;
     ios.stop();
     ioThread.join();
+    BOOST_LOG(log) << "IO thread joined, we're outta here";
 }
 catch (util::Monospawn::DuplicateProcess& e) {
     boost::log::sources::logger log;

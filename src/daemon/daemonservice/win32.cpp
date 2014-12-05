@@ -85,7 +85,7 @@ void ControlHandler(DWORD request)
     { 
         case SERVICE_CONTROL_STOP:
             // fall-through
-        case SERVICE_CONTROL_SHUTDOWN: 
+        case SERVICE_CONTROL_SHUTDOWN:
             serviceStatus().dwCurrentState  = SERVICE_STOP_PENDING;
             serviceStatus().dwWaitHint = 3000; // We should be stopped w/i 3 seconds
             std::raise(SIGTERM);
