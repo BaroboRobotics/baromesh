@@ -63,7 +63,7 @@ public:
     MethodResult::resolveSerialId onFire (MethodIn::resolveSerialId args) {
         auto serialId = std::string(args.serialId.value);
         BOOST_LOG(mLog) << "firing barobo.Daemon.resolveSerialId(" << serialId << ")";
-        
+
         MethodResult::resolveSerialId result = decltype(result)();
         try {
             BOOST_LOG(mLog) << "searching for proxy for " << serialId;
