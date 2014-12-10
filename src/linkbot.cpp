@@ -33,7 +33,7 @@ template <class T>
 T radToDeg (T x) { return T(double(x) * 180.0 / M_PI); }
 
 constexpr static const
-std::chrono::milliseconds kRequestTimeout { 10000 };
+std::chrono::milliseconds kRequestTimeout { 1000 };
 
 } // file namespace
 
