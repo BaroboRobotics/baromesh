@@ -211,9 +211,6 @@ static void initializeLoggingCore () {
 
 
 void runDongle () try {
-    // dko No longer needed as baromeshd is to become a legit service
-    //util::Monospawn sentinel { "baromeshd", std::chrono::seconds(1) };
-
     initializeLoggingCore();
     boost::log::sources::logger log;
 
@@ -241,12 +238,8 @@ void runDongle () try {
     ioThread.join();
     BOOST_LOG(log) << "IO thread joined, we're outta here";
 }
-catch (util::Monospawn::DuplicateProcess& e) {
-    boost::log::sources::logger log;
-    BOOST_LOG(log) << "baromeshd already running, exiting";
-}
 catch (std::exception& e) {
     boost::log::sources::logger log;
-    BOOST_LOG(log) << "baromeshd caught some other exception: " << e.what();
+    BOOST_LOG(log) << "baromeshd caught exception: " << e.what();
 }
 
