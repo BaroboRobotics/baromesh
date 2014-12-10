@@ -46,12 +46,6 @@ void updateServiceStatus () {
     }
 }
 
-void reportStoppedService () {
-    serviceStatus().dwCurrentState = SERVICE_STOPPED;
-    serviceStatus().dwWin32ExitCode = 0;
-    serviceStatus().dwWaitHint = 0;
-    updateServiceStatus();
-}
 
 void serviceMain (int argc, char** argv)
 {
@@ -74,8 +68,13 @@ void serviceMain (int argc, char** argv)
     serviceStatus().dwWaitHint           = 0;
     updateServiceStatus();
 
-    std::atexit(reportStoppedService);
     runDongle();
+
+    serviceStatus().dwCurrentState = SERVICE_STOPPED;
+    serviceStatus().dwWin32ExitCode = 0;
+    serviceStatus().dwCheckPoint = 0;
+    serviceStatus().dwWaitHint = 0;
+    updateServiceStatus();
 }
  
 // Control handler function
@@ -88,6 +87,7 @@ void ControlHandler(DWORD request)
         case SERVICE_CONTROL_SHUTDOWN:
             serviceStatus().dwCurrentState  = SERVICE_STOP_PENDING;
             serviceStatus().dwWaitHint = 3000; // We should be stopped w/i 3 seconds
+            serviceStatus().dwCheckPoint = 1;
             std::raise(SIGTERM);
             break;
         default:
