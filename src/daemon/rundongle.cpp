@@ -79,13 +79,13 @@ static bool runDongle (boost::asio::io_service& ios, Breaker& breaker) {
         auto dongle = std::make_shared<baromesh::Dongle>(ios, dongleClLog);
 
         auto& stream = dongle->client().messageQueue().stream();
+        using Option = boost::asio::serial_port_base;
         stream.open(devicePath);
-        BOOST_SCOPE_EXIT(&stream, &log, devicePath) {
-            boost::system::error_code ec;
-            stream.close(ec);
-            BOOST_LOG(log) << "Closed " << devicePath << ": " << ec.message();
-        } BOOST_SCOPE_EXIT_END
-        stream.set_option(boost::asio::serial_port_base::baud_rate(kBaudRate));
+        stream.set_option(Option::baud_rate(kBaudRate));
+        stream.set_option(Option::character_size(8));
+        stream.set_option(Option::parity(Option::parity::none));
+        stream.set_option(Option::stop_bits(Option::stop_bits::one));
+        stream.set_option(Option::flow_control(Option::flow_control::none));
 
         {
             auto killswitch = Breaker::Killswitch(breaker, [dongle, &continueRunning] () {
