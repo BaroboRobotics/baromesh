@@ -94,7 +94,10 @@ static bool runDongle (boost::asio::io_service& ios, Breaker& breaker) {
             });
 
             dongle->client().messageQueue().asyncHandshake(use_future).get();
-            asyncConnect(dongle->client(), std::chrono::milliseconds(100), use_future).get();
+            auto info = asyncConnect(dongle->client(), std::chrono::milliseconds(100), use_future).get();
+            BOOST_LOG(log) << "Dongle has RPC version " << info.rpcVersion()
+                           << ", interface version " << info.interfaceVersion();
+#warning check for version mismatch
         }
 
         Tcp::resolver resolver { ios };

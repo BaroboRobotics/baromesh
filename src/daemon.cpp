@@ -90,7 +90,9 @@ void asyncAcquireDaemonImpl (AcquireDaemonHandler handler) {
                                     asyncConnect(d->client(), kDaemonConnectTimeout,
                                     [=] (boost::system::error_code ec, rpc::ServiceInfo info) mutable {
                                         if (!ec) {
-                                            BOOST_LOG(log) << "Connected to daemon";
+#warning check for version mismatch
+                                            BOOST_LOG(log) << "Daemon has RPC version " << info.rpcVersion()
+                                                           << ", interface version " << info.interfaceVersion();
                                             postAcquires(boost::system::error_code(), d);
                                         }
                                         else {
