@@ -1,8 +1,6 @@
 #include "daemon.hpp"
 #include "iocore.hpp"
 
-#include <boost/asio/spawn.hpp>
-
 #include <chrono>
 #include <memory>
 #include <mutex>
@@ -67,31 +65,57 @@ void asyncAcquireDaemonImpl (AcquireDaemonHandler handler) {
         }
     };
 
-    strand.post([=] () {
+    boost::log::sources::logger log;
+    BOOST_LOG(log) << "Acquiring daemon ...";
+    strand.post([=] () mutable {
         handlers->push(handler);
         if (1 == handlers->size()) {
             auto d = daemonInstance();
-            boost::asio::spawn(strand,
-                [=] (boost::asio::yield_context yield) {
-                    boost::log::sources::logger log;
-                    try {
-                        // TODO: what to do about gracefully disconnecting? Do we care?
-                        boost::asio::ip::tcp::resolver resolver { ioCore().ios() };
-                        auto iter = resolver.async_resolve(decltype(resolver)::query("127.0.0.1", "42000"), yield);
-                        BOOST_LOG(log) << "Resolved daemon's TCP endpoint";
-                        boost::asio::async_connect(d->client().messageQueue().stream(), iter, yield);
-                        BOOST_LOG(log) << "Connected to daemon's TCP endpoint";
-                        d->client().messageQueue().asyncHandshake(yield);
-                        BOOST_LOG(log) << "Shook hands with the daemon";
-                        asyncConnect(d->client(), kDaemonConnectTimeout, yield);
-                        BOOST_LOG(log) << "Connected to daemon";
-                        postAcquires(boost::system::error_code(), d);
-                    }
-                    catch (boost::system::system_error& e) {
-                        BOOST_LOG(log) << "Error connecting to daemon: " << e.what();
-                        postAcquires(e.code(), nullptr);
-                    }
-                });
+            using Tcp = boost::asio::ip::tcp;
+            // TODO: what to do about gracefully disconnecting? Do we care?
+            auto resolver = std::make_shared<Tcp::resolver>(ioCore().ios());
+            resolver->async_resolve(Tcp::resolver::query("127.0.0.1", "42000"),
+            [=] (boost::system::error_code ec, Tcp::resolver::iterator iter) mutable {
+                (void)resolver; // reference it so its lifetime is extended
+                if (!ec) {
+                    BOOST_LOG(log) << "Resolved daemon to " << iter->endpoint();
+                    boost::asio::async_connect(d->client().messageQueue().stream(), iter,
+                    [=] (boost::system::error_code ec, Tcp::resolver::iterator iter) mutable {
+                        if (!ec) {
+                            BOOST_LOG(log) << "Connected to daemon at " << iter->endpoint();
+                            d->client().messageQueue().asyncHandshake(
+                            [=] (boost::system::error_code ec) mutable {
+                                if (!ec) {
+                                    BOOST_LOG(log) << "Shook hands with the daemon";
+                                    asyncConnect(d->client(), kDaemonConnectTimeout,
+                                    [=] (boost::system::error_code ec, rpc::ServiceInfo info) mutable {
+                                        if (!ec) {
+                                            BOOST_LOG(log) << "Connected to daemon";
+                                            postAcquires(boost::system::error_code(), d);
+                                        }
+                                        else {
+                                            BOOST_LOG(log) << "Daemon RPC connection failed: " << ec.message();
+                                            postAcquires(ec, nullptr);
+                                        }
+                                    });
+                                }
+                                else {
+                                    BOOST_LOG(log) << "Daemon handshake failed: " << ec.message();
+                                    postAcquires(ec, nullptr);
+                                }
+                            });
+                        }
+                        else {
+                            BOOST_LOG(log) << "Daemon TCP connection failed: " << ec.message();
+                            postAcquires(ec, nullptr);
+                        }
+                    });
+                }
+                else {
+                    BOOST_LOG(log) << "Daemon endpoint resolution failed: " << ec.message();
+                    postAcquires(ec, nullptr);
+                }
+            });
         }
     });
 }
