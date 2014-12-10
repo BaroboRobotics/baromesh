@@ -61,13 +61,17 @@ static bool runDongle (boost::asio::io_service& ios, Breaker& breaker) {
             auto killswitch = Breaker::Killswitch(breaker, [&timer, &continueRunning] () {
                 continueRunning = false;
                 timer.cancel();
+                boost::log::sources::logger log;
+                BOOST_LOG(log) << "Dongle wait loop canceled";
             });
 
             boost::system::error_code ec;
             devicePath = baromesh::dongleDevicePath(ec);
-            while (ec) {
+            while (ec && continueRunning) {
                 timer.expires_from_now(kDongleDevicePathPollTimeout);
-                timer.wait();
+                // .wait() does not throw an exception when canceled, while
+                // .async_wait(use_future).get() does. We want the exception.
+                timer.async_wait(use_future).get();
                 devicePath = baromesh::dongleDevicePath(ec);
             }
         }
