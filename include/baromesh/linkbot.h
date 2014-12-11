@@ -80,6 +80,7 @@ int linkbotSetJointStates(baromesh::Linkbot *l, int mask,
         barobo::JointState::Type s1, double d1,
         barobo::JointState::Type s2, double d2,
         barobo::JointState::Type s3, double d3);
+int linkbotSetLedColor(baromesh::Linkbot *l, int r, int g, int b);
 
 /* MOVEMENT */
 int linkbotMoveContinuous(baromesh::Linkbot *l, int mask, 

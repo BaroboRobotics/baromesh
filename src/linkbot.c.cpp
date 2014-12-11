@@ -126,6 +126,11 @@ int linkbotSetJointStates(Linkbot *l, int mask,
         s3, d3);
 }
 
+int linkbotSetLedColor(baromesh::Linkbot *l, int r, int g, int b)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(setLedColor, r, g, b);
+}
+
 /* MOVEMENT */
 
 int linkbotMoveContinuous(Linkbot *l, int mask, 
