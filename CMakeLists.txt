@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.12) 
-project(baromesh CXX)
+project(baromesh CXX C)
 
 set(VERSION_MAJOR 0)
 set(VERSION_MINOR 1)
@@ -19,6 +19,31 @@ if(NOT DEFINED BOOST_ROOT)
             "command line.\n")
     endif()
 endif()
+
+# Dependencies
+if(NOT DEFINED DEPS_ROOT)
+  if(DEFINED ENV{DEPS_ROOT})
+    set(DEPS_ROOT "$ENV{DEPS_ROOT}")
+  else()
+    message(FATAL_ERROR "Set DEPS_ROOT to the location of your dependencies")
+  endif()
+endif()
+
+function(add_dependency _name)
+  add_subdirectory(${DEPS_ROOT}/${_name} ${_name})
+endfunction()
+
+if(WIN32 AND NOT CMAKE_COMPILER_IS_GNUCXX)
+  add_definitions("-D_ALLOW_KEYWORD_MACROS")
+  #set_target_properties(${target} PROPERTIES
+  #  COMPILE_FLAGS "-D_ALLOW_KEYWORD_MACROS"
+  #)
+endif()
+
+add_dependency(cxx-util)
+add_dependency(libsfp)
+add_dependency(ribbon-bridge)
+add_dependency(ribbon-bridge-interfaces)
 
 # Linking statically to Boost is easier for prototyping. For multi-module
 # projects we'll want to use shared libraries and defined -DBOOST_ALL_DYN_LINK
