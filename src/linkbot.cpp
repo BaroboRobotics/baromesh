@@ -32,9 +32,10 @@ T degToRad (T x) { return T(double(x) * M_PI / 180.0); }
 template <class T>
 T radToDeg (T x) { return T(double(x) * 180.0 / M_PI); }
 
-constexpr static const
-std::chrono::milliseconds kRequestTimeout { 1000 };
-
+std::chrono::milliseconds requestTimeout() {
+    static std::chrono::milliseconds kRequestTimeout { 1000 };
+    return kRequestTimeout;
+}
 } // file namespace
 
 using MethodIn = rpc::MethodIn<barobo::Robot>;
@@ -145,7 +146,7 @@ std::string Linkbot::serialId () const {
 void Linkbot::connect()
 {
     try {
-        auto serviceInfo = asyncConnect(m->client, kRequestTimeout, use_future).get();
+        auto serviceInfo = asyncConnect(m->client, requestTimeout(), use_future).get();
 
         // Check version before we check if the connection succeeded--the user will
         // probably want to know to flash the robot, regardless.
@@ -168,7 +169,7 @@ void Linkbot::connect()
 void Linkbot::disconnect()
 {
     try {
-        asyncDisconnect(m->client, kRequestTimeout, use_future).get();
+        asyncDisconnect(m->client, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -182,7 +183,7 @@ using namespace std::placeholders; // _1, _2, etc.
 void Linkbot::getAccelerometer (int& timestamp, double&x, double&y, double&z)
 {
     try {
-        auto value = asyncFire(m->client, MethodIn::getAccelerometerData{}, kRequestTimeout, use_future).get();
+        auto value = asyncFire(m->client, MethodIn::getAccelerometerData{}, requestTimeout(), use_future).get();
         x = value.x;
         y = value.y;
         z = value.z;
@@ -195,7 +196,7 @@ void Linkbot::getAccelerometer (int& timestamp, double&x, double&y, double&z)
 void Linkbot::getFormFactor(FormFactor::Type& form)
 {
     try {
-        auto value = asyncFire(m->client, MethodIn::getFormFactor{}, kRequestTimeout, use_future).get();
+        auto value = asyncFire(m->client, MethodIn::getFormFactor{}, requestTimeout(), use_future).get();
         form = FormFactor::Type(value.value);
     } 
     catch (std::exception& e) {
@@ -205,7 +206,7 @@ void Linkbot::getFormFactor(FormFactor::Type& form)
 
 void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2) {
     try {
-        auto values = asyncFire(m->client, MethodIn::getEncoderValues{}, kRequestTimeout, use_future).get();
+        auto values = asyncFire(m->client, MethodIn::getEncoderValues{}, requestTimeout(), use_future).get();
         assert(values.values_count >= 3);
         a0 = radToDeg(values.values[0]);
         a1 = radToDeg(values.values[1]);
@@ -220,7 +221,7 @@ void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2
 void Linkbot::getJointSpeeds(double&s1, double&s2, double&s3)
 {
     try {
-        auto values = asyncFire(m->client, MethodIn::getMotorControllerOmega{}, kRequestTimeout, use_future).get();
+        auto values = asyncFire(m->client, MethodIn::getMotorControllerOmega{}, requestTimeout(), use_future).get();
         assert(values.values_count >= 3);
         s1 = radToDeg(values.values[0]);
         s2 = radToDeg(values.values[1]);
@@ -237,7 +238,7 @@ void Linkbot::getJointStates(int& timestamp,
                              JointState::Type& s3)
 {
     try {
-        auto values = asyncFire(m->client, MethodIn::getJointStates{}, kRequestTimeout, use_future).get();
+        auto values = asyncFire(m->client, MethodIn::getJointStates{}, requestTimeout(), use_future).get();
         assert(values.values_count >= 3);
         s1 = static_cast<JointState::Type>(values.values[0]);
         s2 = static_cast<JointState::Type>(values.values[1]);
@@ -250,7 +251,7 @@ void Linkbot::getJointStates(int& timestamp,
 
 void Linkbot::getLedColor (int& r, int& g, int& b) {
     try {
-        auto color = asyncFire(m->client, MethodIn::getLedColor{}, kRequestTimeout, use_future).get();
+        auto color = asyncFire(m->client, MethodIn::getLedColor{}, requestTimeout(), use_future).get();
         r = 0xff & color.value >> 16;
         g = 0xff & color.value >> 8;
         b = 0xff & color.value;
@@ -262,7 +263,7 @@ void Linkbot::getLedColor (int& r, int& g, int& b) {
 
 void Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
     try {
-        auto version = asyncFire(m->client, MethodIn::getFirmwareVersion{}, kRequestTimeout, use_future).get();
+        auto version = asyncFire(m->client, MethodIn::getFirmwareVersion{}, requestTimeout(), use_future).get();
         major = version.major;
         minor = version.minor;
         patch = version.patch;
@@ -278,7 +279,7 @@ void Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
 
 void Linkbot::setBuzzerFrequencyOn (float freq) {
     try {
-        asyncFire(m->client, MethodIn::setBuzzerFrequency{freq}, kRequestTimeout, use_future).get();
+        asyncFire(m->client, MethodIn::setBuzzerFrequency{freq}, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -297,7 +298,7 @@ void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
             }
             jointFlag <<= 1;
         }
-        asyncFire(m->client, arg, kRequestTimeout, use_future).get();
+        asyncFire(m->client, arg, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -308,7 +309,7 @@ void Linkbot::setLedColor (int r, int g, int b) {
     try {
         asyncFire(m->client, MethodIn::setLedColor{
             uint32_t(r << 16 | g << 8 | b)
-        }, kRequestTimeout, use_future).get();
+        }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -356,7 +357,7 @@ void Linkbot::setJointStates(
             bool(mask&0x01), { goalType[0], coefficients[0], true, controllerType[0] },
             bool(mask&0x02), { goalType[1], coefficients[1], true, controllerType[1] },
             bool(mask&0x04), { goalType[2], coefficients[2], true, controllerType[2] }
-        }, kRequestTimeout, use_future).get();
+        }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -384,7 +385,7 @@ void Linkbot::drive (int mask, double a0, double a1, double a2)
                                true,
                                barobo_Robot_Goal_Controller_PID
                              }
-        }, kRequestTimeout, use_future).get();
+        }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -410,7 +411,7 @@ void Linkbot::driveTo (int mask, double a0, double a1, double a2)
                                true,
                                barobo_Robot_Goal_Controller_PID
                              }
-        }, kRequestTimeout, use_future).get();
+        }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -429,7 +430,7 @@ void Linkbot::move (int mask, double a0, double a1, double a2) {
             bool(mask&0x04), { barobo_Robot_Goal_Type_RELATIVE, 
                                float(degToRad(a2)),
                                false}
-        }, kRequestTimeout, use_future).get();
+        }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -442,7 +443,7 @@ void Linkbot::moveContinuous (int mask, double c0, double c1, double c2) {
             bool(mask&0x01), { barobo_Robot_Goal_Type_INFINITE, float(c0), false },
             bool(mask&0x02), { barobo_Robot_Goal_Type_INFINITE, float(c1), false },
             bool(mask&0x04), { barobo_Robot_Goal_Type_INFINITE, float(c2), false }
-        }, kRequestTimeout, use_future).get();
+        }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -455,7 +456,7 @@ void Linkbot::moveTo (int mask, double a0, double a1, double a2) {
             bool(mask&0x01), { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a0)) },
             bool(mask&0x02), { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a1)) },
             bool(mask&0x04), { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a2)) }
-        }, kRequestTimeout, use_future).get();
+        }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -481,7 +482,7 @@ void Linkbot::motorPower(int mask, int m1, int m2, int m3)
                                true,
                                barobo_Robot_Goal_Controller_PID
                              }
-        }, kRequestTimeout, use_future).get();
+        }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -490,7 +491,7 @@ void Linkbot::motorPower(int mask, int m1, int m2, int m3)
 
 void Linkbot::stop (int mask) {
     try {
-        asyncFire(m->client, MethodIn::stop{true, static_cast<uint32_t>(mask)}, kRequestTimeout, use_future).get();
+        asyncFire(m->client, MethodIn::stop{true, static_cast<uint32_t>(mask)}, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -506,7 +507,7 @@ void Linkbot::setAccelerometerEventCallback (AccelerometerEventCallback cb, void
     try {
         asyncFire(m->client, MethodIn::enableAccelerometerEvent {
             enable, granularity
-        }, kRequestTimeout, use_future).get();
+        }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -524,7 +525,7 @@ void Linkbot::setButtonEventCallback (ButtonEventCallback cb, void* userData) {
     const bool enable = !!cb;
 
     try {
-        asyncFire(m->client, MethodIn::enableButtonEvent{enable}, kRequestTimeout, use_future).get();
+        asyncFire(m->client, MethodIn::enableButtonEvent{enable}, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -549,7 +550,7 @@ void Linkbot::setEncoderEventCallback (EncoderEventCallback cb,
             true, { enable, granularity },
             true, { enable, granularity },
             true, { enable, granularity }
-        }, kRequestTimeout, use_future).get();
+        }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -573,7 +574,7 @@ void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, void* userData)
             true, { enable, granularity },
             true, { enable, granularity },
             true, { enable, granularity }
-        }, kRequestTimeout, use_future).get();
+        }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -592,7 +593,7 @@ void Linkbot::setJointEventCallback (JointEventCallback cb, void* userData) {
     try {
         asyncFire(m->client, MethodIn::enableJointEvent {
             enable
-        }, kRequestTimeout, use_future).get();
+        }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -621,7 +622,7 @@ void Linkbot::writeEeprom(uint32_t address, const uint8_t *data, size_t size)
         arg.address = address;
         memcpy(arg.data.bytes, data, size);
         arg.data.size = size;
-        asyncFire(m->client, arg, kRequestTimeout, use_future).get();
+        asyncFire(m->client, arg, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
