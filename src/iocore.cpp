@@ -18,7 +18,7 @@ void IoCore::init () {
 
 IoCore::~IoCore () {
     mWork = boost::none;
-    mIos.stop();
+    //mIos.stop();
     if (mThread.joinable()) {
         mThread.join();
     }

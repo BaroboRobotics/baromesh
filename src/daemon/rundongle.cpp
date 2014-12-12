@@ -238,7 +238,7 @@ void runDongle () try {
     BOOST_LOG(log) << "runDongle stopped, shutting down";
 
     work = boost::none;
-    ios.stop();
+    //ios.stop();
     ioThread.join();
     BOOST_LOG(log) << "IO thread joined, we're outta here";
 }
