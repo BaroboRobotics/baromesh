@@ -141,20 +141,22 @@ public:
     }
 
     void onBroadcast (Broadcast::receiveUnicast broadcast) {
-        using std::get;
-        std::lock_guard<std::mutex> lock { mReceiveDataMutex };
-        auto serialId = std::string(broadcast.serialId.value);
-        auto iter = mReceiveData.find(serialId);
-        if (iter != mReceiveData.end()) {
-            BOOST_LOG(mLog) << "received message destined for " << serialId;
-            auto& inbox = iter->second.inbox;
-            auto& payload = broadcast.payload.value;
-            inbox.push(std::vector<uint8_t>(payload.bytes, payload.bytes + payload.size));
+        {
+            std::lock_guard<std::mutex> lock { mReceiveDataMutex };
+            auto serialId = std::string(broadcast.serialId.value);
+            auto iter = mReceiveData.find(serialId);
+            if (iter != mReceiveData.end()) {
+                BOOST_LOG(mLog) << "received message from " << serialId;
+                auto& inbox = iter->second.inbox;
+                auto& payload = broadcast.payload.value;
+                inbox.push(std::vector<uint8_t>(payload.bytes, payload.bytes + payload.size));
+            }
+            else {
+                BOOST_LOG(mLog) << "discarding message from unregistered serial ID "
+                                << serialId;
+            }
         }
-        else {
-            BOOST_LOG(mLog) << "discarding message destined for unregistered serial ID "
-                            << serialId;
-        }
+        postReceives();
     }
 
 private:
@@ -215,30 +217,37 @@ private:
     }
 
     void handleReceive (boost::system::error_code ec, barobo_rpc_Broadcast broadcast) {
-        if (!ec) {
+        try {
+            if (ec) {
+                BOOST_LOG(mLog) << "Dongle receive broadcast error: " << ec.message();
+                throw boost::system::system_error(ec);
+            }
+
             rpc::ComponentBroadcastUnion<barobo::Dongle> argument;
             auto status = decodeBroadcastPayload(argument, broadcast.id, broadcast.payload);
-            if (!hasError(status)) {
-                BOOST_LOG(mLog) << "received broadcast";
-                status = invokeBroadcast(*this, argument, broadcast.id);
-                postReceives();
-                receivePump();
+            if (hasError(status)) {
+                ec = status;
+                BOOST_LOG(mLog) << "Dongle broadcast decode error: " << ec.message();
+                throw boost::system::system_error(ec);
             }
+
+            BOOST_LOG(mLog) << "received broadcast";
+            status = invokeBroadcast(*this, argument, broadcast.id);
             if (hasError(status)) {
                 ec = status;
                 BOOST_LOG(mLog) << "Dongle broadcast invocation error: " << ec.message();
-                voidHandlers(ec);
+                throw boost::system::system_error(ec);
             }
+
+            receivePump();
         }
-        else {
-            BOOST_LOG(mLog) << "Dongle receive broadcast error: " << ec.message();
-            voidHandlers(ec);
+        catch (boost::system::system_error& e) {
+            voidHandlers(e.code());
+            mReceivePumpRunning = false;
         }
-        mReceivePumpRunning = false;
     }
 
     void voidHandlers (boost::system::error_code ec) {
-        using std::get;
         std::lock_guard<std::mutex> lock { mReceiveDataMutex };
         for (auto& kv : mReceiveData) {
             auto& data = kv.second;
