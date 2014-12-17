@@ -83,7 +83,10 @@ public:
         > init { std::forward<Handler>(handler) };
         auto& realHandler = init.handler;
 
-        assert(4 == serialId.size());
+        if (4 != serialId.size()) {
+            throw boost::system::system_error(Status::INVALID_SERIALID);
+        }
+
         MethodIn::transmitUnicast args = decltype(args)();
 
         strncpy(args.serialId.value, serialId.data(), 4);

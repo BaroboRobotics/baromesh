@@ -15,6 +15,7 @@ std::string ErrorCategory::message (int ev) const noexcept {
         ITEM(NO_ROBOT_ENDPOINT)
 
         ITEM(UNREGISTERED_SERIALID)
+        ITEM(INVALID_SERIALID)
 #undef ITEM
         default: return "(unknown status)";
     }

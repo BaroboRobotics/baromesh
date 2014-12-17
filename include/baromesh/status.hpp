@@ -9,7 +9,8 @@ enum class Status {
     PORT_OUT_OF_RANGE,
     NO_ROBOT_ENDPOINT,
 
-    UNREGISTERED_SERIALID
+    UNREGISTERED_SERIALID,
+    INVALID_SERIALID
 };
 
 } // namespace baromesh
