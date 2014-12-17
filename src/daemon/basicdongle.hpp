@@ -124,6 +124,7 @@ public:
                     mClient.get_io_service().post(std::bind(realHandler, Status::UNREGISTERED_SERIALID, 0));
                 }
                 else {
+                    BOOST_LOG(mLog) << "Pushing a receive handler for " << serialId;
                     iter->second.ops.push(std::make_pair(buffer, realHandler));
                 }
             }
@@ -203,6 +204,8 @@ private:
             });
     }
 
+    // FIXME the receive pump could probably be replaced with a call to
+    // asyncRunClient.
     void receivePump () {
         if (thereArePendingOperations()) {
             mClient.asyncReceiveBroadcast(mStrand.wrap(
@@ -243,6 +246,7 @@ private:
                 auto op = data.ops.front();
                 data.ops.pop();
                 auto& handler = op.second;
+                BOOST_LOG(mLog) << "Voiding handler for " << kv.first;
                 mClient.get_io_service().post(std::bind(handler, ec, 0));
             }
         }
@@ -327,6 +331,7 @@ public:
 
         auto dongle = mDongle.lock();
         if (dongle) {
+            BOOST_LOG(mLog) << "Calling dongle->asyncReceiveFrom(" << mSerialId << ")";
             dongle->asyncReceiveFrom(mSerialId, buffer, realHandler);
         }
         else {
