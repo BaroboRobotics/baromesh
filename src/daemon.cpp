@@ -38,7 +38,7 @@ std::shared_ptr<Daemon> daemonInstance () {
     auto p = d.lock();
     if (!p) {
         BOOST_LOG(log) << "Creating daemon singleton";
-        // TODO, spawn daemon coroutine
+        // TODO, spawn daemon process on demand
         p = std::make_shared<Daemon>(ioCore().ios(), log);
         d = p;
     }
@@ -47,7 +47,9 @@ std::shared_ptr<Daemon> daemonInstance () {
 }
 
 void asyncAcquireDaemonImpl (AcquireDaemonHandler handler) {
-    std::chrono::milliseconds kDaemonConnectTimeout { 200 };
+    const std::chrono::milliseconds kDaemonConnectTimeout { 200 };
+    const std::chrono::milliseconds kDaemonKeepaliveTimeout { 500 };
+
     static boost::asio::io_service::strand strand { ioCore().ios() };
     static std::queue<AcquireDaemonHandler> handlerQueue;
 

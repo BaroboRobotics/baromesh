@@ -46,8 +46,8 @@ static const int kBaudRate = 230400;
 
 // return true for "run me again", false for stop
 static bool runDongle (boost::asio::io_service& ios, Breaker& breaker) {
-    std::chrono::milliseconds kDongleDevicePathPollTimeout { 500 };
-    std::chrono::milliseconds kKeepaliveTimeout { 500 };
+    const std::chrono::milliseconds kDongleDevicePathPollTimeout { 500 };
+    const std::chrono::milliseconds kKeepaliveTimeout { 500 };
     boost::log::sources::logger log;
     log.add_attribute("Title", boost::log::attributes::constant<std::string>("DONGLECORO"));
 
