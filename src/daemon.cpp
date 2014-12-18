@@ -52,12 +52,24 @@ void asyncAcquireDaemonImpl (AcquireDaemonHandler handler) {
 
     static boost::asio::io_service::strand strand { ioCore().ios() };
     static std::queue<AcquireDaemonHandler> handlerQueue;
+    static std::atomic<bool> daemonIsAcquired = { false };
+
+    auto d = daemonInstance();
+    if (!d->client().messageQueue().stream().is_open()) {
+        daemonIsAcquired = false;
+    }
+
+    if (daemonIsAcquired) {
+        ioCore().ios().post(std::bind(handler, boost::system::error_code(), d));
+        return;
+    }
 
     // Capturing a static variable by reference causes a compiler warning about
     // capture of a variable with non-automatic storage duration. I'm not sure
     // that this particular case is actually a problem, but work around the
     // warning anyway.
     auto handlers = &handlerQueue;
+    auto acquired = &daemonIsAcquired;
 
     auto postAcquires = [=] (boost::system::error_code ec, std::shared_ptr<Daemon> d) {
         while (handlers->size()) {
@@ -72,7 +84,6 @@ void asyncAcquireDaemonImpl (AcquireDaemonHandler handler) {
     strand.post([=] () mutable {
         handlers->push(handler);
         if (1 == handlers->size()) {
-            auto d = daemonInstance();
             using Tcp = boost::asio::ip::tcp;
             // TODO: what to do about gracefully disconnecting? Do we care?
             auto resolver = std::make_shared<Tcp::resolver>(ioCore().ios());
@@ -92,6 +103,7 @@ void asyncAcquireDaemonImpl (AcquireDaemonHandler handler) {
                                     asyncConnect(d->client(), kDaemonConnectTimeout,
                                     [=] (boost::system::error_code ec, rpc::ServiceInfo info) mutable {
                                         if (!ec) {
+                                            *acquired = true;
 #warning check for version mismatch
                                             BOOST_LOG(log) << "Daemon has RPC version " << info.rpcVersion()
                                                            << ", interface version " << info.interfaceVersion();
