@@ -127,15 +127,15 @@ Linkbot::Linkbot (const std::string& id)
 Linkbot::~Linkbot () {
     if (m->clientFinishedFuture.valid()) {
         try {
+            BOOST_LOG(m->log) << "waiting for asyncRunClient to finish";
             m->client.close();
             m->clientFinishedFuture.get();
+            BOOST_LOG(m->log) << "asyncRunClient finished";
         }
         catch (boost::system::system_error& e) {
             BOOST_LOG(m->log) << "asyncRunClient finished with: " << e.what();
         }
     }
-    // This should probably be the only line in Linkbot's dtor. Let Impl's
-    // subobjects clean themselves up.
     delete m;
 }
 
