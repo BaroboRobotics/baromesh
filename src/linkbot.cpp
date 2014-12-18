@@ -96,6 +96,10 @@ struct Linkbot::Impl {
         }
     }
 
+    void onBroadcast (Broadcast::debugMessageEvent e) {
+        std::cout << "Debug message from robot: " << e.bytestring << std::endl;
+    }
+
     std::function<void(int, ButtonState::Type, int)> buttonEventCallback;
     std::function<void(int,double, int)> encoderEventCallback;
     std::function<void(int,JointState::Type, int)> jointEventCallback;
