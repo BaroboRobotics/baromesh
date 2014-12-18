@@ -98,18 +98,27 @@ void asyncAcquireDaemonImpl (AcquireDaemonHandler handler) {
                                             postAcquires(boost::system::error_code(), d);
                                         }
                                         else {
+                                            if (ec != boost::asio::error::operation_aborted) {
+                                                d->client().close();
+                                            }
                                             BOOST_LOG(log) << "Daemon RPC connection failed: " << ec.message();
                                             postAcquires(ec, nullptr);
                                         }
                                     });
                                 }
                                 else {
+                                    if (ec != boost::asio::error::operation_aborted) {
+                                        d->client().close();
+                                    }
                                     BOOST_LOG(log) << "Daemon handshake failed: " << ec.message();
                                     postAcquires(ec, nullptr);
                                 }
                             });
                         }
                         else {
+                            if (ec != boost::asio::error::operation_aborted) {
+                                d->client().close();
+                            }
                             BOOST_LOG(log) << "Daemon TCP connection failed: " << ec.message();
                             postAcquires(ec, nullptr);
                         }
