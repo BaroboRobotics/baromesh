@@ -546,40 +546,16 @@ void Linkbot::setButtonEventCallback (ButtonEventCallback cb, void* userData) {
 }
 
 void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, 
-                                       float granularity, void* userData) 
+                                       double granularity, void* userData)
 {
     const bool enable = !!cb;
     granularity = degToRad(granularity);
 
     try {
         asyncFire(m->client, MethodIn::enableEncoderEvent {
-            true, { enable, granularity },
-            true, { enable, granularity },
-            true, { enable, granularity }
-        }, requestTimeout(), use_future).get();
-    }
-    catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
-    }
-
-    if (enable) {
-        m->encoderEventCallback = std::bind(cb, _1, _2, _3, userData);
-    }
-    else {
-        m->encoderEventCallback = nullptr;
-    }
-}
-
-void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, void* userData) 
-{
-    const bool enable = !!cb;
-    float granularity = degToRad(enable ? 20.0 : 0);
-
-    try {
-        asyncFire(m->client, MethodIn::enableEncoderEvent {
-            true, { enable, granularity },
-            true, { enable, granularity },
-            true, { enable, granularity }
+            true, { enable, float(granularity) },
+            true, { enable, float(granularity) },
+            true, { enable, float(granularity) }
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {

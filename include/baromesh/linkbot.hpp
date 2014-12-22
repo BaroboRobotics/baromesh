@@ -76,8 +76,7 @@ public:
     // Passing a null pointer as the first parameter of those three functions
     // will disable its respective events.
     void setButtonEventCallback (ButtonEventCallback, void* userData);
-    void setEncoderEventCallback (EncoderEventCallback, float granularity, void* userData);
-    void setEncoderEventCallback (EncoderEventCallback, void* userData);
+    void setEncoderEventCallback (EncoderEventCallback, double granularity, void* userData);
     void setJointEventCallback (JointEventCallback, void* userData);
     void setAccelerometerEventCallback (AccelerometerEventCallback, void* userData);
 
