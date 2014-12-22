@@ -55,7 +55,6 @@ public:
     void motorPower(int mask, int m1, int m2, int m3);
     void setLedColor (int, int, int);
     void getLedColor (int&, int&, int&);
-    void setEncoderEventThreshold (int, double);
     void setJointSpeeds (int mask, double, double, double);
     void setJointStates(
         int mask,

@@ -613,11 +613,6 @@ void Linkbot::setJointEventCallback (JointEventCallback cb, void* userData) {
     }
 }
 
-void Linkbot::setEncoderEventThreshold (int, double) {
-#warning Unimplemented stub function in Linkbot
-    BOOST_LOG(m->log) << "Unimplemented stub function in Linkbot";
-}
-
 void Linkbot::writeEeprom(uint32_t address, const uint8_t *data, size_t size)
 {
     if(size > 128) {

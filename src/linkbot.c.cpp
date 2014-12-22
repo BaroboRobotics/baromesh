@@ -98,11 +98,6 @@ int linkbotGetLedColor(Linkbot *l, int *r, int *g, int *b)
 
 /* SETTERS */
 
-int linkbotSetEncoderEventThreshold(Linkbot *l, int jointNo, double thresh)
-{
-    LINKBOT_C_WRAPPER_FUNC_IMPL(setEncoderEventThreshold, jointNo, thresh);
-}
-
 int linkbotSetJointSpeeds(Linkbot *l, int mask, double j1, double j2, 
                           double j3)
 {
