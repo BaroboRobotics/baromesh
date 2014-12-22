@@ -47,7 +47,9 @@ static const int kBaudRate = 230400;
 // return true for "run me again", false for stop
 static bool runDongle (boost::asio::io_service& ios, Breaker& breaker) {
     const std::chrono::milliseconds kDongleDevicePathPollTimeout { 500 };
-    const std::chrono::milliseconds kKeepaliveTimeout { 500 };
+    const std::chrono::milliseconds kDongleConnectTimeout { 1000 };
+    const std::chrono::milliseconds kDongleKeepaliveTimeout { 500 };
+
     boost::log::sources::logger log;
     log.add_attribute("Title", boost::log::attributes::constant<std::string>("DONGLECORO"));
 
@@ -98,7 +100,7 @@ static bool runDongle (boost::asio::io_service& ios, Breaker& breaker) {
             });
 
             dongle->client().messageQueue().asyncHandshake(use_future).get();
-            auto info = asyncConnect(dongle->client(), std::chrono::milliseconds(100), use_future).get();
+            auto info = asyncConnect(dongle->client(), kDongleConnectTimeout, use_future).get();
             BOOST_LOG(log) << "Dongle has RPC version " << info.rpcVersion()
                            << ", interface version " << info.interfaceVersion();
 #warning check for version mismatch
@@ -145,7 +147,7 @@ static bool runDongle (boost::asio::io_service& ios, Breaker& breaker) {
         // So that takes care of linux. Windows XP's implementation of IOCP is
         // too stupid to notify us when a serial read fails because of a device
         // unplugged, so ping the dongle periodically.
-        asyncKeepalive(dongle->client().messageQueue(), kKeepaliveTimeout, stopTheWorld);
+        asyncKeepalive(dongle->client().messageQueue(), kDongleKeepaliveTimeout, stopTheWorld);
 
         {
             auto killswitch = Breaker::Killswitch(breaker, [&continueRunning, stopTheWorld] () {

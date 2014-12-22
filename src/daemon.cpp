@@ -47,7 +47,7 @@ std::shared_ptr<Daemon> daemonInstance () {
 }
 
 void asyncAcquireDaemonImpl (AcquireDaemonHandler handler) {
-    const std::chrono::milliseconds kDaemonConnectTimeout { 200 };
+    const std::chrono::milliseconds kDaemonConnectTimeout { 1000 };
     const std::chrono::milliseconds kDaemonKeepaliveTimeout { 500 };
 
     static boost::asio::io_service::strand strand { ioCore().ios() };
