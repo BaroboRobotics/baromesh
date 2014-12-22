@@ -73,7 +73,9 @@ struct Linkbot::Impl {
 
     void onBroadcast (Broadcast::buttonEvent b) {
         if (buttonEventCallback) {
-            buttonEventCallback(b.button, static_cast<ButtonState::Type>(b.state), b.timestamp);
+            buttonEventCallback(static_cast<Button::Type>(b.button),
+                                static_cast<ButtonState::Type>(b.state),
+                                b.timestamp);
         }
     }
 
@@ -100,7 +102,7 @@ struct Linkbot::Impl {
         std::cout << "Debug message from robot: " << e.bytestring << std::endl;
     }
 
-    std::function<void(int, ButtonState::Type, int)> buttonEventCallback;
+    std::function<void(Button::Type, ButtonState::Type, int)> buttonEventCallback;
     std::function<void(int,double, int)> encoderEventCallback;
     std::function<void(int,JointState::Type, int)> jointEventCallback;
     std::function<void(double,double,double,int)> accelerometerEventCallback;

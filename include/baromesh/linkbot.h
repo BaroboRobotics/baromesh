@@ -18,6 +18,14 @@ namespace ButtonState {
     };
 }
 
+namespace Button {
+    enum Type {
+        POWER,
+        A,
+        B
+    };
+}
+
 namespace FormFactor {
     enum Type {
         I,
@@ -37,7 +45,7 @@ namespace JointState {
     };
 }
 
-typedef void (*ButtonEventCallback)(int buttonNo, ButtonState::Type event, int timestamp, void* userData);
+typedef void (*ButtonEventCallback)(Button::Type button, ButtonState::Type event, int timestamp, void* userData);
 // EncoderEventCallback's anglePosition parameter is reported in degrees.
 typedef void (*EncoderEventCallback)(int jointNo, double anglePosition, int timestamp, void* userData);
 typedef void (*JointEventCallback)(int jointNo, JointState::Type event, int timestamp, void* userData);
