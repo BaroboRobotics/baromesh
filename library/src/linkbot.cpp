@@ -57,7 +57,6 @@ struct Linkbot::Impl {
 
     std::string serialId;
 
-    boost::asio::io_service ios;
     rpc::asio::Client<sfp::asio::MessageQueue<boost::asio::ip::tcp::socket>> client;
 
     std::future<void> clientFinishedFuture;
