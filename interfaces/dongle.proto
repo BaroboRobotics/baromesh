@@ -1,0 +1,26 @@
+import "nanopb.proto";
+import "commontypes.proto";
+package barobo.Dongle;
+
+message Payload {
+    required bytes value = 1 [(nanopb).max_size = 128];
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Methods
+
+message transmitUnicast {
+    message In {
+        required barobo.commontypes.SerialId serialId = 1;
+        required Payload payload = 2;
+    }
+    message Result { }
+}
+
+//////////////////////////////////////////////////////////////////////////////
+// Broadcasts
+
+message receiveUnicast {
+    required barobo.commontypes.SerialId serialId = 1;
+    required Payload payload = 2;
+}
