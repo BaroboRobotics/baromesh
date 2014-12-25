@@ -36,7 +36,7 @@ set(SOURCES
 
 add_executable(baromeshd ${SOURCES})
 set_source_files_properties(${SOURCES}
-    PROPERTIES COMPILE_FLAGS "-std=c++11 -DBOOST_ASIO_SEPARATE_COMPILATION")
+    PROPERTIES COMPILE_FLAGS "-std=c++11")
 target_include_directories(baromeshd
     PRIVATE ${Boost_INCLUDE_DIRS}
             src

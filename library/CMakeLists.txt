@@ -38,7 +38,7 @@ set(SOURCES
 add_library(baromesh ${SOURCES})
 
 set_source_files_properties(${SOURCES}
-    PROPERTIES COMPILE_FLAGS "-std=c++11 -DBOOST_ASIO_SEPARATE_COMPILATION")
+    PROPERTIES COMPILE_FLAGS "-std=c++11")
 
 target_include_directories(baromesh
     PUBLIC ${Boost_INCLUDE_DIRS}

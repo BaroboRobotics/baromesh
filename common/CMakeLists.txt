@@ -21,13 +21,12 @@ find_package(Boost 1.54.0 REQUIRED COMPONENTS system)
 
 set(SOURCES
     src/system_error.cpp
-    src/asio_impl_src.cpp
     )
 
 add_library(baromesh-common STATIC ${SOURCES})
 
 set_source_files_properties(${SOURCES}
-    PROPERTIES COMPILE_FLAGS "-std=c++11 -DBOOST_ASIO_SEPARATE_COMPILATION")
+    PROPERTIES COMPILE_FLAGS "-std=c++11")
 
 target_include_directories(baromesh-common
     PUBLIC ${Boost_INCLUDE_DIRS}
