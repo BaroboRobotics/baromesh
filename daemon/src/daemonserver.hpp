@@ -2,13 +2,19 @@
 #define BAROMESH_DAEMON_DAEMONSERVER_HPP
 
 #include "gen-daemon.pb.hpp"
-#include "dongle.hpp"
+
+#include "basicdongle.hpp"
 
 #include "rpc/asio/forwardcoroutines.hpp"
 #include "rpc/asio/tcppolyserver.hpp"
 
-#include <boost/log/common.hpp>
+#include <boost/asio/io_service.hpp>
+#include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/strand.hpp>
+#include <boost/asio/serial_port.hpp>
+
 #include <boost/log/sources/logger.hpp>
+#include <boost/log/sources/record_ostream.hpp>
 
 #include <memory>
 #include <string>
@@ -17,6 +23,11 @@
 #include <cstring>
 
 namespace baromesh {
+
+using SerialMessageQueue = sfp::asio::MessageQueue<boost::asio::serial_port>;
+using SerialClient = rpc::asio::Client<SerialMessageQueue>;
+using Dongle = baromesh::BasicDongle<SerialClient>;
+using ZigbeeClient = rpc::asio::Client<Dongle::MessageQueue>;
 
 class DaemonServerImpl : public std::enable_shared_from_this<DaemonServerImpl> {
     using Tcp = boost::asio::ip::tcp;

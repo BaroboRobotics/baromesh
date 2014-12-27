@@ -2,18 +2,13 @@
 #include "daemonserver.hpp"
 #include "dongledevicepath.hpp"
 
-#include "sfp/asio/messagequeue.hpp"
-
 #include "rpc/message.hpp"
 #include "rpc/version.hpp"
 #include "rpc/asio/client.hpp"
 #include "rpc/asio/server.hpp"
 #include "rpc/asio/tcppolyserver.hpp"
 
-#include "util/hexdump.hpp"
-#include "util/monospawn.hpp"
-
-#include <boost/asio.hpp>
+#include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/use_future.hpp>
 
 #include <boost/log/common.hpp>
@@ -36,9 +31,6 @@
 #include <chrono>
 
 using namespace std::placeholders;
-
-using Tcp = boost::asio::ip::tcp;
-using TcpMessageQueue = sfp::asio::MessageQueue<Tcp::socket>;
 
 using boost::asio::use_future;
 
@@ -106,6 +98,7 @@ static bool runDongle (boost::asio::io_service& ios, Breaker& breaker) {
 #warning check for version mismatch
         }
 
+        using Tcp = boost::asio::ip::tcp;
         Tcp::resolver resolver { ios };
         auto iter = resolver.resolve(decltype(resolver)::query("127.0.0.1", "42000"));
         boost::log::sources::logger daemonSvLog;

@@ -1,7 +1,8 @@
 #ifndef BAROMESH_DAEMON_BREAKER_HPP
 #define BAROMESH_DAEMON_BREAKER_HPP
 
-#include <boost/asio.hpp>
+#include <boost/asio/io_service.hpp>
+#include <boost/asio/signal_set.hpp>
 
 #include <condition_variable>
 #include <exception>
