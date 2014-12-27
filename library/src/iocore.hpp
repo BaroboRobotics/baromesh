@@ -8,9 +8,6 @@
 #include <boost/log/core/core.hpp>
 #include <boost/log/sources/logger.hpp>
 
-//#define BOOST_BIND_NO_PLACEHOLDERS
-//#include <boost/thread.hpp>
-
 #include <future>
 #include <memory>
 #include <thread>
