@@ -32,7 +32,6 @@ set(SOURCES
     src/linkbot.cpp
     src/linkbot.c.cpp
     src/iocore.cpp
-    src/daemon.cpp
     )
 
 add_library(baromesh ${SOURCES})

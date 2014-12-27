@@ -1,7 +1,7 @@
 #include "gen-robot.pb.hpp"
 
 #include "iocore.hpp"
-#include "daemon.hpp"
+#include "basicdaemon.hpp"
 
 #include "baromesh/linkbot.hpp"
 #include "baromesh/error.hpp"
@@ -9,11 +9,11 @@
 #include "rpc/asio/client.hpp"
 #include "sfp/asio/messagequeue.hpp"
 
-#include <boost/asio.hpp>
+#include <boost/asio/connect.hpp>
 #include <boost/asio/use_future.hpp>
 
-#include <boost/log/common.hpp>
 #include <boost/log/sources/logger.hpp>
+#include <boost/log/sources/record_ostream.hpp>
 
 #include <iostream>
 #include <memory>
@@ -33,9 +33,15 @@ template <class T>
 T radToDeg (T x) { return T(double(x) * 180.0 / M_PI); }
 
 std::chrono::milliseconds requestTimeout() {
-    static std::chrono::milliseconds kRequestTimeout { 1000 };
+    static const std::chrono::milliseconds kRequestTimeout { 1000 };
     return kRequestTimeout;
 }
+
+std::chrono::milliseconds daemonConnectTimeout() {
+    static const std::chrono::milliseconds kDaemonConnectTimeout { 1000 };
+    return kDaemonConnectTimeout;
+}
+
 } // file namespace
 
 using MethodIn = rpc::MethodIn<barobo::Robot>;
@@ -48,22 +54,21 @@ struct Linkbot::Impl {
     using Interface = barobo::Robot;
     Impl (const std::string& id)
         : serialId(id)
-        , client(baromesh::ioCore().ios(), log)
-        , work(baromesh::ioCore().ios())
-        , daemon(baromesh::asyncAcquireDaemon(use_future).get())
+        , ioCore(baromesh::IoCore::get(false))
+        , daemon(ioCore->ios(), log)
+        , client(ioCore->ios(), log)
     {}
 
     mutable boost::log::sources::logger log;
 
     std::string serialId;
 
-    rpc::asio::Client<sfp::asio::MessageQueue<boost::asio::ip::tcp::socket>> client;
+    std::shared_ptr<baromesh::IoCore> ioCore;
+    using TcpClient = rpc::asio::Client<sfp::asio::MessageQueue<boost::asio::ip::tcp::socket>>;
+    baromesh::BasicDaemon<TcpClient> daemon;
+    TcpClient client;
 
     std::future<void> clientFinishedFuture;
-
-    boost::asio::io_service::work work;
-
-    std::shared_ptr<baromesh::Daemon> daemon;
 
     template <class B>
     void broadcast (B&& args) {
@@ -114,11 +119,23 @@ Linkbot::Linkbot (const std::string& id)
     // up if any code in the rest of the ctor throws.
     std::unique_ptr<Impl> p { new Linkbot::Impl(id) };
 
-    auto epIter = p->daemon->asyncResolveSerialId(p->serialId, use_future).get();
+    using Tcp = boost::asio::ip::tcp;
+    Tcp::resolver resolver {p->ioCore->ios()};
+    auto daemonEndpointIter = resolver.resolve(Tcp::resolver::query("127.0.0.1", "42000"));
 
-    BOOST_LOG(p->log) << "connecting to " << p->serialId << " at " << epIter->endpoint();
+    boost::asio::connect(p->daemon.client().messageQueue().stream(), daemonEndpointIter);
+    p->daemon.client().messageQueue().asyncHandshake(use_future).get();
+    auto info = asyncConnect(p->daemon.client(), daemonConnectTimeout(), use_future).get();
+#warning check for version mismatch
+    BOOST_LOG(p->log) << "Daemon has RPC version " << info.rpcVersion()
+                   << ", interface version " << info.interfaceVersion();
 
-    boost::asio::connect(p->client.messageQueue().stream(), epIter);
+    auto robotEndpointIter = p->daemon.asyncResolveSerialId(p->serialId, use_future).get();
+
+    BOOST_LOG(p->log) << "connecting to " << p->serialId
+                      << " at " << robotEndpointIter->endpoint();
+
+    boost::asio::connect(p->client.messageQueue().stream(), robotEndpointIter);
     p->client.messageQueue().asyncHandshake(use_future).get();
 
     p->clientFinishedFuture = asyncRunClient(p->client, *p, use_future);
@@ -130,6 +147,7 @@ Linkbot::Linkbot (const std::string& id)
 }
 
 Linkbot::~Linkbot () {
+    m->daemon.client().close();
     if (m->clientFinishedFuture.valid()) {
         try {
             BOOST_LOG(m->log) << "waiting for asyncRunClient to finish";

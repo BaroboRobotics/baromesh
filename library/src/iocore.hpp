@@ -1,20 +1,29 @@
 #ifndef BAROMESH_IOCORE_HPP
 #define BAROMESH_IOCORE_HPP
 
-#include <boost/asio.hpp>
+#include <boost/asio/io_service.hpp>
+
 #include <boost/optional.hpp>
 
+#include <boost/log/core/core.hpp>
+#include <boost/log/sources/logger.hpp>
+
+//#define BOOST_BIND_NO_PLACEHOLDERS
+//#include <boost/thread.hpp>
+
+#include <future>
+#include <memory>
 #include <thread>
 
 namespace baromesh {
 
 class IoCore {
-    friend IoCore& ioCore ();
-
-    IoCore ();
-    void init ();
+    explicit IoCore (boost::optional<bool> enableLogging);
+    void maybeEnableLogging (boost::optional<bool> enable);
+    void startThread ();
 
 public:
+    static std::shared_ptr<IoCore> get (boost::optional<bool> enableLogging = boost::none);
     ~IoCore ();
 
     boost::asio::io_service& ios () {
@@ -22,12 +31,15 @@ public:
     }
 
 private:
+    boost::log::core_ptr mLoggingCore;
+
+    mutable boost::log::sources::logger_mt mLog;
+
     boost::asio::io_service mIos;
     boost::optional<boost::asio::io_service::work> mWork;
+    std::weak_ptr<int> mToken;
     std::thread mThread;
 };
-
-IoCore& ioCore ();
 
 } // namespace baromesh
 

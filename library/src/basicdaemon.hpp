@@ -5,10 +5,12 @@
 
 #include "baromesh/system_error.hpp"
 
-#include <boost/asio.hpp>
+#include <boost/asio/async_result.hpp>
+#include <boost/asio/io_service.hpp>
+#include <boost/asio/ip/tcp.hpp>
 
-#include <boost/log/common.hpp>
 #include <boost/log/sources/logger.hpp>
+#include <boost/log/sources/record_ostream.hpp>
 
 #include <chrono>
 #include <functional>
