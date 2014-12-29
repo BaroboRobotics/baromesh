@@ -10,14 +10,11 @@
 
 #include <future>
 #include <memory>
-#include <thread>
 
 namespace baromesh {
 
 class IoCore {
-    explicit IoCore (boost::optional<bool> enableLogging);
-    void maybeEnableLogging (boost::optional<bool> enable);
-    void startThread ();
+    explicit IoCore (boost::optional<bool>);
 
 public:
     static std::shared_ptr<IoCore> get (boost::optional<bool> enableLogging = boost::none);
@@ -34,8 +31,8 @@ private:
 
     boost::asio::io_service mIos;
     boost::optional<boost::asio::io_service::work> mWork;
-    std::weak_ptr<int> mToken;
-    std::thread mThread;
+
+    std::future<size_t> mNHandlers;
 };
 
 } // namespace baromesh

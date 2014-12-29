@@ -2,17 +2,20 @@
 
 #include <boost/log/sources/record_ostream.hpp>
 
+#include <exception>
+#include <mutex>
+#include <string>
+
+#include <cstdlib>
+
 namespace baromesh {
 
-IoCore::IoCore (boost::optional<bool> enableLogging)
+IoCore::IoCore (boost::optional<bool> enable)
     : mLoggingCore(boost::log::core::get())
     , mWork(boost::in_place(std::ref(mIos)))
+    // Run the io_service in a separate thread
+    , mNHandlers(std::async(std::launch::async, [this] () { return mIos.run(); }))
 {
-    maybeEnableLogging(enableLogging);
-    startThread();
-}
-
-void IoCore::maybeEnableLogging (boost::optional<bool> enable) {
     // The environment variable overrides whatever we were passed.
     if (const auto enableStr = std::getenv("BAROMESH_LOG_ENABLE")) {
         try {
@@ -30,26 +33,7 @@ void IoCore::maybeEnableLogging (boost::optional<bool> enable) {
     }
 }
 
-void IoCore::startThread () {
-    auto p = std::make_shared<int>(0);
-    mToken = p;
-    std::thread t {
-        [this, p] () mutable {
-            try {
-                auto nHandlers = mIos.run();
-                BOOST_LOG(mLog) << "ran " << nHandlers << " handlers to completion";
-            }
-            catch (std::exception& e) {
-                BOOST_LOG(mLog) << "ran into " << e.what();
-            }
-            p.reset();
-        }
-    };
-    t.swap(mThread);
-}
-
 std::shared_ptr<IoCore> IoCore::get (boost::optional<bool> enableLogging) {
-    //static auto core = std::shared_ptr<IoCore>(new IoCore{enableLogging});
     static std::mutex mutex;
     std::lock_guard<std::mutex> lock {mutex};
 
@@ -64,24 +48,15 @@ std::shared_ptr<IoCore> IoCore::get (boost::optional<bool> enableLogging) {
 
 IoCore::~IoCore () {
     mWork = boost::none;
-    while (!mToken.expired()) {
-        std::this_thread::yield();
-    }
-#if 0
     try {
+        // When mNHandlers is ready, the io_service::run thread must be all
+        // cleaned up, and it's safe to continue destruction.
         auto nHandlers = mNHandlers.get();
         BOOST_LOG(mLog) << "ran " << nHandlers << " handlers to completion";
     }
     catch (std::exception& e) {
         BOOST_LOG(mLog) << "ran into " << e.what();
     }
-#endif
-    mThread.detach();
-#if 0
-    if (mThread.joinable()) {
-        mThread.join();
-    }
-#endif
 }
 
 } // namespace baromesh
