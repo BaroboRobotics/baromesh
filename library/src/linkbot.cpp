@@ -1,10 +1,10 @@
-#include "gen-robot.pb.hpp"
-
-#include "iocore.hpp"
-#include "basicdaemon.hpp"
-
 #include "baromesh/linkbot.hpp"
 #include "baromesh/error.hpp"
+#include "baromesh/iocore.hpp"
+
+#include "gen-robot.pb.hpp"
+
+#include "basicdaemon.hpp"
 
 #include "rpc/asio/client.hpp"
 #include "sfp/asio/messagequeue.hpp"
