@@ -20,6 +20,7 @@ Linkbot* linkbotNew(const char* serialId)
     return new Linkbot(serialId);
 }
 
+#if 0
 /* CONNECTION */
 int linkbotConnect(Linkbot* l)
 {
@@ -44,6 +45,7 @@ int linkbotDisconnect(Linkbot* l)
         return -1;
     }
 }
+#endif
 
 
 #define LINKBOT_C_WRAPPER_FUNC_IMPL(cpp_name, ...) \

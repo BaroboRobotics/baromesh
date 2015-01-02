@@ -65,7 +65,7 @@ struct Linkbot::Impl {
         boost::asio::connect(daemon.client().messageQueue().stream(), daemonEndpointIter);
         daemon.client().messageQueue().asyncHandshake(use_future).get();
         auto info = asyncConnect(daemon.client(), daemonConnectTimeout(), use_future).get();
-    #warning check for version mismatch
+#warning check for version mismatch
         BOOST_LOG(log) << "Daemon has RPC version " << info.rpcVersion()
                        << ", interface version " << info.interfaceVersion();
 
@@ -78,20 +78,34 @@ struct Linkbot::Impl {
         client.messageQueue().asyncHandshake(use_future).get();
 
         clientFinishedFuture = asyncRunClient(client, *this, use_future);
+
+        auto serviceInfo = asyncConnect(client, requestTimeout(), use_future).get();
+
+        // Check version before we check if the connection succeeded--the user will
+        // probably want to know to flash the robot, regardless.
+        if (serviceInfo.rpcVersion() != rpc::Version<>::triplet()) {
+            throw Error(std::string("RPC version ") +
+                to_string(serviceInfo.rpcVersion()) + " != local RPC version " +
+                to_string(rpc::Version<>::triplet()));
+        }
+        else if (serviceInfo.interfaceVersion() != rpc::Version<barobo::Robot>::triplet()) {
+            throw Error(std::string("Robot interface version ") +
+                to_string(serviceInfo.interfaceVersion()) + " != local Robot interface version " +
+                to_string(rpc::Version<barobo::Robot>::triplet()));
+        }
     }
 
     ~Impl () {
-        daemon.client().close();
-        if (clientFinishedFuture.valid()) {
-            try {
-                BOOST_LOG(log) << "waiting for asyncRunClient to finish";
-                client.close();
-                clientFinishedFuture.get();
-                BOOST_LOG(log) << "asyncRunClient finished";
-            }
-            catch (boost::system::system_error& e) {
-                BOOST_LOG(log) << "asyncRunClient finished with: " << e.what();
-            }
+        try {
+            asyncDisconnect(client, requestTimeout(), use_future).get();
+            daemon.client().close();
+            BOOST_LOG(log) << "waiting for asyncRunClient to finish";
+            client.close();
+            clientFinishedFuture.get();
+            BOOST_LOG(log) << "asyncRunClient finished";
+        }
+        catch (std::exception& e) {
+            BOOST_LOG(log) << "Linkbot destructor swallowed exception: " << e.what();
         }
     }
 
@@ -148,9 +162,12 @@ struct Linkbot::Impl {
     std::function<void(double,double,double,int)> accelerometerEventCallback;
 };
 
-Linkbot::Linkbot (const std::string& id)
+Linkbot::Linkbot (const std::string& id) try
     : m(new Linkbot::Impl{id})
 {}
+catch (std::exception& e) {
+    throw Error(id + ": " + e.what());
+}
 
 Linkbot::~Linkbot () {
     delete m;
@@ -158,39 +175,6 @@ Linkbot::~Linkbot () {
 
 std::string Linkbot::serialId () const {
     return m->serialId;
-}
-
-void Linkbot::connect()
-{
-    try {
-        auto serviceInfo = asyncConnect(m->client, requestTimeout(), use_future).get();
-
-        // Check version before we check if the connection succeeded--the user will
-        // probably want to know to flash the robot, regardless.
-        if (serviceInfo.rpcVersion() != rpc::Version<>::triplet()) {
-            throw Error(std::string("RPC version ") +
-                to_string(serviceInfo.rpcVersion()) + " != local RPC version " +
-                to_string(rpc::Version<>::triplet()));
-        }
-        else if (serviceInfo.interfaceVersion() != rpc::Version<barobo::Robot>::triplet()) {
-            throw Error(std::string("Robot interface version ") +
-                to_string(serviceInfo.interfaceVersion()) + " != local Robot interface version " +
-                to_string(rpc::Version<barobo::Robot>::triplet()));
-        }
-    }
-    catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
-    }
-}
-
-void Linkbot::disconnect()
-{
-    try {
-        asyncDisconnect(m->client, requestTimeout(), use_future).get();
-    }
-    catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
-    }
 }
 
 using namespace std::placeholders; // _1, _2, etc.
