@@ -57,7 +57,43 @@ struct Linkbot::Impl {
         , ioCore(baromesh::IoCore::get(false))
         , daemon(ioCore->ios(), log)
         , client(ioCore->ios(), log)
-    {}
+    {
+        using Tcp = boost::asio::ip::tcp;
+        Tcp::resolver resolver {ioCore->ios()};
+        auto daemonEndpointIter = resolver.resolve(Tcp::resolver::query("127.0.0.1", "42000"));
+
+        boost::asio::connect(daemon.client().messageQueue().stream(), daemonEndpointIter);
+        daemon.client().messageQueue().asyncHandshake(use_future).get();
+        auto info = asyncConnect(daemon.client(), daemonConnectTimeout(), use_future).get();
+    #warning check for version mismatch
+        BOOST_LOG(log) << "Daemon has RPC version " << info.rpcVersion()
+                       << ", interface version " << info.interfaceVersion();
+
+        auto robotEndpointIter = daemon.asyncResolveSerialId(serialId, use_future).get();
+
+        BOOST_LOG(log) << "connecting to " << serialId
+                          << " at " << robotEndpointIter->endpoint();
+
+        boost::asio::connect(client.messageQueue().stream(), robotEndpointIter);
+        client.messageQueue().asyncHandshake(use_future).get();
+
+        clientFinishedFuture = asyncRunClient(client, *this, use_future);
+    }
+
+    ~Impl () {
+        daemon.client().close();
+        if (clientFinishedFuture.valid()) {
+            try {
+                BOOST_LOG(log) << "waiting for asyncRunClient to finish";
+                client.close();
+                clientFinishedFuture.get();
+                BOOST_LOG(log) << "asyncRunClient finished";
+            }
+            catch (boost::system::system_error& e) {
+                BOOST_LOG(log) << "asyncRunClient finished with: " << e.what();
+            }
+        }
+    }
 
     mutable boost::log::sources::logger log;
 
@@ -113,52 +149,10 @@ struct Linkbot::Impl {
 };
 
 Linkbot::Linkbot (const std::string& id)
-    : m(nullptr)
-{
-    // By using a unique_ptr, we can guarantee that our Impl will get cleaned
-    // up if any code in the rest of the ctor throws.
-    std::unique_ptr<Impl> p { new Linkbot::Impl(id) };
-
-    using Tcp = boost::asio::ip::tcp;
-    Tcp::resolver resolver {p->ioCore->ios()};
-    auto daemonEndpointIter = resolver.resolve(Tcp::resolver::query("127.0.0.1", "42000"));
-
-    boost::asio::connect(p->daemon.client().messageQueue().stream(), daemonEndpointIter);
-    p->daemon.client().messageQueue().asyncHandshake(use_future).get();
-    auto info = asyncConnect(p->daemon.client(), daemonConnectTimeout(), use_future).get();
-#warning check for version mismatch
-    BOOST_LOG(p->log) << "Daemon has RPC version " << info.rpcVersion()
-                   << ", interface version " << info.interfaceVersion();
-
-    auto robotEndpointIter = p->daemon.asyncResolveSerialId(p->serialId, use_future).get();
-
-    BOOST_LOG(p->log) << "connecting to " << p->serialId
-                      << " at " << robotEndpointIter->endpoint();
-
-    boost::asio::connect(p->client.messageQueue().stream(), robotEndpointIter);
-    p->client.messageQueue().asyncHandshake(use_future).get();
-
-    p->clientFinishedFuture = asyncRunClient(p->client, *p, use_future);
-
-    // Our C++03 API only uses a raw pointer, so transfer ownership from the
-    // unique_ptr to the raw pointer. This should always be the last line of
-    // the ctor.
-    m = p.release();
-}
+    : m(new Linkbot::Impl{id})
+{}
 
 Linkbot::~Linkbot () {
-    m->daemon.client().close();
-    if (m->clientFinishedFuture.valid()) {
-        try {
-            BOOST_LOG(m->log) << "waiting for asyncRunClient to finish";
-            m->client.close();
-            m->clientFinishedFuture.get();
-            BOOST_LOG(m->log) << "asyncRunClient finished";
-        }
-        catch (boost::system::system_error& e) {
-            BOOST_LOG(m->log) << "asyncRunClient finished with: " << e.what();
-        }
-    }
     delete m;
 }
 
