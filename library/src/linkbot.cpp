@@ -57,7 +57,57 @@ struct Linkbot::Impl {
         , ioCore(baromesh::IoCore::get(false))
         , daemon(ioCore->ios(), log)
         , client(ioCore->ios(), log)
-    {}
+    {
+        using Tcp = boost::asio::ip::tcp;
+        Tcp::resolver resolver {ioCore->ios()};
+        auto daemonEndpointIter = resolver.resolve(Tcp::resolver::query("127.0.0.1", "42000"));
+
+        boost::asio::connect(daemon.client().messageQueue().stream(), daemonEndpointIter);
+        daemon.client().messageQueue().asyncHandshake(use_future).get();
+        auto info = asyncConnect(daemon.client(), daemonConnectTimeout(), use_future).get();
+#warning check for version mismatch
+        BOOST_LOG(log) << "Daemon has RPC version " << info.rpcVersion()
+                       << ", interface version " << info.interfaceVersion();
+
+        auto robotEndpointIter = daemon.asyncResolveSerialId(serialId, use_future).get();
+
+        BOOST_LOG(log) << "connecting to " << serialId
+                          << " at " << robotEndpointIter->endpoint();
+
+        boost::asio::connect(client.messageQueue().stream(), robotEndpointIter);
+        client.messageQueue().asyncHandshake(use_future).get();
+
+        clientFinishedFuture = asyncRunClient(client, *this, use_future);
+
+        auto serviceInfo = asyncConnect(client, requestTimeout(), use_future).get();
+
+        // Check version before we check if the connection succeeded--the user will
+        // probably want to know to flash the robot, regardless.
+        if (serviceInfo.rpcVersion() != rpc::Version<>::triplet()) {
+            throw Error(std::string("RPC version ") +
+                to_string(serviceInfo.rpcVersion()) + " != local RPC version " +
+                to_string(rpc::Version<>::triplet()));
+        }
+        else if (serviceInfo.interfaceVersion() != rpc::Version<barobo::Robot>::triplet()) {
+            throw Error(std::string("Robot interface version ") +
+                to_string(serviceInfo.interfaceVersion()) + " != local Robot interface version " +
+                to_string(rpc::Version<barobo::Robot>::triplet()));
+        }
+    }
+
+    ~Impl () {
+        try {
+            asyncDisconnect(client, requestTimeout(), use_future).get();
+            daemon.client().close();
+            BOOST_LOG(log) << "waiting for asyncRunClient to finish";
+            client.close();
+            clientFinishedFuture.get();
+            BOOST_LOG(log) << "asyncRunClient finished";
+        }
+        catch (std::exception& e) {
+            BOOST_LOG(log) << "Linkbot destructor swallowed exception: " << e.what();
+        }
+    }
 
     mutable boost::log::sources::logger log;
 
@@ -112,91 +162,19 @@ struct Linkbot::Impl {
     std::function<void(double,double,double,int)> accelerometerEventCallback;
 };
 
-Linkbot::Linkbot (const std::string& id)
-    : m(nullptr)
-{
-    // By using a unique_ptr, we can guarantee that our Impl will get cleaned
-    // up if any code in the rest of the ctor throws.
-    std::unique_ptr<Impl> p { new Linkbot::Impl(id) };
-
-    using Tcp = boost::asio::ip::tcp;
-    Tcp::resolver resolver {p->ioCore->ios()};
-    auto daemonEndpointIter = resolver.resolve(Tcp::resolver::query("127.0.0.1", "42000"));
-
-    boost::asio::connect(p->daemon.client().messageQueue().stream(), daemonEndpointIter);
-    p->daemon.client().messageQueue().asyncHandshake(use_future).get();
-    auto info = asyncConnect(p->daemon.client(), daemonConnectTimeout(), use_future).get();
-#warning check for version mismatch
-    BOOST_LOG(p->log) << "Daemon has RPC version " << info.rpcVersion()
-                   << ", interface version " << info.interfaceVersion();
-
-    auto robotEndpointIter = p->daemon.asyncResolveSerialId(p->serialId, use_future).get();
-
-    BOOST_LOG(p->log) << "connecting to " << p->serialId
-                      << " at " << robotEndpointIter->endpoint();
-
-    boost::asio::connect(p->client.messageQueue().stream(), robotEndpointIter);
-    p->client.messageQueue().asyncHandshake(use_future).get();
-
-    p->clientFinishedFuture = asyncRunClient(p->client, *p, use_future);
-
-    // Our C++03 API only uses a raw pointer, so transfer ownership from the
-    // unique_ptr to the raw pointer. This should always be the last line of
-    // the ctor.
-    m = p.release();
+Linkbot::Linkbot (const std::string& id) try
+    : m(new Linkbot::Impl{id})
+{}
+catch (std::exception& e) {
+    throw Error(id + ": " + e.what());
 }
 
 Linkbot::~Linkbot () {
-    m->daemon.client().close();
-    if (m->clientFinishedFuture.valid()) {
-        try {
-            BOOST_LOG(m->log) << "waiting for asyncRunClient to finish";
-            m->client.close();
-            m->clientFinishedFuture.get();
-            BOOST_LOG(m->log) << "asyncRunClient finished";
-        }
-        catch (boost::system::system_error& e) {
-            BOOST_LOG(m->log) << "asyncRunClient finished with: " << e.what();
-        }
-    }
     delete m;
 }
 
 std::string Linkbot::serialId () const {
     return m->serialId;
-}
-
-void Linkbot::connect()
-{
-    try {
-        auto serviceInfo = asyncConnect(m->client, requestTimeout(), use_future).get();
-
-        // Check version before we check if the connection succeeded--the user will
-        // probably want to know to flash the robot, regardless.
-        if (serviceInfo.rpcVersion() != rpc::Version<>::triplet()) {
-            throw Error(std::string("RPC version ") +
-                to_string(serviceInfo.rpcVersion()) + " != local RPC version " +
-                to_string(rpc::Version<>::triplet()));
-        }
-        else if (serviceInfo.interfaceVersion() != rpc::Version<barobo::Robot>::triplet()) {
-            throw Error(std::string("Robot interface version ") +
-                to_string(serviceInfo.interfaceVersion()) + " != local Robot interface version " +
-                to_string(rpc::Version<barobo::Robot>::triplet()));
-        }
-    }
-    catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
-    }
-}
-
-void Linkbot::disconnect()
-{
-    try {
-        asyncDisconnect(m->client, requestTimeout(), use_future).get();
-    }
-    catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
-    }
 }
 
 using namespace std::placeholders; // _1, _2, etc.

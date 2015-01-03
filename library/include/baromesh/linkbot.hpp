@@ -31,9 +31,6 @@ public:
     }
 
     // All member functions may throw a barobo::Error exception on failure.
-    void connect ();
-    void disconnect ();
-
     // Member functions take angles in degrees.
     // All functions are non-blocking. Use moveWait() to wait for non-blocking
     // movement functions.
