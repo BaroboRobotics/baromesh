@@ -2,6 +2,7 @@
 #include "baromesh/linkbot.hpp"
 
 #include <chrono>
+#include <exception>
 #include <iostream>
 #include <thread>
 
@@ -38,7 +39,7 @@ int main (int argc, char** argv) {
         // will disconnect for us.
     }
     catch (std::exception& e) {
-        std::cerr << e.what() << "\n";
+        std::cerr << "Exception: " << e.what() << "\n";
         return 1;
     }
 
