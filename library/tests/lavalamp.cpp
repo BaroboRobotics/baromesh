@@ -20,9 +20,8 @@ void sendNewColor(barobo::Linkbot& linkbot, double tim) {
 
 void lavaLamp (std::string serialId) {
     double t = 0;
-    barobo::Linkbot linkbot { serialId };
     try {
-        linkbot.connect();
+        barobo::Linkbot linkbot { serialId };
         std::cout << serialId << ": connected\n";
 
         while (1) {
