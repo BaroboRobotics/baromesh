@@ -277,6 +277,11 @@ message move {
     message Result { }
 }
 
+message resetEncoderRevs {
+    message In { }
+    message Result { }
+}
+
 message stop {
     message In {optional uint32 mask = 1;}
     message Result {}

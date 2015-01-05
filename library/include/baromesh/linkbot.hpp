@@ -34,11 +34,7 @@ public:
     void connect ();
     void disconnect ();
 
-    // Member functions take angles in degrees.
-    // All functions are non-blocking. Use moveWait() to wait for non-blocking
-    // movement functions.
-    void drive (int mask, double, double, double);
-    void driveTo (int mask, double, double, double);
+    /* GETTERS */
     void getAccelerometer (int& timestamp, double&, double&, double&);
     void getFormFactor(FormFactor::Type & form);
     void getJointAngles (int& timestamp, double&, double&, double&);
@@ -47,26 +43,35 @@ public:
                         JointState::Type & s1,
                         JointState::Type & s2,
                         JointState::Type & s3);
-    void move (int mask, double, double, double);
-    // moveContinuous takes three angular speed coefficients. Use -1 to move
-    // a motor backward, +1 to move it forward.
-    void moveContinuous (int mask, double, double, double);
-    void moveTo (int mask, double, double, double);
-    void motorPower(int mask, int m1, int m2, int m3);
-    void setLedColor (int, int, int);
     void getLedColor (int&, int&, int&);
+    void getVersions (uint32_t&, uint32_t&, uint32_t&);
+
+    /* SETTERS */
+    void resetEncoderRevs();
+    void setBuzzerFrequencyOn (float);
     void setJointSpeeds (int mask, double, double, double);
     void setJointStates(
         int mask,
         JointState::Type s1, double d1,
         JointState::Type s2, double d2,
         JointState::Type s3, double d3);
+    void setLedColor (int, int, int);
+
+    /* MOVEMENT */
+    // Member functions take angles in degrees.
+    // All functions are non-blocking. Use moveWait() to wait for non-blocking
+    // movement functions.
+    void drive (int mask, double, double, double);
+    void driveTo (int mask, double, double, double);
+    void move (int mask, double, double, double);
+    // moveContinuous takes three angular speed coefficients. Use -1 to move
+    // a motor backward, +1 to move it forward.
+    void moveContinuous (int mask, double, double, double);
+    void moveTo (int mask, double, double, double);
+    void motorPower(int mask, int m1, int m2, int m3);
     void stop (int mask = 0x07);
-    void setBuzzerFrequencyOn (float);
-    void getVersions (uint32_t&, uint32_t&, uint32_t&);
 
-    void writeEeprom(uint32_t address, const uint8_t *data, size_t size);
-
+    /* CALLBACKS */
     typedef void (*ButtonEventCallback)(Button::Type button, ButtonState::Type event, int timestamp, void* userData);
     // EncoderEventCallback's anglePosition parameter is reported in degrees.
     typedef void (*EncoderEventCallback)(int jointNo, double anglePosition, int timestamp, void* userData);
@@ -79,6 +84,9 @@ public:
     void setEncoderEventCallback (EncoderEventCallback, double granularity, void* userData);
     void setJointEventCallback (JointEventCallback, void* userData);
     void setAccelerometerEventCallback (AccelerometerEventCallback, void* userData);
+
+    /* MISC */
+    void writeEeprom(uint32_t address, const uint8_t *data, size_t size);
 
 private:
     struct Impl;

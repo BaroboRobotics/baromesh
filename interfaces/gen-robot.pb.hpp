@@ -35,6 +35,7 @@ RPCDEF_HPP(
         (getButtonState)
         (getFirmwareVersion)
         (move)
+        (resetEncoderRevs)
         (stop)
         (writeEeprom)
         ,

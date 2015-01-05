@@ -299,6 +299,14 @@ void Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
 }
 
 /* SETTERS */
+void Linkbot::resetEncoderRevs() {
+    try {
+        asyncFire(m->client, MethodIn::resetEncoderRevs{}, requestTimeout(), use_future).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
 
 void Linkbot::setBuzzerFrequencyOn (float freq) {
     try {
@@ -322,17 +330,6 @@ void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
             jointFlag <<= 1;
         }
         asyncFire(m->client, arg, requestTimeout(), use_future).get();
-    }
-    catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
-    }
-}
-
-void Linkbot::setLedColor (int r, int g, int b) {
-    try {
-        asyncFire(m->client, MethodIn::setLedColor{
-            uint32_t(r << 16 | g << 8 | b)
-        }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -380,6 +377,17 @@ void Linkbot::setJointStates(
             bool(mask&0x01), { goalType[0], coefficients[0], true, controllerType[0] },
             bool(mask&0x02), { goalType[1], coefficients[1], true, controllerType[1] },
             bool(mask&0x04), { goalType[2], coefficients[2], true, controllerType[2] }
+        }, requestTimeout(), use_future).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
+void Linkbot::setLedColor (int r, int g, int b) {
+    try {
+        asyncFire(m->client, MethodIn::setLedColor{
+            uint32_t(r << 16 | g << 8 | b)
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {

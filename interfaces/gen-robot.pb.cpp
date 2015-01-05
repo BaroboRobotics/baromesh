@@ -30,6 +30,7 @@ RPCDEF_CPP((barobo, Robot),
         (getButtonState)
         (getFirmwareVersion)
         (move)
+        (resetEncoderRevs)
         (stop)
         (writeEeprom)
         ,
