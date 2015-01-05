@@ -31,8 +31,6 @@ public:
     }
 
     // All member functions may throw a barobo::Error exception on failure.
-    void connect ();
-    void disconnect ();
 
     /* GETTERS */
     // Member functions take angles in degrees.
