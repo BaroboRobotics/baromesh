@@ -31,7 +31,7 @@ find_package(Threads)
 set(SOURCES
     src/main.cpp
     src/dongledevicepath.cpp
-    src/rundongle.cpp
+    src/rundaemon.cpp
     )
 
 add_executable(baromeshd ${SOURCES})

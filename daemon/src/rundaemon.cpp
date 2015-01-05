@@ -209,8 +209,8 @@ static void initializeLoggingCore () {
 }
 
 
-
-void runDongle () try {
+// The real main function.
+int runDaemon () try {
     initializeLoggingCore();
     boost::log::sources::logger log;
 
@@ -219,13 +219,7 @@ void runDongle () try {
         boost::in_place(std::ref(ios))
     };
 
-    std::thread ioThread {
-        [&] () {
-            boost::system::error_code ec;
-            auto nHandlers = ios.run(ec);
-            BOOST_LOG(log) << "Event loop executed " << nHandlers << " handlers -- " << ec.message();
-        }
-    };
+    auto nHandlersFuture = std::async(std::launch::async, [&] { return ios.run(); });
 
     Breaker breaker { ios, SIGINT, SIGTERM };
     while (runDongle(ios, breaker)) {
@@ -234,12 +228,13 @@ void runDongle () try {
     BOOST_LOG(log) << "runDongle stopped, shutting down";
 
     work = boost::none;
-    //ios.stop();
-    ioThread.join();
-    BOOST_LOG(log) << "IO thread joined, we're outta here";
+    auto nHandlers = nHandlersFuture.get();
+    BOOST_LOG(log) << "Event loop ran " << nHandlers << " handlers";
+
+    return 0;
 }
 catch (std::exception& e) {
     boost::log::sources::logger log;
     BOOST_LOG(log) << "baromeshd caught exception: " << e.what();
+    return 1;
 }
-
