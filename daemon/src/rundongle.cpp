@@ -2,6 +2,8 @@
 #include "daemonserver.hpp"
 #include "dongledevicepath.hpp"
 
+#include "util/logsafely.hpp"
+
 #include "rpc/message.hpp"
 #include "rpc/version.hpp"
 #include "rpc/asio/client.hpp"
@@ -177,13 +179,12 @@ static void initializeLoggingCore () {
     boost::log::add_common_attributes();
 
     auto core = boost::log::core::get();
-    //core->add_global_attribute("Timeline", attrs::timer());
+    core->add_global_attribute("Timeline", attrs::timer());
     core->add_global_attribute("Scope", attrs::named_scope());
 
     boost::log::formatter formatter =
         expr::stream
-            //<< "[T+" << expr::attr<attrs::timer::value_type>("Timeline") << "]"
-            << expr::attr<unsigned int>("LineID") << ": "
+            << "[T+" << expr::attr<attrs::timer::value_type, util::LogSafely>("Timeline") << "]"
             << "[thread=" << expr::attr<attrs::current_thread_id::value_type>("ThreadID") << "]"
             << expr::if_ (expr::has_attr<std::string>("SerialId")) [
                 expr::stream << "[robot=" << expr::attr<std::string>("SerialId") << "]"

@@ -55,7 +55,12 @@ if(WIN32)
     target_link_libraries(baromeshd
         PRIVATE setupapi ws2_32 mswsock
         )
+elseif(APPLE)
+    find_library(coreFoundationLib CoreFoundation)
+    find_library(ioKitLib IOKit)
+    target_link_libraries(baromeshd PRIVATE ${ioKitLib} ${coreFoundationLib})
 endif()
+
 
 if(WIN32)
     set(dest .)

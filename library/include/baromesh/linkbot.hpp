@@ -35,6 +35,9 @@ public:
     void disconnect ();
 
     /* GETTERS */
+    // Member functions take angles in degrees.
+    // All functions are non-blocking. Use moveWait() to wait for non-blocking
+    // movement functions.
     void getAccelerometer (int& timestamp, double&, double&, double&);
     void getFormFactor(FormFactor::Type & form);
     void getJointAngles (int& timestamp, double&, double&, double&);
