@@ -19,6 +19,15 @@ message resolveSerialId {
     }
 }
 
+// If the daemon has acquired the dongle, relinquish it. Attempt to (re)acquire
+// it after the specified time in seconds.
+message cycleDongle {
+    message In {
+        required uint32 seconds = 1;
+    }
+    message Result {}
+}
+
 // TODO: getDongleSerialId method
 
 message robotPluggedIn {

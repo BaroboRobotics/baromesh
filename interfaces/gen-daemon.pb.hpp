@@ -9,6 +9,7 @@ RPCDEF_HPP(
         (barobo, Daemon), (0, 1, 0),
         // all methods
         (resolveSerialId)
+        (cycleDongle)
         ,
         // all broadcasts
         (robotPluggedIn)
