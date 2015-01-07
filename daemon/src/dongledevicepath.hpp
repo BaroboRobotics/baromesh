@@ -7,6 +7,7 @@
 
 namespace baromesh {
 
+std::string dongleDevicePath ();
 std::string dongleDevicePath (boost::system::error_code& ec);
 
 } // namespace baromesh

@@ -1,11 +1,11 @@
-#include "rundongle.hpp"
+#include "rundaemon.hpp"
 
 #ifdef _WIN32
-#include "daemonservice/win32.cpp"
+#include "main/win32.cpp"
 #elif defined(__linux__)
-#include "daemonservice/linux.cpp"
+#include "main/linux.cpp"
 #elif defined(__APPLE__) && defined(__MACH__)
-#include "daemonservice/osx.cpp"
+#include "main/osx.cpp"
 #else
-#error No daemonservice.cpp available for this platform.
+#error No main() implemented for this platform.
 #endif

@@ -20,6 +20,15 @@ static int dongleDevicePathImpl(char *, size_t);
 
 namespace baromesh {
 
+std::string dongleDevicePath () {
+    boost::system::error_code ec;
+    auto path = dongleDevicePath(ec);
+    if (ec) {
+        throw boost::system::system_error(ec);
+    }
+    return path;
+}
+
 std::string dongleDevicePath (boost::system::error_code& ec) {
     // Get the dongle device path, i.e.: /dev/ttyACM0, \\.\COM3, etc.
     char path[64];
