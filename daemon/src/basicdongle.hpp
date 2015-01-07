@@ -383,8 +383,24 @@ public:
     {}
 
     ~BasicDongle () {
-        boost::system::error_code ec;
-        close(ec);
+        if (mImpl) {
+            boost::system::error_code ec;
+            close(ec);
+        }
+    }
+
+    friend void swap (BasicDongle& lhs, BasicDongle& rhs) noexcept {
+        using std::swap;
+        swap(lhs.mImpl, rhs.mImpl);
+    }
+
+    BasicDongle (BasicDongle&& other) noexcept {
+        swap(*this, other);
+    }
+
+    BasicDongle& operator= (BasicDongle&& other) noexcept {
+        swap(*this, other);
+        return *this;
     }
 
     void close () {
