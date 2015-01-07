@@ -31,7 +31,6 @@ find_package(Threads)
 set(SOURCES
     src/linkbot.cpp
     src/linkbot.c.cpp
-    src/iocore.cpp
     )
 
 add_library(baromesh ${SOURCES})

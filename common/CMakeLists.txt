@@ -20,6 +20,7 @@ set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.54.0 REQUIRED COMPONENTS system)
 
 set(SOURCES
+    src/iocore.cpp
     src/system_error.cpp
     )
 
