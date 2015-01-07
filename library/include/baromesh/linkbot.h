@@ -59,6 +59,7 @@ typedef struct Linkbot Linkbot;
 }
 
 baromesh::Linkbot* linkbotNew(const char* serialId);
+void linkbotDelete(baromesh::Linkbot* l);
 
 /* CONNECTION */
 int linkbotConnect(baromesh::Linkbot*);

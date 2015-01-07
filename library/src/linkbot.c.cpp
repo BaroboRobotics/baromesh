@@ -20,6 +20,11 @@ Linkbot* linkbotNew(const char* serialId)
     return new Linkbot(serialId);
 }
 
+void linkbotDelete(Linkbot* l)
+{
+    delete l;
+}
+
 #if 0
 /* CONNECTION */
 int linkbotConnect(Linkbot* l)
