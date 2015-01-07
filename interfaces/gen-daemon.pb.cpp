@@ -3,6 +3,7 @@
 
 RPCDEF_CPP((barobo, Daemon),
         (resolveSerialId)
+        (cycleDongle)
         ,
         (robotPluggedIn)
         )
