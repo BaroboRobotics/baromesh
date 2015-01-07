@@ -242,11 +242,19 @@ private:
                 auto& stream = dongle->client().messageQueue().stream();
                 using Option = boost::asio::serial_port_base;
                 stream.open(devicePath);
+#ifdef __MACH__
+                // Mac serial ports require some strategic timing ninjitsu in order to work
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+#endif
                 stream.set_option(Option::baud_rate(kDongleBaudRate));
                 stream.set_option(Option::character_size(8));
                 stream.set_option(Option::parity(Option::parity::none));
                 stream.set_option(Option::stop_bits(Option::stop_bits::one));
                 stream.set_option(Option::flow_control(Option::flow_control::none));
+#ifdef __MACH__
+                auto handle = stream.native_handle();
+                write(handle, nullptr, 0);
+#endif
                 dongle->client().messageQueue().asyncHandshake(mStrand.wrap(
                     std::bind(&DaemonServerImpl::handleCycleDongleStepTwo,
                         this->shared_from_this(), dongle, _1)));
