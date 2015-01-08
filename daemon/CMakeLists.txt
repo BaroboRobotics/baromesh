@@ -33,7 +33,6 @@ find_package(Threads)
 
 set(SOURCES
     src/main.cpp
-    src/dongledevicepath.cpp
     src/rundaemon.cpp
     )
 

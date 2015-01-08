@@ -4,7 +4,7 @@
 #include "gen-daemon.pb.hpp"
 
 #include "basicdongle.hpp"
-#include "dongledevicepath.hpp"
+#include "baromesh/dongledevicepath.hpp"
 
 #include "rpc/asio/client.hpp"
 #include "rpc/asio/forwardcoroutines.hpp"
