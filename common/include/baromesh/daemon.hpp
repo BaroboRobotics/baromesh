@@ -1,7 +1,7 @@
-#ifndef BAROMESH_BASIC_HPP
-#define BAROMESH_BASIC_HPP
+#ifndef BAROMESH_DAEMON_HPP
+#define BAROMESH_DAEMON_HPP
 
-#include "tcpclient.hpp"
+#include "baromesh/tcpclient.hpp"
 #include "gen-daemon.pb.hpp"
 
 #include "baromesh/system_error.hpp"

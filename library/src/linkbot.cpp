@@ -2,8 +2,7 @@
 #include "baromesh/error.hpp"
 #include "baromesh/iocore.hpp"
 
-#include "daemon.hpp"
-#include "tcpclient.hpp"
+#include "baromesh/daemon.hpp"
 
 #include "gen-robot.pb.hpp"
 
@@ -30,13 +29,7 @@ template <class T>
 T radToDeg (T x) { return T(double(x) * 180.0 / M_PI); }
 
 std::chrono::milliseconds requestTimeout () {
-    static const std::chrono::milliseconds kRequestTimeout { 1000 };
-    return kRequestTimeout;
-}
-
-std::chrono::milliseconds daemonConnectTimeout () {
-    static const std::chrono::milliseconds kDaemonConnectTimeout { 1000 };
-    return kDaemonConnectTimeout;
+    return std::chrono::milliseconds{1000};
 }
 
 std::string daemonHostName () {
@@ -115,6 +108,10 @@ struct Linkbot::Impl {
         onBroadcast(std::forward<B>(args));
     }
 
+    void onBroadcast (rpc::Broadcast<barobo::Daemon>::dongleAvailable) {
+        BOOST_LOG(log) << "Dongle available";
+    }
+
     void onBroadcast (Broadcast::buttonEvent b) {
         if (buttonEventCallback) {
             buttonEventCallback(static_cast<Button::Type>(b.button),
@@ -144,10 +141,6 @@ struct Linkbot::Impl {
 
     void onBroadcast (Broadcast::debugMessageEvent e) {
         BOOST_LOG(log) << "Debug message from robot: " << e.bytestring;
-    }
-
-    void onBroadcast (rpc::Broadcast<barobo::Daemon>::dongleAvailable) {
-        BOOST_LOG(log) << "Dongle available";
     }
 
     mutable boost::log::sources::logger log;
