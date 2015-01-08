@@ -39,9 +39,40 @@ using Dongle = baromesh::BasicDongle<SerialClient>;
 using ZigbeeClient = rpc::asio::Client<Dongle::MessageQueue>;
 
 static const int kDongleBaudRate = 230400;
+
+// One of the daemon's responsibilities is to acquire and communicate with the
+// dongle. Dongle acquisition involves the following steps:
+//
+//   - Query the operating system for the dongle's serial device (e.g., COM3).
+//   - Open the dongle's serial device.
+//   - Sleep for kDongleSettleTimeAfterOpen duration.
+//   - Set dongle serial device options (baud rate, parity, etc.).
+//   - Conduct an SFP handshake.
+//   - Conduct an RPC connection request, allowing the dongle
+//     kDongleConnectTimeout duration to reply.
+//
+// If at any point during the acquisition process the daemon encounters an
+// error, the process is restarted after kDongleDevicePathPollTimeout duration.
+//
+// If a read or write error is encountered after the dongle has been acquired,
+// the daemon will attempt to reacquire the dongle after
+// kDongleDowntimeAfterError duration.
+
+// The amount of time to wait between unsuccessful attempts to acquire the
+// dongle.
 static const std::chrono::milliseconds kDongleDevicePathPollTimeout { 500 };
+
+// The amount of time we give the dongle to respond to our RPC connect request.
 static const std::chrono::milliseconds kDongleConnectTimeout { 1000 };
-static const std::chrono::milliseconds kDongleResetTimeout { 500 };
+
+// How long we wait after an I/O error occurs on the dongle before trying to
+// reacquire the dongle.
+static const std::chrono::milliseconds kDongleDowntimeAfterError { 500 };
+
+// How long we pause after opening the dongle's device path before setting the
+// serial line options. Mac serial ports require some strategic timing
+// ninjitsu in order to work, adjust this value as necessary.
+static const std::chrono::milliseconds kDongleSettleTimeAfterOpen { 500 };
 
 class DaemonServerImpl : public std::enable_shared_from_this<DaemonServerImpl> {
     using Tcp = boost::asio::ip::tcp;
@@ -58,9 +89,9 @@ class DaemonServerImpl : public std::enable_shared_from_this<DaemonServerImpl> {
     };
 
 public:
-    using Interface = barobo::Daemon;
-    using MethodIn = rpc::MethodIn<Interface>;
-    using MethodResult = rpc::MethodResult<Interface>;
+    using MethodIn = rpc::MethodIn<barobo::Daemon>;
+    using MethodResult = rpc::MethodResult<barobo::Daemon>;
+    using Broadcast = rpc::Broadcast<barobo::Daemon>;
 
     DaemonServerImpl (boost::asio::io_service& ios, boost::log::sources::logger log)
         : mIos(ios)
@@ -120,7 +151,7 @@ public:
     void run () {
         try {
             while (true) {
-                asyncRunServer(mServer, *this, use_future).get();
+                rpc::asio::asyncRunServer<barobo::Daemon>(mServer, *this, use_future).get();
             }
         }
         catch (std::exception& e) {
@@ -236,26 +267,15 @@ private:
                 // handshake.
                 auto devicePath = dongleDevicePath();
                 BOOST_LOG(mLog) << "Dongle detected at " << devicePath;
+
                 boost::log::sources::logger dongleClLog;
                 dongleClLog.add_attribute("Title", boost::log::attributes::constant<std::string>("DONGLE-CL"));
+
                 auto dongle = std::make_shared<Dongle>(mIos, dongleClLog);
-                auto& stream = dongle->client().messageQueue().stream();
-                using Option = boost::asio::serial_port_base;
-                stream.open(devicePath);
-#ifdef __MACH__
-                // Mac serial ports require some strategic timing ninjitsu in order to work
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-#endif
-                stream.set_option(Option::baud_rate(kDongleBaudRate));
-                stream.set_option(Option::character_size(8));
-                stream.set_option(Option::parity(Option::parity::none));
-                stream.set_option(Option::stop_bits(Option::stop_bits::one));
-                stream.set_option(Option::flow_control(Option::flow_control::none));
-#ifdef __MACH__
-                auto handle = stream.native_handle();
-                write(handle, nullptr, 0);
-#endif
-                dongle->client().messageQueue().asyncHandshake(mStrand.wrap(
+                dongle->client().messageQueue().stream().open(devicePath);
+
+                mDongleTimer.expires_from_now(kDongleSettleTimeAfterOpen);
+                mDongleTimer.async_wait(mStrand.wrap(
                     std::bind(&DaemonServerImpl::handleCycleDongleStepTwo,
                         this->shared_from_this(), dongle, _1)));
             }
@@ -267,27 +287,58 @@ private:
 
     void handleCycleDongleStepTwo (std::shared_ptr<Dongle> dongle, boost::system::error_code ec) {
         if (!ec) {
-            asyncConnect(dongle->client(), kDongleConnectTimeout, mStrand.wrap(
-                std::bind(&DaemonServerImpl::handleCycleDongleStepThree,
-                    this->shared_from_this(), dongle, _1, _2)));
+            try {
+                using Option = boost::asio::serial_port_base;
+                auto& stream = dongle->client().messageQueue().stream();
+
+                stream.set_option(Option::baud_rate(kDongleBaudRate));
+                stream.set_option(Option::character_size(8));
+                stream.set_option(Option::parity(Option::parity::none));
+                stream.set_option(Option::stop_bits(Option::stop_bits::one));
+                stream.set_option(Option::flow_control(Option::flow_control::none));
+
+#ifdef __MACH__
+                auto handle = stream.native_handle();
+                ::write(handle, nullptr, 0);
+#endif
+
+                dongle->client().messageQueue().asyncHandshake(mStrand.wrap(
+                    std::bind(&DaemonServerImpl::handleCycleDongleStepThree,
+                        this->shared_from_this(), dongle, _1)));
+            }
+            catch (std::exception& e) {
+                cycleDongleImpl(kDongleDevicePathPollTimeout);
+            }
+        }
+    }
+
+    void handleCycleDongleStepThree (std::shared_ptr<Dongle> dongle, boost::system::error_code ec) {
+        if (!ec) {
+            rpc::asio::asyncConnect<barobo::Dongle>(dongle->client(), kDongleConnectTimeout, mStrand.wrap(
+                std::bind(&DaemonServerImpl::handleCycleDongleStepFour,
+                    this->shared_from_this(), dongle, _1)));
         }
         else if (boost::asio::error::operation_aborted != ec) {
             cycleDongleImpl(kDongleDevicePathPollTimeout);
         }
     }
 
-    void handleCycleDongleStepThree (std::shared_ptr<Dongle> dongle,
-                                     boost::system::error_code ec,
-                                     rpc::ServiceInfo info) {
+    void handleCycleDongleStepFour (std::shared_ptr<Dongle> dongle,
+                                     boost::system::error_code ec) {
         if (!ec) {
-            BOOST_LOG(mLog) << "Dongle has RPC version " << info.rpcVersion()
-                           << ", interface version " << info.interfaceVersion();
-#warning check for version mismatch
-
             mDongle.reset(new Dongle{std::move(*dongle)});
             setDongleIoTraps();
+            asyncBroadcast(mServer, Broadcast::dongleAvailable{},
+                [] (boost::system::error_code ec) {
+                    if (ec && boost::asio::error::operation_aborted != ec) {
+                        boost::log::sources::logger log;
+                        BOOST_LOG(log) << "dongleAvailable broadcast completed"
+                                       << " with " << ec.message();
+                    }
+                });
         }
         else if (boost::asio::error::operation_aborted != ec) {
+            // TODO propagate VERSION_MISMATCH via dongleAvailable broadcast?
             cycleDongleImpl(kDongleDevicePathPollTimeout);
         }
     }
@@ -310,7 +361,7 @@ private:
             if (boost::asio::error::operation_aborted != ec) {
                 assert(mDongle);
                 mDongle->close(ec);
-                cycleDongleImpl(kDongleResetTimeout);
+                cycleDongleImpl(kDongleDowntimeAfterError);
             }
         };
 
@@ -353,8 +404,6 @@ private:
 
 class DaemonServer {
 public:
-    using Interface = DaemonServerImpl::Interface;
-    
     template <class... Args>
     DaemonServer (Args&&... args)
         : mImpl(std::make_shared<DaemonServerImpl>(std::forward<Args>(args)...))

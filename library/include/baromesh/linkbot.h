@@ -61,10 +61,6 @@ typedef struct Linkbot Linkbot;
 baromesh::Linkbot* linkbotNew(const char* serialId);
 void linkbotDelete(baromesh::Linkbot* l);
 
-/* CONNECTION */
-int linkbotConnect(baromesh::Linkbot*);
-int linkbotDisconnect(baromesh::Linkbot*);
-
 /* MISC */
 int linkbotWriteEeprom(baromesh::Linkbot *l, unsigned int address, const char *data, unsigned int size);
 

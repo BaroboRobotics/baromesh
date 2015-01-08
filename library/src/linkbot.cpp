@@ -2,14 +2,11 @@
 #include "baromesh/error.hpp"
 #include "baromesh/iocore.hpp"
 
+#include "daemon.hpp"
+#include "tcpclient.hpp"
+
 #include "gen-robot.pb.hpp"
 
-#include "basicdaemon.hpp"
-
-#include "rpc/asio/client.hpp"
-#include "sfp/asio/messagequeue.hpp"
-
-#include <boost/asio/connect.hpp>
 #include <boost/asio/use_future.hpp>
 
 #include <boost/log/sources/logger.hpp>
@@ -32,14 +29,22 @@ T degToRad (T x) { return T(double(x) * M_PI / 180.0); }
 template <class T>
 T radToDeg (T x) { return T(double(x) * 180.0 / M_PI); }
 
-std::chrono::milliseconds requestTimeout() {
+std::chrono::milliseconds requestTimeout () {
     static const std::chrono::milliseconds kRequestTimeout { 1000 };
     return kRequestTimeout;
 }
 
-std::chrono::milliseconds daemonConnectTimeout() {
+std::chrono::milliseconds daemonConnectTimeout () {
     static const std::chrono::milliseconds kDaemonConnectTimeout { 1000 };
     return kDaemonConnectTimeout;
+}
+
+std::string daemonHostName () {
+    return "127.0.0.1";
+}
+
+std::string daemonServiceName () {
+    return "42000";
 }
 
 } // file namespace
@@ -51,74 +56,59 @@ using Broadcast = rpc::Broadcast<barobo::Robot>;
 using boost::asio::use_future;
 
 struct Linkbot::Impl {
-    using Interface = barobo::Robot;
     Impl (const std::string& id)
         : serialId(id)
         , ioCore(baromesh::IoCore::get(false))
+        , resolver(ioCore->ios())
         , daemon(ioCore->ios(), log)
-        , client(ioCore->ios(), log)
+        , robot(ioCore->ios(), log)
     {
-        using Tcp = boost::asio::ip::tcp;
-        Tcp::resolver resolver {ioCore->ios()};
-        auto daemonEndpointIter = resolver.resolve(Tcp::resolver::query("127.0.0.1", "42000"));
+        auto daemonQuery = decltype(resolver)::query{daemonHostName(), daemonServiceName()};
+        BOOST_LOG(log) << "Connecting to the daemon at "
+                       << daemonQuery.host_name() << ":" << daemonQuery.service_name();
+        auto daemonIter = resolver.resolve(daemonQuery);
+        baromesh::asyncInitTcpClient(daemon, daemonIter, use_future).get();
+        rpc::asio::asyncConnect<barobo::Daemon>(daemon, requestTimeout(), use_future).get();
+        daemonRunDone = rpc::asio::asyncRunClient<barobo::Daemon>(daemon, *this, use_future);
 
-        boost::asio::connect(daemon.client().messageQueue().stream(), daemonEndpointIter);
-        daemon.client().messageQueue().asyncHandshake(use_future).get();
-        auto info = asyncConnect(daemon.client(), daemonConnectTimeout(), use_future).get();
-#warning check for version mismatch
-        BOOST_LOG(log) << "Daemon has RPC version " << info.rpcVersion()
-                       << ", interface version " << info.interfaceVersion();
-
-        auto robotEndpointIter = daemon.asyncResolveSerialId(serialId, use_future).get();
-
-        BOOST_LOG(log) << "connecting to " << serialId
-                          << " at " << robotEndpointIter->endpoint();
-
-        boost::asio::connect(client.messageQueue().stream(), robotEndpointIter);
-        client.messageQueue().asyncHandshake(use_future).get();
-
-        clientFinishedFuture = asyncRunClient(client, *this, use_future);
-
-        auto serviceInfo = asyncConnect(client, requestTimeout(), use_future).get();
-
-        // Check version before we check if the connection succeeded--the user will
-        // probably want to know to flash the robot, regardless.
-        if (serviceInfo.rpcVersion() != rpc::Version<>::triplet()) {
-            throw Error(std::string("RPC version ") +
-                to_string(serviceInfo.rpcVersion()) + " != local RPC version " +
-                to_string(rpc::Version<>::triplet()));
-        }
-        else if (serviceInfo.interfaceVersion() != rpc::Version<barobo::Robot>::triplet()) {
-            throw Error(std::string("Robot interface version ") +
-                to_string(serviceInfo.interfaceVersion()) + " != local Robot interface version " +
-                to_string(rpc::Version<barobo::Robot>::triplet()));
-        }
+        // FIXME rename asyncResolveSerialId since it returns a resolver query,
+        // not an endpoint iterator.
+        auto robotHostServicePair = baromesh::asyncResolveSerialId(daemon,
+            serialId, requestTimeout(), use_future).get();
+        BOOST_LOG(log) << "Connecting to " << serialId << " proxy at "
+                       << robotHostServicePair.first << ":"
+                       << robotHostServicePair.second;
+        auto robotIter = resolver.resolve(decltype(resolver)::query{
+            robotHostServicePair.first, robotHostServicePair.second});
+        baromesh::asyncInitTcpClient(robot, robotIter, use_future).get();
+        rpc::asio::asyncConnect<barobo::Robot>(robot, requestTimeout(), use_future).get();
+        robotRunDone = rpc::asio::asyncRunClient<barobo::Robot>(robot, *this, use_future);
     }
 
     ~Impl () {
-        try {
-            asyncDisconnect(client, requestTimeout(), use_future).get();
-            daemon.client().close();
-            BOOST_LOG(log) << "waiting for asyncRunClient to finish";
-            client.close();
-            clientFinishedFuture.get();
-            BOOST_LOG(log) << "asyncRunClient finished";
+        if (robotRunDone.valid()) {
+            try {
+                BOOST_LOG(log) << "Disconnecting robot client";
+                asyncDisconnect(robot, requestTimeout(), use_future).get();
+                robot.close();
+                robotRunDone.get();
+            }
+            catch (std::exception& e) {
+                BOOST_LOG(log) << "Exception during disconnect: " << e.what();
+            }
         }
-        catch (std::exception& e) {
-            BOOST_LOG(log) << "Linkbot destructor swallowed exception: " << e.what();
+        if (daemonRunDone.valid()) {
+            try {
+                BOOST_LOG(log) << "Disconnecting daemon client";
+                asyncDisconnect(daemon, requestTimeout(), use_future).get();
+                daemon.close();
+                daemonRunDone.get();
+            }
+            catch (std::exception& e) {
+                BOOST_LOG(log) << "Exception during disconnect: " << e.what();
+            }
         }
     }
-
-    mutable boost::log::sources::logger log;
-
-    std::string serialId;
-
-    std::shared_ptr<baromesh::IoCore> ioCore;
-    using TcpClient = rpc::asio::Client<sfp::asio::MessageQueue<boost::asio::ip::tcp::socket>>;
-    baromesh::BasicDaemon<TcpClient> daemon;
-    TcpClient client;
-
-    std::future<void> clientFinishedFuture;
 
     template <class B>
     void broadcast (B&& args) {
@@ -153,8 +143,25 @@ struct Linkbot::Impl {
     }
 
     void onBroadcast (Broadcast::debugMessageEvent e) {
-        std::cout << "Debug message from robot: " << e.bytestring << std::endl;
+        BOOST_LOG(log) << "Debug message from robot: " << e.bytestring;
     }
+
+    void onBroadcast (rpc::Broadcast<barobo::Daemon>::dongleAvailable) {
+        BOOST_LOG(log) << "Dongle available";
+    }
+
+    mutable boost::log::sources::logger log;
+
+    std::string serialId;
+
+    std::shared_ptr<baromesh::IoCore> ioCore;
+    boost::asio::ip::tcp::resolver resolver;
+
+    baromesh::TcpClient daemon;
+    baromesh::TcpClient robot;
+
+    std::future<void> robotRunDone;
+    std::future<void> daemonRunDone;
 
     std::function<void(Button::Type, ButtonState::Type, int)> buttonEventCallback;
     std::function<void(int,double, int)> encoderEventCallback;
@@ -184,7 +191,7 @@ using namespace std::placeholders; // _1, _2, etc.
 void Linkbot::getAccelerometer (int& timestamp, double&x, double&y, double&z)
 {
     try {
-        auto value = asyncFire(m->client, MethodIn::getAccelerometerData{}, requestTimeout(), use_future).get();
+        auto value = asyncFire(m->robot, MethodIn::getAccelerometerData{}, requestTimeout(), use_future).get();
         x = value.x;
         y = value.y;
         z = value.z;
@@ -197,7 +204,7 @@ void Linkbot::getAccelerometer (int& timestamp, double&x, double&y, double&z)
 void Linkbot::getFormFactor(FormFactor::Type& form)
 {
     try {
-        auto value = asyncFire(m->client, MethodIn::getFormFactor{}, requestTimeout(), use_future).get();
+        auto value = asyncFire(m->robot, MethodIn::getFormFactor{}, requestTimeout(), use_future).get();
         form = FormFactor::Type(value.value);
     } 
     catch (std::exception& e) {
@@ -207,7 +214,7 @@ void Linkbot::getFormFactor(FormFactor::Type& form)
 
 void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2) {
     try {
-        auto values = asyncFire(m->client, MethodIn::getEncoderValues{}, requestTimeout(), use_future).get();
+        auto values = asyncFire(m->robot, MethodIn::getEncoderValues{}, requestTimeout(), use_future).get();
         assert(values.values_count >= 3);
         a0 = radToDeg(values.values[0]);
         a1 = radToDeg(values.values[1]);
@@ -222,7 +229,7 @@ void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2
 void Linkbot::getJointSpeeds(double&s1, double&s2, double&s3)
 {
     try {
-        auto values = asyncFire(m->client, MethodIn::getMotorControllerOmega{}, requestTimeout(), use_future).get();
+        auto values = asyncFire(m->robot, MethodIn::getMotorControllerOmega{}, requestTimeout(), use_future).get();
         assert(values.values_count >= 3);
         s1 = radToDeg(values.values[0]);
         s2 = radToDeg(values.values[1]);
@@ -239,7 +246,7 @@ void Linkbot::getJointStates(int& timestamp,
                              JointState::Type& s3)
 {
     try {
-        auto values = asyncFire(m->client, MethodIn::getJointStates{}, requestTimeout(), use_future).get();
+        auto values = asyncFire(m->robot, MethodIn::getJointStates{}, requestTimeout(), use_future).get();
         assert(values.values_count >= 3);
         s1 = static_cast<JointState::Type>(values.values[0]);
         s2 = static_cast<JointState::Type>(values.values[1]);
@@ -252,7 +259,7 @@ void Linkbot::getJointStates(int& timestamp,
 
 void Linkbot::getLedColor (int& r, int& g, int& b) {
     try {
-        auto color = asyncFire(m->client, MethodIn::getLedColor{}, requestTimeout(), use_future).get();
+        auto color = asyncFire(m->robot, MethodIn::getLedColor{}, requestTimeout(), use_future).get();
         r = 0xff & color.value >> 16;
         g = 0xff & color.value >> 8;
         b = 0xff & color.value;
@@ -264,7 +271,7 @@ void Linkbot::getLedColor (int& r, int& g, int& b) {
 
 void Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
     try {
-        auto version = asyncFire(m->client, MethodIn::getFirmwareVersion{}, requestTimeout(), use_future).get();
+        auto version = asyncFire(m->robot, MethodIn::getFirmwareVersion{}, requestTimeout(), use_future).get();
         major = version.major;
         minor = version.minor;
         patch = version.patch;
@@ -279,7 +286,7 @@ void Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
 /* SETTERS */
 void Linkbot::resetEncoderRevs() {
     try {
-        asyncFire(m->client, MethodIn::resetEncoderRevs{}, requestTimeout(), use_future).get();
+        asyncFire(m->robot, MethodIn::resetEncoderRevs{}, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -288,7 +295,7 @@ void Linkbot::resetEncoderRevs() {
 
 void Linkbot::setBuzzerFrequencyOn (double freq) {
     try {
-        asyncFire(m->client, MethodIn::setBuzzerFrequency{float(freq)}, requestTimeout(), use_future).get();
+        asyncFire(m->robot, MethodIn::setBuzzerFrequency{float(freq)}, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -297,7 +304,7 @@ void Linkbot::setBuzzerFrequencyOn (double freq) {
 
 void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
     try {
-        barobo_Robot_setMotorControllerOmega_In arg;
+        MethodIn::setMotorControllerOmega arg;
         arg.mask = mask;
         arg.values_count = 0;
         int jointFlag = 0x01;
@@ -307,7 +314,7 @@ void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
             }
             jointFlag <<= 1;
         }
-        asyncFire(m->client, arg, requestTimeout(), use_future).get();
+        asyncFire(m->robot, arg, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -351,7 +358,7 @@ void Linkbot::setJointStates(
         }
     }
     try {
-        asyncFire(m->client, MethodIn::move {
+        asyncFire(m->robot, MethodIn::move {
             bool(mask&0x01), { goalType[0], coefficients[0], true, controllerType[0] },
             bool(mask&0x02), { goalType[1], coefficients[1], true, controllerType[1] },
             bool(mask&0x04), { goalType[2], coefficients[2], true, controllerType[2] }
@@ -364,7 +371,7 @@ void Linkbot::setJointStates(
 
 void Linkbot::setLedColor (int r, int g, int b) {
     try {
-        asyncFire(m->client, MethodIn::setLedColor{
+        asyncFire(m->robot, MethodIn::setLedColor{
             uint32_t(r << 16 | g << 8 | b)
         }, requestTimeout(), use_future).get();
     }
@@ -378,7 +385,7 @@ void Linkbot::setLedColor (int r, int g, int b) {
 void Linkbot::drive (int mask, double a0, double a1, double a2)
 {
     try {
-        asyncFire(m->client, MethodIn::move {
+        asyncFire(m->robot, MethodIn::move {
             bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE, 
                                float(degToRad(a0)),
                                true, 
@@ -404,7 +411,7 @@ void Linkbot::drive (int mask, double a0, double a1, double a2)
 void Linkbot::driveTo (int mask, double a0, double a1, double a2)
 {
     try {
-        asyncFire(m->client, MethodIn::move {
+        asyncFire(m->robot, MethodIn::move {
             bool(mask&0x01), { barobo_Robot_Goal_Type_ABSOLUTE, 
                                float(degToRad(a0)),
                                true, 
@@ -429,7 +436,7 @@ void Linkbot::driveTo (int mask, double a0, double a1, double a2)
 
 void Linkbot::move (int mask, double a0, double a1, double a2) {
     try {
-        asyncFire(m->client, MethodIn::move {
+        asyncFire(m->robot, MethodIn::move {
             bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE, 
                                float(degToRad(a0)),
                                false},
@@ -448,7 +455,7 @@ void Linkbot::move (int mask, double a0, double a1, double a2) {
 
 void Linkbot::moveContinuous (int mask, double c0, double c1, double c2) {
     try {
-        asyncFire(m->client, MethodIn::move {
+        asyncFire(m->robot, MethodIn::move {
             bool(mask&0x01), { barobo_Robot_Goal_Type_INFINITE, float(c0), false },
             bool(mask&0x02), { barobo_Robot_Goal_Type_INFINITE, float(c1), false },
             bool(mask&0x04), { barobo_Robot_Goal_Type_INFINITE, float(c2), false }
@@ -461,7 +468,7 @@ void Linkbot::moveContinuous (int mask, double c0, double c1, double c2) {
 
 void Linkbot::moveTo (int mask, double a0, double a1, double a2) {
     try {
-        asyncFire(m->client, MethodIn::move {
+        asyncFire(m->robot, MethodIn::move {
             bool(mask&0x01), { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a0)) },
             bool(mask&0x02), { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a1)) },
             bool(mask&0x04), { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a2)) }
@@ -475,7 +482,7 @@ void Linkbot::moveTo (int mask, double a0, double a1, double a2) {
 void Linkbot::motorPower(int mask, int m1, int m2, int m3)
 {
     try {
-        asyncFire(m->client, MethodIn::move {
+        asyncFire(m->robot, MethodIn::move {
             bool(mask&0x01), { barobo_Robot_Goal_Type_INFINITE, 
                                float(m1),
                                true, 
@@ -500,7 +507,7 @@ void Linkbot::motorPower(int mask, int m1, int m2, int m3)
 
 void Linkbot::stop (int mask) {
     try {
-        asyncFire(m->client, MethodIn::stop{true, static_cast<uint32_t>(mask)}, requestTimeout(), use_future).get();
+        asyncFire(m->robot, MethodIn::stop{true, static_cast<uint32_t>(mask)}, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -514,7 +521,7 @@ void Linkbot::setAccelerometerEventCallback (AccelerometerEventCallback cb, void
     auto granularity = float(enable ? 0.05 : 0);
 
     try {
-        asyncFire(m->client, MethodIn::enableAccelerometerEvent {
+        asyncFire(m->robot, MethodIn::enableAccelerometerEvent {
             enable, granularity
         }, requestTimeout(), use_future).get();
     }
@@ -534,7 +541,7 @@ void Linkbot::setButtonEventCallback (ButtonEventCallback cb, void* userData) {
     const bool enable = !!cb;
 
     try {
-        asyncFire(m->client, MethodIn::enableButtonEvent{enable}, requestTimeout(), use_future).get();
+        asyncFire(m->robot, MethodIn::enableButtonEvent{enable}, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -555,7 +562,7 @@ void Linkbot::setEncoderEventCallback (EncoderEventCallback cb,
     granularity = degToRad(granularity);
 
     try {
-        asyncFire(m->client, MethodIn::enableEncoderEvent {
+        asyncFire(m->robot, MethodIn::enableEncoderEvent {
             true, { enable, float(granularity) },
             true, { enable, float(granularity) },
             true, { enable, float(granularity) }
@@ -576,7 +583,7 @@ void Linkbot::setEncoderEventCallback (EncoderEventCallback cb,
 void Linkbot::setJointEventCallback (JointEventCallback cb, void* userData) {
     const bool enable = !!cb;
     try {
-        asyncFire(m->client, MethodIn::enableJointEvent {
+        asyncFire(m->robot, MethodIn::enableJointEvent {
             enable
         }, requestTimeout(), use_future).get();
     }
@@ -602,7 +609,7 @@ void Linkbot::writeEeprom(uint32_t address, const uint8_t *data, size_t size)
         arg.address = address;
         memcpy(arg.data.bytes, data, size);
         arg.data.size = size;
-        asyncFire(m->client, arg, requestTimeout(), use_future).get();
+        asyncFire(m->robot, arg, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
