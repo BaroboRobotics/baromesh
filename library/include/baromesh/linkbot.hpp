@@ -49,7 +49,7 @@ public:
 
     /* SETTERS */
     void resetEncoderRevs();
-    void setBuzzerFrequencyOn (float);
+    void setBuzzerFrequencyOn (double);
     void setJointSpeeds (int mask, double, double, double);
     void setJointStates(
         int mask,

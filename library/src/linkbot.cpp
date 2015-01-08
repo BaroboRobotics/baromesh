@@ -286,9 +286,9 @@ void Linkbot::resetEncoderRevs() {
     }
 }
 
-void Linkbot::setBuzzerFrequencyOn (float freq) {
+void Linkbot::setBuzzerFrequencyOn (double freq) {
     try {
-        asyncFire(m->client, MethodIn::setBuzzerFrequency{freq}, requestTimeout(), use_future).get();
+        asyncFire(m->client, MethodIn::setBuzzerFrequency{float(freq)}, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
