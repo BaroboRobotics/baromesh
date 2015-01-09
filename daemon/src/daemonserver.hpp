@@ -253,7 +253,10 @@ private:
 
     template <class Duration>
     void cycleDongleImpl (Duration&& timeout) {
-        mDongle.reset();
+        if (mDongle) {
+            mDongle->close();
+            mDongle.reset();
+        }
         mDongleTimer.cancel();
         mDongleTimer.expires_from_now(std::forward<Duration>(timeout));
         mDongleTimer.async_wait(mStrand.wrap(
@@ -328,17 +331,17 @@ private:
         if (!ec) {
             mDongle.reset(new Dongle{std::move(*dongle)});
             setDongleIoTraps();
-            asyncBroadcast(mServer, Broadcast::dongleAvailable{},
+            asyncBroadcast(mServer, Broadcast::dongleDetected{},
                 [] (boost::system::error_code ec) {
                     if (ec && boost::asio::error::operation_aborted != ec) {
                         boost::log::sources::logger log;
-                        BOOST_LOG(log) << "dongleAvailable broadcast completed"
+                        BOOST_LOG(log) << "dongleDetected broadcast completed"
                                        << " with " << ec.message();
                     }
                 });
         }
         else if (boost::asio::error::operation_aborted != ec) {
-            // TODO propagate VERSION_MISMATCH via dongleAvailable broadcast?
+            // TODO propagate VERSION_MISMATCH via dongleDetected broadcast?
             cycleDongleImpl(kDongleDevicePathPollTimeout);
         }
     }
@@ -360,7 +363,6 @@ private:
         auto resetDongle = [self, this] (boost::system::error_code ec) {
             if (boost::asio::error::operation_aborted != ec) {
                 assert(mDongle);
-                mDongle->close(ec);
                 cycleDongleImpl(kDongleDowntimeAfterError);
             }
         };

@@ -12,7 +12,7 @@ RPCDEF_HPP(
         (cycleDongle)
         ,
         // all broadcasts
-        (dongleAvailable)
+        (dongleDetected)
         )
 
 #endif

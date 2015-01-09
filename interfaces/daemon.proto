@@ -32,7 +32,7 @@ message cycleDongle {
 
 // Broadcasts
 
-message dongleAvailable {
+message dongleDetected {
     // TODO probably want a form factor here. For that matter, maybe this
     // should be a more generic devicePluggedIn broadcast.
 }

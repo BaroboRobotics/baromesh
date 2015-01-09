@@ -19,6 +19,18 @@
 
 namespace baromesh {
 
+namespace {
+
+std::string daemonHostName () {
+    return "127.0.0.1";
+}
+
+std::string daemonServiceName () {
+    return "42000";
+}
+
+}
+
 using ResolveSerialIdHandlerSignature = void(boost::system::error_code, std::pair<std::string, std::string>);
 using ResolveSerialIdHandler = std::function<ResolveSerialIdHandlerSignature>;
 

@@ -32,14 +32,6 @@ std::chrono::milliseconds requestTimeout () {
     return std::chrono::milliseconds{1000};
 }
 
-std::string daemonHostName () {
-    return "127.0.0.1";
-}
-
-std::string daemonServiceName () {
-    return "42000";
-}
-
 } // file namespace
 
 using MethodIn = rpc::MethodIn<barobo::Robot>;
@@ -56,7 +48,9 @@ struct Linkbot::Impl {
         , daemon(ioCore->ios(), log)
         , robot(ioCore->ios(), log)
     {
-        auto daemonQuery = decltype(resolver)::query{daemonHostName(), daemonServiceName()};
+        auto daemonQuery = decltype(resolver)::query {
+            baromesh::daemonHostName(), baromesh::daemonServiceName()
+        };
         BOOST_LOG(log) << "Connecting to the daemon at "
                        << daemonQuery.host_name() << ":" << daemonQuery.service_name();
         auto daemonIter = resolver.resolve(daemonQuery);
@@ -108,7 +102,7 @@ struct Linkbot::Impl {
         onBroadcast(std::forward<B>(args));
     }
 
-    void onBroadcast (rpc::Broadcast<barobo::Daemon>::dongleAvailable) {
+    void onBroadcast (rpc::Broadcast<barobo::Daemon>::dongleDetected) {
         BOOST_LOG(log) << "Dongle available";
     }
 
