@@ -21,8 +21,6 @@ void testMovement (std::string serialId) {
         using std::chrono::milliseconds;
         const auto jointMask = 0x04 | 0x01;
 
-        linkbot.connect();
-
         std::cout << "moving forward quickly for a second\n";
         linkbot.setJointSpeeds(jointMask, 200, 0, 200);
         linkbot.moveContinuous(jointMask, 1, 0, -1);

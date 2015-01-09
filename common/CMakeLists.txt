@@ -38,6 +38,11 @@ target_link_libraries(baromesh-common
     PUBLIC ${Boost_LIBRARIES}
     )
 
+if(WIN32)
+    target_link_libraries(baromesh-common
+        PRIVATE setupapi 
+        )
+endif()
 set_target_properties(baromesh-common PROPERTIES
     VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
     SOVERSION ${VERSION_MAJOR}
