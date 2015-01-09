@@ -1,0 +1,6 @@
+import "nanopb.proto";
+package barobo.commontypes;
+
+message SerialId {
+    required string value = 1 [(nanopb).max_size = 5];
+}

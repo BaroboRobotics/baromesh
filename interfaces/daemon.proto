@@ -1,0 +1,38 @@
+import "nanopb.proto";
+//import "rpc-options.proto";
+import "commontypes.proto";
+package barobo.Daemon;
+
+message TcpEndpoint {
+    required string address = 1 [(nanopb).max_size = 64];
+    required uint32 port = 2;    
+}
+
+// Methods
+
+message resolveSerialId {
+    message In {
+        required barobo.commontypes.SerialId serialId = 1;
+    }
+    message Result {
+        optional TcpEndpoint endpoint = 1;
+    }
+}
+
+// If the daemon has acquired the dongle, relinquish it. Attempt to (re)acquire
+// it after the specified time in seconds.
+message cycleDongle {
+    message In {
+        required uint32 seconds = 1;
+    }
+    message Result {}
+}
+
+// TODO: getDongleSerialId method
+
+// Broadcasts
+
+message dongleDetected {
+    // TODO probably want a form factor here. For that matter, maybe this
+    // should be a more generic devicePluggedIn broadcast.
+}
