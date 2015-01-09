@@ -15,18 +15,9 @@
 #include <memory>
 #include <string>
 
-#undef M_PI
-#define M_PI 3.14159265358979323846
-
 namespace barobo {
 
 namespace {
-
-template <class T>
-T degToRad (T x) { return T(double(x) * M_PI / 180.0); }
-
-template <class T>
-T radToDeg (T x) { return T(double(x) * 180.0 / M_PI); }
 
 std::chrono::milliseconds requestTimeout () {
     return std::chrono::milliseconds{1000};
@@ -116,7 +107,7 @@ struct Linkbot::Impl {
 
     void onBroadcast (Broadcast::encoderEvent b) {
         if (encoderEventCallback) {
-            encoderEventCallback(b.encoder, radToDeg(b.value), b.timestamp);
+            encoderEventCallback(b.encoder, baromesh::radToDeg(b.value), b.timestamp);
         }
     }
 
@@ -203,9 +194,9 @@ void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2
     try {
         auto values = asyncFire(m->robot, MethodIn::getEncoderValues{}, requestTimeout(), use_future).get();
         assert(values.values_count >= 3);
-        a0 = radToDeg(values.values[0]);
-        a1 = radToDeg(values.values[1]);
-        a2 = radToDeg(values.values[2]);
+        a0 = baromesh::radToDeg(values.values[0]);
+        a1 = baromesh::radToDeg(values.values[1]);
+        a2 = baromesh::radToDeg(values.values[2]);
         timestamp = values.timestamp;
     }
     catch (std::exception& e) {
@@ -218,9 +209,9 @@ void Linkbot::getJointSpeeds(double&s1, double&s2, double&s3)
     try {
         auto values = asyncFire(m->robot, MethodIn::getMotorControllerOmega{}, requestTimeout(), use_future).get();
         assert(values.values_count >= 3);
-        s1 = radToDeg(values.values[0]);
-        s2 = radToDeg(values.values[1]);
-        s3 = radToDeg(values.values[2]);
+        s1 = baromesh::radToDeg(values.values[0]);
+        s2 = baromesh::radToDeg(values.values[1]);
+        s3 = baromesh::radToDeg(values.values[2]);
     } 
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());
@@ -297,7 +288,7 @@ void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
         int jointFlag = 0x01;
         for (auto& s : { s0, s1, s2 }) {
             if (jointFlag & mask) {
-                arg.values[arg.values_count++] = float(degToRad(s));
+                arg.values[arg.values_count++] = float(baromesh::degToRad(s));
             }
             jointFlag <<= 1;
         }
@@ -374,17 +365,17 @@ void Linkbot::drive (int mask, double a0, double a1, double a2)
     try {
         asyncFire(m->robot, MethodIn::move {
             bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE, 
-                               float(degToRad(a0)),
+                               float(baromesh::degToRad(a0)),
                                true, 
                                barobo_Robot_Goal_Controller_PID
                              },
             bool(mask&0x02), { barobo_Robot_Goal_Type_RELATIVE, 
-                               float(degToRad(a1)),
+                               float(baromesh::degToRad(a1)),
                                true,
                                barobo_Robot_Goal_Controller_PID
                              },
             bool(mask&0x04), { barobo_Robot_Goal_Type_RELATIVE, 
-                               float(degToRad(a2)),
+                               float(baromesh::degToRad(a2)),
                                true,
                                barobo_Robot_Goal_Controller_PID
                              }
@@ -400,17 +391,17 @@ void Linkbot::driveTo (int mask, double a0, double a1, double a2)
     try {
         asyncFire(m->robot, MethodIn::move {
             bool(mask&0x01), { barobo_Robot_Goal_Type_ABSOLUTE, 
-                               float(degToRad(a0)),
+                               float(baromesh::degToRad(a0)),
                                true, 
                                barobo_Robot_Goal_Controller_PID
                              },
             bool(mask&0x02), { barobo_Robot_Goal_Type_ABSOLUTE, 
-                               float(degToRad(a1)),
+                               float(baromesh::degToRad(a1)),
                                true,
                                barobo_Robot_Goal_Controller_PID
                              },
             bool(mask&0x04), { barobo_Robot_Goal_Type_ABSOLUTE, 
-                               float(degToRad(a2)),
+                               float(baromesh::degToRad(a2)),
                                true,
                                barobo_Robot_Goal_Controller_PID
                              }
@@ -425,13 +416,13 @@ void Linkbot::move (int mask, double a0, double a1, double a2) {
     try {
         asyncFire(m->robot, MethodIn::move {
             bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE, 
-                               float(degToRad(a0)),
+                               float(baromesh::degToRad(a0)),
                                false},
             bool(mask&0x02), { barobo_Robot_Goal_Type_RELATIVE, 
-                               float(degToRad(a1)),
+                               float(baromesh::degToRad(a1)),
                                false},
             bool(mask&0x04), { barobo_Robot_Goal_Type_RELATIVE, 
-                               float(degToRad(a2)),
+                               float(baromesh::degToRad(a2)),
                                false}
         }, requestTimeout(), use_future).get();
     }
@@ -456,9 +447,9 @@ void Linkbot::moveContinuous (int mask, double c0, double c1, double c2) {
 void Linkbot::moveTo (int mask, double a0, double a1, double a2) {
     try {
         asyncFire(m->robot, MethodIn::move {
-            bool(mask&0x01), { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a0)) },
-            bool(mask&0x02), { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a1)) },
-            bool(mask&0x04), { barobo_Robot_Goal_Type_ABSOLUTE, float(degToRad(a2)) }
+            bool(mask&0x01), { barobo_Robot_Goal_Type_ABSOLUTE, float(baromesh::degToRad(a0)) },
+            bool(mask&0x02), { barobo_Robot_Goal_Type_ABSOLUTE, float(baromesh::degToRad(a1)) },
+            bool(mask&0x04), { barobo_Robot_Goal_Type_ABSOLUTE, float(baromesh::degToRad(a2)) }
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
@@ -546,7 +537,7 @@ void Linkbot::setEncoderEventCallback (EncoderEventCallback cb,
                                        double granularity, void* userData)
 {
     const bool enable = !!cb;
-    granularity = degToRad(granularity);
+    granularity = baromesh::degToRad(granularity);
 
     try {
         asyncFire(m->robot, MethodIn::enableEncoderEvent {

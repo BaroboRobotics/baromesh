@@ -17,9 +17,18 @@
 #include <memory>
 #include <utility>
 
+#undef M_PI
+#define M_PI 3.14159265358979323846
+
 namespace baromesh {
 
 namespace {
+
+template <class T>
+T degToRad (T x) { return T(double(x) * M_PI / 180.0); }
+
+template <class T>
+T radToDeg (T x) { return T(double(x) * 180.0 / M_PI); }
 
 std::string daemonHostName () {
     return "127.0.0.1";
