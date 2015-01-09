@@ -16,6 +16,7 @@ std::string ErrorCategory::message (int ev) const noexcept {
 
         ITEM(UNREGISTERED_SERIALID)
         ITEM(INVALID_SERIALID)
+        ITEM(DAEMON_UNAVAILABLE)
 #undef ITEM
         default: return "(unknown status)";
     }

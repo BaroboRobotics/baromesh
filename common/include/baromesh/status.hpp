@@ -10,7 +10,9 @@ enum class Status {
     NO_ROBOT_ENDPOINT,
 
     UNREGISTERED_SERIALID,
-    INVALID_SERIALID
+    INVALID_SERIALID,
+
+    DAEMON_UNAVAILABLE
 };
 
 } // namespace baromesh
