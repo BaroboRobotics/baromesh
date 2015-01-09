@@ -42,7 +42,12 @@ if(WIN32)
     target_link_libraries(baromesh-common
         PRIVATE setupapi 
         )
+elseif(APPLE)
+    find_library(coreFoundationLib CoreFoundation)
+    find_library(ioKitLib IOKit)
+    target_link_libraries(baromesh-common PRIVATE ${ioKitLib} ${coreFoundationLib})
 endif()
+
 set_target_properties(baromesh-common PROPERTIES
     VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
     SOVERSION ${VERSION_MAJOR}
