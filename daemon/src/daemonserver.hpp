@@ -24,6 +24,7 @@
 #include <boost/log/sources/record_ostream.hpp>
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 
@@ -135,6 +136,7 @@ public:
             ec = lEc;
         }
 
+        std::lock_guard<std::mutex> lock { mRobotProxiesMutex };
         for (auto& kv : mRobotProxies) {
             auto& proxy = *kv.second;
             proxy.client.close(lEc);
@@ -183,6 +185,7 @@ public:
             }
 
             BOOST_LOG(mLog) << "searching for proxy for " << serialId;
+            std::lock_guard<std::mutex> lock { mRobotProxiesMutex };
             auto iter = mRobotProxies.find(serialId);
             Tcp::endpoint endpoint;
             if (mRobotProxies.end() == iter) {
@@ -245,6 +248,7 @@ private:
                               std::shared_ptr<ProxyData>,
                               boost::system::error_code ec) {
         BOOST_LOG(mLog) << "Proxy for " << serialId << " finished with " << ec.message();
+        std::lock_guard<std::mutex> lock { mRobotProxiesMutex };
         auto nErased = mRobotProxies.erase(serialId);
         BOOST_LOG(mLog) << "Proxy for " << serialId
                         << (nErased ? " erased; " : " does not exist! ")
@@ -391,15 +395,8 @@ private:
     std::unique_ptr<Dongle> mDongle;
     boost::asio::steady_timer mDongleTimer;
 
-    // FIXME mRobotProxies needs to be protected by a mutex, unless we can
-    // guarantee that all accesses take place on the same strand. That is
-    // currently not the case, but since our io_services are all single-
-    // threaded at the moment, there is an implicit strand which makes this
-    // safe, for now. If we want to be able to support multiple threads
-    // calling io_service::run simultaneously, this needs to be protected
-    // by a mutex, or we need to implement asynchronous fire implementations,
-    // which will permit us to use a strand to synchronize access to mRobotProxies.
     std::map<std::string, std::shared_ptr<ProxyData>> mRobotProxies;
+    std::mutex mRobotProxiesMutex;
 
     mutable boost::log::sources::logger mLog;
 };
