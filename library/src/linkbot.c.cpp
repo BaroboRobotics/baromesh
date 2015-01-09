@@ -25,34 +25,6 @@ void linkbotDelete(Linkbot* l)
     delete l;
 }
 
-#if 0
-/* CONNECTION */
-int linkbotConnect(Linkbot* l)
-{
-    try {
-        l->impl.connect();
-        return 0;
-    }
-    catch (std::exception& e) {
-        fprintf(stderr, "Runtime exception: %s\n", e.what());
-        return -1;
-    }
-}
-
-int linkbotDisconnect(Linkbot* l)
-{
-    try {
-        l->impl.disconnect();
-        return 0;
-    }
-    catch (std::exception& e) {
-        fprintf(stderr, "Runtime exception: %s\n", e.what());
-        return -1;
-    }
-}
-#endif
-
-
 #define LINKBOT_C_WRAPPER_FUNC_IMPL(cpp_name, ...) \
 do \
 { \
