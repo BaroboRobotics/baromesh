@@ -83,9 +83,9 @@ int linkbotSetJointSpeeds(Linkbot *l, int mask, double j1, double j2,
     LINKBOT_C_WRAPPER_FUNC_IMPL(setJointSpeeds, mask, j1, j2, j3);
 }
 
-int linkbotSetBuzzerFrequencyOn(Linkbot *l, float freq)
+int linkbotSetBuzzerFrequency(Linkbot *l, float freq)
 {
-    LINKBOT_C_WRAPPER_FUNC_IMPL(setBuzzerFrequencyOn, freq);
+    LINKBOT_C_WRAPPER_FUNC_IMPL(setBuzzerFrequency, freq);
 }
 
 int linkbotSetJointStates(Linkbot *l, int mask, 

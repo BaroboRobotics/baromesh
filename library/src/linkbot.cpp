@@ -271,7 +271,7 @@ void Linkbot::resetEncoderRevs() {
     }
 }
 
-void Linkbot::setBuzzerFrequencyOn (double freq) {
+void Linkbot::setBuzzerFrequency (double freq) {
     try {
         asyncFire(m->robot, MethodIn::setBuzzerFrequency{float(freq)}, requestTimeout(), use_future).get();
     }
