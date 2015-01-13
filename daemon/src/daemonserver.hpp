@@ -365,6 +365,7 @@ private:
 
         auto self = this->shared_from_this();
         auto resetDongle = [self, this] (boost::system::error_code ec) {
+            BOOST_LOG(mLog) << "Resetting dongle because: " << ec.message();
             if (boost::asio::error::operation_aborted != ec) {
                 assert(mDongle);
                 cycleDongleImpl(kDongleDowntimeAfterError);
