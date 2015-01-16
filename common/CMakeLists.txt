@@ -35,7 +35,8 @@ target_include_directories(baromesh-common
            include
     )
 target_link_libraries(baromesh-common
-    PUBLIC ${Boost_LIBRARIES}
+    PUBLIC daemon-interface
+           ${Boost_LIBRARIES}
     )
 
 if(WIN32)

@@ -5,5 +5,5 @@ RPCDEF_CPP((barobo, Daemon),
         (resolveSerialId)
         (cycleDongle)
         ,
-        (dongleDetected)
+        (dongleEvent)
         )

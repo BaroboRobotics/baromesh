@@ -93,8 +93,10 @@ struct Linkbot::Impl {
         onBroadcast(std::forward<B>(args));
     }
 
-    void onBroadcast (rpc::Broadcast<barobo::Daemon>::dongleDetected) {
-        BOOST_LOG(log) << "Dongle available";
+    void onBroadcast (rpc::Broadcast<barobo::Daemon>::dongleEvent b) {
+        if (!b.status) {
+            BOOST_LOG(log) << "Dongle available";
+        }
     }
 
     void onBroadcast (Broadcast::buttonEvent b) {

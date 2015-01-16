@@ -10,6 +10,7 @@ std::string ErrorCategory::message (int ev) const noexcept {
     switch (Status(ev)) {
 #define ITEM(x) case Status::x: return #x;
         ITEM(OK)
+        ITEM(CANNOT_OPEN_DONGLE)
         ITEM(DONGLE_NOT_FOUND)
         ITEM(PORT_OUT_OF_RANGE)
         ITEM(NO_ROBOT_ENDPOINT)

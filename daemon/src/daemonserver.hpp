@@ -286,7 +286,9 @@ private:
                     std::bind(&DaemonServerImpl::handleCycleDongleStepTwo,
                         this->shared_from_this(), dongle, _1)));
             }
-            catch (std::exception& e) {
+            catch (boost::system::system_error& e) {
+                BOOST_LOG(mLog) << "Cannot open dongle: " << e.what();
+                dongleEvent(e.code());
                 cycleDongleImpl(kDongleDevicePathPollTimeout);
             }
         }
@@ -313,7 +315,9 @@ private:
                     std::bind(&DaemonServerImpl::handleCycleDongleStepThree,
                         this->shared_from_this(), dongle, _1)));
             }
-            catch (std::exception& e) {
+            catch (boost::system::system_error& e) {
+                BOOST_LOG(mLog) << "Cannot set options on dongle stream: " << e.what();
+                dongleEvent(e.code());
                 cycleDongleImpl(kDongleDevicePathPollTimeout);
             }
         }
@@ -326,6 +330,8 @@ private:
                     this->shared_from_this(), dongle, _1)));
         }
         else if (boost::asio::error::operation_aborted != ec) {
+            BOOST_LOG(mLog) << "Cannot shake hands with the dongle: " << ec.message();
+            dongleEvent(ec);
             cycleDongleImpl(kDongleDevicePathPollTimeout);
         }
     }
@@ -335,42 +341,60 @@ private:
         if (!ec) {
             mDongle.reset(new Dongle{std::move(*dongle)});
             setDongleIoTraps();
-            asyncBroadcast(mServer, Broadcast::dongleDetected{},
-                [] (boost::system::error_code ec) {
-                    if (ec && boost::asio::error::operation_aborted != ec) {
-                        boost::log::sources::logger log;
-                        BOOST_LOG(log) << "dongleDetected broadcast completed"
-                                       << " with " << ec.message();
-                    }
-                });
+            dongleEvent(Status::OK);
         }
         else if (boost::asio::error::operation_aborted != ec) {
-            // TODO propagate VERSION_MISMATCH via dongleDetected broadcast?
+            BOOST_LOG(mLog) << "Cannot RPC connect to the dongle: " << ec.message();
+            dongleEvent(ec);
             cycleDongleImpl(kDongleDevicePathPollTimeout);
         }
+    }
+
+    void dongleEvent (boost::system::error_code ec) {
+        if (ec && errorCategory() != ec.category()) {
+            auto newEc = make_error_code(Status::CANNOT_OPEN_DONGLE);
+            BOOST_LOG(mLog) << "Replacing \"" << ec.message()
+                           << "\" with \"" << newEc.message() << "\"";
+            ec = newEc;
+
+        }
+        using BStatus = decltype(Broadcast::dongleEvent::status);
+        asyncBroadcast(mServer, Broadcast::dongleEvent{BStatus(ec.value())},
+            [] (boost::system::error_code ec2) {
+                if (ec2 && boost::asio::error::operation_aborted != ec2) {
+                    boost::log::sources::logger log;
+                    BOOST_LOG(log) << "dongleEvent broadcast completed"
+                                   << " with " << ec2.message();
+                }
+            });
     }
 
     void setDongleIoTraps () {
         assert(mDongle);
 
-        // Now that we're all connected up, queue up an asynchronous operation
-        // that should in theory never complete. The only time this code should
-        // execute, then, is when there's a dongle read error. In that case, we
-        // want to wait for a dongle to appear in the OS environment again.
+        auto self = this->shared_from_this();
+        auto resetDongle = [self, this] (boost::system::error_code ec) {
+            BOOST_LOG(mLog) << "Resetting dongle because: " << ec.message();
+            if (boost::asio::error::operation_aborted != ec) {
+                cycleDongleImpl(kDongleDowntimeAfterError);
+            }
+        };
+
+        // We can set two traps: a read trap and a write trap. The read trap
+        // would be preferable because we would get quicker notification in the
+        // event of a dongle error. However, this does not work correctly on
+        // Windows XP, so we need to use a keepalive as well. resetDongle only
+        // cycles the dongle if the error code is not operation_aborted,
+        // allowing us still to raise SIGTERM in order to shut the daemon down,
+        // and to avoid "bounce" in the dongle cycle.
+
+        // Set up a read trap--a read operation that should never complete, and
+        // will just inform us when the dongle encounters an error.
         auto mqLog = mLog;
         mqLog.add_attribute("SerialId", boost::log::attributes::constant<std::string>("...."));
 
         auto buf = std::make_shared<uint8_t>();
         auto nullMq = std::make_shared<Dongle::MessageQueue>(mIos, mqLog);
-
-        auto self = this->shared_from_this();
-        auto resetDongle = [self, this] (boost::system::error_code ec) {
-            BOOST_LOG(mLog) << "Resetting dongle because: " << ec.message();
-            if (boost::asio::error::operation_aborted != ec) {
-                assert(mDongle);
-                cycleDongleImpl(kDongleDowntimeAfterError);
-            }
-        };
 
         nullMq->setRoute(*mDongle, "....");
         nullMq->asyncReceive(boost::asio::buffer(buf.get(), 1), mStrand.wrap(
@@ -378,9 +402,8 @@ private:
                 resetDongle(ec);
             }));
 
-        // So that takes care of linux. Windows XP's implementation of IOCP is
-        // too stupid to notify us when a serial read fails because of a device
-        // unplugged, so ping the dongle periodically.
+        // Set up a write trap--a periodic write operation to detect when the
+        // dongle has an error.
         mDongle->client().messageQueue().asyncKeepalive(mStrand.wrap(
             [resetDongle] (boost::system::error_code ec) {
                 resetDongle(ec);

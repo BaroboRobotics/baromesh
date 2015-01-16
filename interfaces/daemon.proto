@@ -3,6 +3,19 @@ import "nanopb.proto";
 import "commontypes.proto";
 package barobo.Daemon;
 
+enum Status {
+    OK = 0;
+    CANNOT_OPEN_DONGLE = 1;
+    DONGLE_NOT_FOUND = 2;
+    PORT_OUT_OF_RANGE = 3;
+    NO_ROBOT_ENDPOINT = 4;
+
+    UNREGISTERED_SERIALID = 5;
+    INVALID_SERIALID = 6;
+
+    DAEMON_UNAVAILABLE = 7;
+}
+
 message TcpEndpoint {
     required string address = 1 [(nanopb).max_size = 64];
     required uint32 port = 2;    
@@ -32,7 +45,8 @@ message cycleDongle {
 
 // Broadcasts
 
-message dongleDetected {
+message dongleEvent {
     // TODO probably want a form factor here. For that matter, maybe this
     // should be a more generic devicePluggedIn broadcast.
+    required Status status = 1;
 }
