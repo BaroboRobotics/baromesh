@@ -66,3 +66,6 @@ else()
 endif()
 
 install(TARGETS baromeshd DESTINATION ${dest})
+if(APPLE)
+    install(FILES ${PROJECT_SOURCE_DIR}/src/daemonservice/macosx/com.barobo.LinkbotLabs.plist DESTINATION Contents/Resources)
+endif()
