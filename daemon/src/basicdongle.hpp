@@ -7,6 +7,8 @@
 
 #include "rpc/asio/client.hpp"
 
+#include "util/benchmarkedlock.hpp"
+
 #include <functional>
 #include <memory>
 #include <queue>
@@ -53,13 +55,13 @@ public:
     // "closed" serial ID). Return false if the buffer already exists, true
     // otherwise.
     bool openMessageQueue (std::string serialId, boost::log::sources::logger log) {
-        std::lock_guard<std::mutex> lock { mReceiveDataMutex };
+        auto lock = util::BenchmarkedLock{mReceiveDataMutex};
         return mReceiveData.insert(std::make_pair(serialId, ReceiveData(log))).second;
     }
 
     // Remove the incoming messages buffer for the given serial ID, if one exists.
     void closeMessageQueue (std::string serialId) {
-        std::lock_guard<std::mutex> lock { mReceiveDataMutex };
+        auto lock = util::BenchmarkedLock{mReceiveDataMutex};
         auto iter = mReceiveData.find(serialId);
         if (iter != mReceiveData.end()) {
             auto& data = iter->second;
@@ -118,7 +120,7 @@ public:
         auto self = this->shared_from_this();
         mStrand.post([self, this, serialId, buffer, realHandler] () {
             {
-                std::lock_guard<std::mutex> lock { mReceiveDataMutex };
+                auto lock = util::BenchmarkedLock{mReceiveDataMutex};
                 auto iter = mReceiveData.find(serialId);
                 if (mReceiveData.end() == iter) {
                     mClient.get_io_service().post(std::bind(realHandler, Status::UNREGISTERED_SERIALID, 0));
@@ -142,7 +144,7 @@ public:
 
     void onBroadcast (Broadcast::receiveUnicast broadcast) {
         {
-            std::lock_guard<std::mutex> lock { mReceiveDataMutex };
+            auto lock = util::BenchmarkedLock{mReceiveDataMutex};
             auto serialId = std::string(broadcast.serialId.value);
             auto iter = mReceiveData.find(serialId);
             if (iter != mReceiveData.end()) {
@@ -161,7 +163,7 @@ public:
 
 private:
     void postReceives () {
-        std::lock_guard<std::mutex> lock { mReceiveDataMutex };
+        auto lock = util::BenchmarkedLock{mReceiveDataMutex};
         for (auto& kv : mReceiveData) {
             auto& data = kv.second;
             BOOST_LOG(data.log) << "posting ready receive operations (ops: "
@@ -197,7 +199,8 @@ private:
     }
 
     bool thereArePendingOperations () {
-        std::lock_guard<std::mutex> lock { mReceiveDataMutex };
+        BOOST_LOG(mLog) << "thereArePendingOperations";
+        auto lock = util::BenchmarkedLock{mReceiveDataMutex};
         using KeyValue = typename decltype(mReceiveData)::value_type;
         return std::any_of(mReceiveData.begin(), mReceiveData.end(),
             [] (KeyValue& kv) {
@@ -210,6 +213,7 @@ private:
     // asyncRunClient.
     void receivePump () {
         if (thereArePendingOperations()) {
+            BOOST_LOG(mLog) << "Receive pump: calling asyncReceiveBroadcast";
             mClient.asyncReceiveBroadcast(mStrand.wrap(
                 std::bind(&DongleImpl::handleReceive,
                     this->shared_from_this(), _1, _2)));
@@ -231,7 +235,7 @@ private:
                 throw boost::system::system_error(ec);
             }
 
-            BOOST_LOG(mLog) << "received broadcast";
+            BOOST_LOG(mLog) << "Receive pump: received broadcast";
             status = invokeBroadcast(*this, argument, broadcast.id);
             if (hasError(status)) {
                 ec = status;
@@ -248,7 +252,7 @@ private:
     }
 
     void voidHandlers (boost::system::error_code ec) {
-        std::lock_guard<std::mutex> lock { mReceiveDataMutex };
+        auto lock = util::BenchmarkedLock{mReceiveDataMutex};
         for (auto& kv : mReceiveData) {
             auto& data = kv.second;
             while (data.ops.size()) {
