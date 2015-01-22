@@ -18,6 +18,9 @@ std::string ErrorCategory::message (int ev) const noexcept {
         ITEM(UNREGISTERED_SERIALID)
         ITEM(INVALID_SERIALID)
         ITEM(DAEMON_UNAVAILABLE)
+
+        ITEM(STRANGE_DONGLE)
+        ITEM(DONGLE_VERSION_MISMATCH)
 #undef ITEM
         default: return "(unknown status)";
     }

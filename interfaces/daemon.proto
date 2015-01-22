@@ -14,6 +14,9 @@ enum Status {
     INVALID_SERIALID = 6;
 
     DAEMON_UNAVAILABLE = 7;
+
+    STRANGE_DONGLE = 8;
+    DONGLE_VERSION_MISMATCH = 9;
 }
 
 message TcpEndpoint {

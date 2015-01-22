@@ -16,8 +16,9 @@
 
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/tcp.hpp>
-#include <boost/asio/strand.hpp>
 #include <boost/asio/serial_port.hpp>
+#include <boost/asio/signal_set.hpp>
+#include <boost/asio/strand.hpp>
 #include <boost/asio/use_future.hpp>
 
 #include <boost/log/sources/logger.hpp>
@@ -151,6 +152,14 @@ public:
     }
 
     void run () {
+        boost::asio::signal_set sigSet { mIos, SIGINT, SIGTERM };
+        sigSet.async_wait([this] (boost::system::error_code ec, int sigNo) {
+            if (!ec) {
+                BOOST_LOG(mLog) << "Closing DaemonServer after signal " << sigNo;
+                close(ec);
+            }
+        });
+
         try {
             while (true) {
                 rpc::asio::asyncRunServer<barobo::Daemon>(mServer, *this, use_future).get();
@@ -194,10 +203,10 @@ public:
                 // FIXME this resolve is synchronous. Make it asynchronous.
                 // This will require us to enable asynchronous method invocation in
                 // ribbon-bridge.
-                BOOST_LOG(mLog) << "Resolving 127.0.0.1:any port";
+                //BOOST_LOG(mLog) << "Resolving 127.0.0.1:any port";
                 auto epIter = mResolver.resolve(decltype(mResolver)::query("127.0.0.1", "",
                     boost::asio::ip::resolver_query_base::flags(0)));
-                BOOST_LOG(mLog) << "Resolved to iterator";
+                //BOOST_LOG(mLog) << "Resolved to iterator";
                 endpoint = epIter->endpoint();
 
                 BOOST_LOG(mLog) << "Starting new robot proxy on " << endpoint;
@@ -260,6 +269,7 @@ private:
         if (mDongle) {
             mDongle->close();
             mDongle.reset();
+            dongleEvent(Status::DONGLE_NOT_FOUND);
         }
         mDongleTimer.cancel();
         mDongleTimer.expires_from_now(std::forward<Duration>(timeout));
@@ -287,7 +297,7 @@ private:
                         this->shared_from_this(), dongle, _1)));
             }
             catch (boost::system::system_error& e) {
-                BOOST_LOG(mLog) << "Cannot open dongle: " << e.what();
+                //BOOST_LOG(mLog) << "Cannot open dongle: " << e.what();
                 dongleEvent(e.code());
                 cycleDongleImpl(kDongleDevicePathPollTimeout);
             }
@@ -311,9 +321,16 @@ private:
                 ::write(handle, nullptr, 0);
 #endif
 
+                auto sigSet = std::make_shared<boost::asio::signal_set>(mIos, SIGINT, SIGTERM);
+                sigSet->async_wait([this, dongle] (boost::system::error_code ec, int sigNo) {
+                    if (!ec) {
+                        BOOST_LOG(mLog) << "Closing nascent dongle after signal " << sigNo;
+                        dongle->close(ec);
+                    }
+                });
                 dongle->client().messageQueue().asyncHandshake(mStrand.wrap(
                     std::bind(&DaemonServerImpl::handleCycleDongleStepThree,
-                        this->shared_from_this(), dongle, _1)));
+                        this->shared_from_this(), dongle, sigSet, _1)));
             }
             catch (boost::system::system_error& e) {
                 BOOST_LOG(mLog) << "Cannot set options on dongle stream: " << e.what();
@@ -323,11 +340,13 @@ private:
         }
     }
 
-    void handleCycleDongleStepThree (std::shared_ptr<Dongle> dongle, boost::system::error_code ec) {
+    void handleCycleDongleStepThree (std::shared_ptr<Dongle> dongle,
+                                     std::shared_ptr<boost::asio::signal_set> sigSet,
+                                     boost::system::error_code ec) {
         if (!ec) {
             rpc::asio::asyncConnect<barobo::Dongle>(dongle->client(), kDongleConnectTimeout, mStrand.wrap(
                 std::bind(&DaemonServerImpl::handleCycleDongleStepFour,
-                    this->shared_from_this(), dongle, _1)));
+                    this->shared_from_this(), dongle, sigSet, _1)));
         }
         else if (boost::asio::error::operation_aborted != ec) {
             BOOST_LOG(mLog) << "Cannot shake hands with the dongle: " << ec.message();
@@ -337,8 +356,10 @@ private:
     }
 
     void handleCycleDongleStepFour (std::shared_ptr<Dongle> dongle,
+                                    std::shared_ptr<boost::asio::signal_set> sigSet,
                                      boost::system::error_code ec) {
         if (!ec) {
+            sigSet->cancel();
             mDongle.reset(new Dongle{std::move(*dongle)});
             setDongleIoTraps();
             dongleEvent(Status::OK);
@@ -351,7 +372,15 @@ private:
     }
 
     void dongleEvent (boost::system::error_code ec) {
-        if (ec && errorCategory() != ec.category()) {
+        if (sfp::Status::HANDSHAKE_FAILED == ec
+            || rpc::Status::INCONSISTENT_REPLY == ec
+            || rpc::Status::TIMED_OUT == ec) {
+            ec = Status::STRANGE_DONGLE;
+        }
+        else if (rpc::Status::VERSION_MISMATCH == ec) {
+            ec = Status::DONGLE_VERSION_MISMATCH;
+        }
+        else if (ec && errorCategory() != ec.category()) {
             auto newEc = make_error_code(Status::CANNOT_OPEN_DONGLE);
             BOOST_LOG(mLog) << "Replacing \"" << ec.message()
                            << "\" with \"" << newEc.message() << "\"";
