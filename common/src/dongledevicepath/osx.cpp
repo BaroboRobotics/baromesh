@@ -38,6 +38,7 @@ int dongleDevicePathImpl (char *buf, size_t len) {
     }
     const char *usb_vendor_name
       = CFStringGetCStringPtr(static_cast<CFStringRef>(vend_cont), kCFStringEncodingMacRoman);
+    if(!usb_vendor_name) continue;
 
     prod_cont = get_string_prop(device, "USB Product Name");
     if (!prod_cont) {
@@ -46,6 +47,7 @@ int dongleDevicePathImpl (char *buf, size_t len) {
     }
     const char *usb_product_name
       = CFStringGetCStringPtr(static_cast<CFStringRef>(prod_cont), kCFStringEncodingMacRoman);
+    if(!usb_product_name) continue;
 
     int i;
     for (i = 0; i < NUM_BAROBO_USB_DONGLE_IDS; ++i) {
