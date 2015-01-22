@@ -166,8 +166,8 @@ private:
         auto lock = util::BenchmarkedLock{mReceiveDataMutex};
         for (auto& kv : mReceiveData) {
             auto& data = kv.second;
-            BOOST_LOG(data.log) << "posting ready receive operations (ops: "
-                                << data.ops.size() << ", inbox: " << data.inbox.size() << ")";
+            //BOOST_LOG(data.log) << "posting ready receive operations (ops: "
+            //                    << data.ops.size() << ", inbox: " << data.inbox.size() << ")";
             while (data.inbox.size() && data.ops.size()) {
                 auto op = data.ops.front();
                 data.ops.pop();
@@ -199,7 +199,6 @@ private:
     }
 
     bool thereArePendingOperations () {
-        BOOST_LOG(mLog) << "thereArePendingOperations";
         auto lock = util::BenchmarkedLock{mReceiveDataMutex};
         using KeyValue = typename decltype(mReceiveData)::value_type;
         return std::any_of(mReceiveData.begin(), mReceiveData.end(),
@@ -213,7 +212,7 @@ private:
     // asyncRunClient.
     void receivePump () {
         if (thereArePendingOperations()) {
-            BOOST_LOG(mLog) << "Receive pump: calling asyncReceiveBroadcast";
+            //BOOST_LOG(mLog) << "Receive pump: calling asyncReceiveBroadcast";
             mClient.asyncReceiveBroadcast(mStrand.wrap(
                 std::bind(&DongleImpl::handleReceive,
                     this->shared_from_this(), _1, _2)));
@@ -235,7 +234,7 @@ private:
                 throw boost::system::system_error(ec);
             }
 
-            BOOST_LOG(mLog) << "Receive pump: received broadcast";
+            //BOOST_LOG(mLog) << "Receive pump: received broadcast";
             status = invokeBroadcast(*this, argument, broadcast.id);
             if (hasError(status)) {
                 ec = status;

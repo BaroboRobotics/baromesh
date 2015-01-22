@@ -203,10 +203,10 @@ public:
                 // FIXME this resolve is synchronous. Make it asynchronous.
                 // This will require us to enable asynchronous method invocation in
                 // ribbon-bridge.
-                BOOST_LOG(mLog) << "Resolving 127.0.0.1:any port";
+                //BOOST_LOG(mLog) << "Resolving 127.0.0.1:any port";
                 auto epIter = mResolver.resolve(decltype(mResolver)::query("127.0.0.1", "",
                     boost::asio::ip::resolver_query_base::flags(0)));
-                BOOST_LOG(mLog) << "Resolved to iterator";
+                //BOOST_LOG(mLog) << "Resolved to iterator";
                 endpoint = epIter->endpoint();
 
                 BOOST_LOG(mLog) << "Starting new robot proxy on " << endpoint;
@@ -297,7 +297,7 @@ private:
                         this->shared_from_this(), dongle, _1)));
             }
             catch (boost::system::system_error& e) {
-                BOOST_LOG(mLog) << "Cannot open dongle: " << e.what();
+                //BOOST_LOG(mLog) << "Cannot open dongle: " << e.what();
                 dongleEvent(e.code());
                 cycleDongleImpl(kDongleDevicePathPollTimeout);
             }
