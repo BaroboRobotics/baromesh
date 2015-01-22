@@ -260,6 +260,7 @@ private:
         if (mDongle) {
             mDongle->close();
             mDongle.reset();
+            dongleEvent(Status::DONGLE_NOT_FOUND);
         }
         mDongleTimer.cancel();
         mDongleTimer.expires_from_now(std::forward<Duration>(timeout));
