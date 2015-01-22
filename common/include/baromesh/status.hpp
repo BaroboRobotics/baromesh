@@ -15,7 +15,10 @@ enum class Status {
     UNREGISTERED_SERIALID   = barobo_Daemon_Status_UNREGISTERED_SERIALID,
     INVALID_SERIALID        = barobo_Daemon_Status_INVALID_SERIALID,
 
-    DAEMON_UNAVAILABLE      = barobo_Daemon_Status_DAEMON_UNAVAILABLE
+    DAEMON_UNAVAILABLE      = barobo_Daemon_Status_DAEMON_UNAVAILABLE,
+
+    STRANGE_DONGLE          = barobo_Daemon_Status_STRANGE_DONGLE,
+    DONGLE_VERSION_MISMATCH = barobo_Daemon_Status_DONGLE_VERSION_MISMATCH
 };
 
 } // namespace baromesh

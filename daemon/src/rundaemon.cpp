@@ -1,4 +1,3 @@
-#include "breaker.hpp"
 #include "daemonserver.hpp"
 
 #include "baromesh/iocore.hpp"
@@ -63,18 +62,12 @@ static void initializeLoggingCore () {
 // The real main function.
 int runDaemon () try {
     auto ioCore = baromesh::IoCore::get(true);
-    Breaker breaker { ioCore->ios(), SIGINT, SIGTERM };
 
     initializeLoggingCore();
     boost::log::sources::logger log;
     log.add_attribute("Title", boost::log::attributes::constant<std::string>("BAROMESHD"));
 
     baromesh::DaemonServer daemon { ioCore->ios(), log };
-    Breaker::Killswitch killswitch { breaker, [&] {
-        boost::system::error_code ec;
-        daemon.close(ec);
-    } };
-
     daemon.run();
     BOOST_LOG(log) << "Shutting down";
 
