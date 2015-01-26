@@ -77,15 +77,20 @@ int linkbotGetLedColor(Linkbot *l, int *r, int *g, int *b)
 
 /* SETTERS */
 
-int linkbotSetJointSpeeds(Linkbot *l, int mask, double j1, double j2, 
-                          double j3)
+int linkbotResetEncoderRevs(Linkbot *l)
 {
-    LINKBOT_C_WRAPPER_FUNC_IMPL(setJointSpeeds, mask, j1, j2, j3);
+    LINKBOT_C_WRAPPER_FUNC_IMPL(resetEncoderRevs);
 }
 
 int linkbotSetBuzzerFrequency(Linkbot *l, float freq)
 {
     LINKBOT_C_WRAPPER_FUNC_IMPL(setBuzzerFrequency, freq);
+}
+
+int linkbotSetJointSpeeds(Linkbot *l, int mask, double j1, double j2, 
+                          double j3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(setJointSpeeds, mask, j1, j2, j3);
 }
 
 int linkbotSetJointStates(Linkbot *l, int mask, 
