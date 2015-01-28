@@ -77,6 +77,7 @@ int linkbotGetJointStates(baromesh::Linkbot*, int *timestamp, barobo::JointState
 int linkbotGetLedColor(baromesh::Linkbot *l, int *r, int *g, int *b);
 
 /* SETTERS */
+int linkbotResetEncoderRevs(baromesh::Linkbot *l);
 int linkbotSetJointSpeeds(baromesh::Linkbot *l, int mask, double j1, double j2, 
                           double j3);
 int linkbotSetBuzzerFrequency(baromesh::Linkbot *l, float freq);

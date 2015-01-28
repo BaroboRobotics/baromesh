@@ -1,10 +1,11 @@
+#include <iostream>
 #include "baromesh/linkbot.h"
 #include "baromesh/linkbot.hpp"
 
 namespace baromesh {
 
 struct Linkbot {
-    Linkbot (const char* serialId) : impl(serialId)
+    Linkbot (const char* serialId) : impl(std::string(serialId))
     {
     }
     barobo::Linkbot impl;
@@ -16,7 +17,6 @@ using namespace baromesh;
 
 Linkbot* linkbotNew(const char* serialId)
 {
-    
     return new Linkbot(serialId);
 }
 
@@ -76,6 +76,11 @@ int linkbotGetLedColor(Linkbot *l, int *r, int *g, int *b)
 }
 
 /* SETTERS */
+
+int linkbotResetEncoderRevs(Linkbot *l)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(resetEncoderRevs);
+}
 
 int linkbotSetJointSpeeds(Linkbot *l, int mask, double j1, double j2, 
                           double j3)

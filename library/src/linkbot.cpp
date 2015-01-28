@@ -39,6 +39,7 @@ struct Linkbot::Impl {
         , daemon(ioCore->ios(), log)
         , robot(ioCore->ios(), log)
     {
+        std::cout<<"Linkbot::Impl"<<std::endl;
         auto daemonQuery = decltype(resolver)::query {
             baromesh::daemonHostName(), baromesh::daemonServiceName()
         };
