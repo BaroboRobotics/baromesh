@@ -14,7 +14,7 @@ set(CMAKE_CXX_FLAGS_MINSIZEREL_INIT "-Os -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELEASE_INIT "-O2 -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
 
-set(ldflags "-Wl,-O1 -Wl,--hash-style=gnu -Wl,--as-needed")
+set(ldflags "-Wl,-O1 -Wl,--hash-style=gnu -Wl,--as-needed -static-libgcc -static-libstdc++")
 
 set(CMAKE_EXE_LINKER_FLAGS_INIT ${ldflags})
 set(CMAKE_EXE_LINKER_FLAGS_DEBUG_INIT ${ldflags})
