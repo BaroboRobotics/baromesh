@@ -1,77 +1,124 @@
-#include "logging.h"
-#include "popen3.h"
-#include "sysfs.h"
+#include <boost/algorithm/string/predicate.hpp>
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <ctype.h>
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
+
+#include <boost/iterator/filter_iterator.hpp>
+
+#include <boost/log/sources/logger.hpp>
+#include <boost/log/sources/record_ostream.hpp>
+
+#include <boost/range/iterator_range.hpp>
+
+#include <boost/system/error_code.hpp>
+
+#include <exception>
+#include <iostream>
+#include <string>
+
+#include <cstdlib>
+
 #include <unistd.h>
 
+namespace fs = boost::filesystem;
+
+bool findTtyPath (std::string& output,
+        std::string expectedManufacturer,
+        std::string expectedProduct) {
+    using namespace std::placeholders;
+
+    std::string sysfs{"/sys"};
+    auto sysfsPtr = std::getenv("SYSFS_PATH");
+    if (sysfsPtr) {
+        sysfs = sysfsPtr;
+    }
+
+    auto sysDevices = fs::path{sysfs + "/devices"};
+
+    if (fs::exists(sysDevices) && fs::is_directory(sysDevices)) {
+        // True if a path is a subsystem symlink matching ss.
+        auto isSubsystemSymlink = [] (const fs::path& ss, const fs::path& p) {
+            return p.filename() == "subsystem" &&
+                   fs::read_symlink(p).filename() == ss;
+        };
+
+        // Make an iterator which filters directory entries by isSubsystemSymlink.
+        auto makeSubsystemFilter = [=] (fs::path ss, fs::recursive_directory_iterator iter) {
+            return boost::make_filter_iterator(
+                std::bind(isSubsystemSymlink, ss, _1),
+                iter,
+                fs::recursive_directory_iterator{});
+        };
+
+        // Make an object we can for (x : y) over.
+        auto subsystems = [=] (const fs::path& ss, const fs::path& root) {
+            return boost::make_iterator_range(
+                makeSubsystemFilter(ss, fs::recursive_directory_iterator{root}),
+                makeSubsystemFilter(ss, fs::recursive_directory_iterator{}));
+        };
+
+        // For each USB device on the system ...
+        for (fs::path usbSs : subsystems("usb", sysDevices)) {
+            auto manufacturerPath = usbSs.parent_path() / "manufacturer";
+            auto productPath = usbSs.parent_path() / "product";
+
+            // that has manufacturer and product entries ...
+            if (fs::exists(manufacturerPath) && fs::exists(productPath)) {
+                std::string manufacturer;
+                fs::ifstream manufacturerStream{manufacturerPath};
+                std::getline(manufacturerStream, manufacturer);
+
+                std::string product;
+                fs::ifstream productStream{productPath};
+                std::getline(productStream, product);
+
+                // which matches the dongle's expected strings ...
+                if (manufacturer == expectedManufacturer && product == expectedProduct) {
+                    // find its associated TTY device path.
+                    for (fs::path ttySs : subsystems("tty", usbSs.parent_path())) {
+                        auto uePath = ttySs.parent_path() / "uevent";
+                        if (fs::exists(uePath)) {
+                            fs::ifstream ueStream{uePath};
+                            while (std::getline(ueStream, output)) {
+                                auto key = std::string{"DEVNAME="};
+                                if (boost::algorithm::starts_with(output, key)) {
+                                    output.replace(0, key.length(), "/dev/");
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
 int dongleDevicePathImpl (char *buf, size_t len) {
-  const char* sysfs = getenv("SYSFS_PATH");
-  if (!sysfs) {
-    sysfs = "/sys";
-  }
-
-  size_t i;
-  int dongle_found = 0;
-  for (i = 0; !dongle_found && i < NUM_BAROBO_USB_DONGLE_IDS; ++i) {
-    char cmd[1024];
-
-    snprintf(cmd, sizeof(cmd),
-            /* Generate a list of all dongles. */
-            FROM("%s/devices") SELECT SYSATTRF("manufacturer", "%s")
-                               AND SYSATTRF("product", "%s")
-                               SELECT SUBSYSTEMF("tty")
-            /* Look up the dongles' /dev/tty* path. */
-            " | xargs -I{} grep DEVNAME '{}'/uevent"
-            " | cut -d= -f2",
-      sysfs, g_barobo_usb_dongle_ids[i].manufacturer, g_barobo_usb_dongle_ids[i].product);
-
-    /* Using popen3() so that stderr is suppressed upon failure. */
-    process_t cmd_proc = popen3(cmd);
-
-    if (-1 == cmd_proc.pid) {
-      char errbuf[256];
-      strerror_r(errno, errbuf, sizeof(errbuf));
-      fprintf(stderr, "(barobo) ERROR: unable to execute find dongle command: %s", errbuf);
-      return -1;
+    boost::log::sources::logger log;
+    std::string path;
+    for (auto i = 0; i < NUM_BAROBO_USB_DONGLE_IDS; ++i) {
+        if (findTtyPath(path,
+                g_barobo_usb_dongle_ids[i].manufacturer,
+                g_barobo_usb_dongle_ids[i].product)) {
+            if (!access(path.c_str(), R_OK | W_OK)) {
+                auto nWritten = snprintf(buf, len, "%s", path.c_str());
+                if (nWritten >= len) {
+                    BOOST_LOG(log) << "Buffer overflow copying device path: "
+                                   << buf << " (... and "
+                                   << path.length() - len + 1
+                                   << " more characters)";
+                }
+                else {
+                    return 0;
+                }
+            }
+            else {
+                auto ec = boost::system::error_code{errno, boost::system::generic_category()};
+                BOOST_LOG(log) << "Error accessing dongle at " << path << ": " << ec.message();
+            }
+        }
     }
-
-    char* line = NULL;
-    size_t n = 0;
-    long read;
-
-    while (-1 != (read = getline(&line, &n, cmd_proc.out))) {
-      line[read - 1] = '\0';  /* Overwrite newline */
-      snprintf(buf, len, "/dev/%s", line);
-      if (!access(buf, R_OK | W_OK)) {
-        bInfo(stderr, "(barobo) INFO: dongle found at %s\n", buf);
-        dongle_found = 1;
-        break;
-      }
-      if (EACCES == errno) {
-        fprintf(stderr, "(barobo) WARNING: dongle found at %s, but user does not have "
-            "sufficient read/write permissions.\n", buf);
-      }
-      else {
-        char errbuf[256];
-        strerror_r(errno, errbuf, sizeof(errbuf));
-        fprintf(stderr, "(barobo) WARNING: attempted to access %s: %s\n", buf, errbuf);
-      }
-    }
-
-    free(line);
-    if (-1 == pclose3(cmd_proc)) {
-      char errbuf[256];
-      strerror_r(errno, errbuf, sizeof(errbuf));
-      fprintf(stderr, "(barobo) WARNING: error closing find dongle command: %s\n", errbuf);
-      return -1;
-    }
-  }
-
-  return dongle_found ? 0 : -1;
+    return -1;
 }

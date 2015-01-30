@@ -51,7 +51,6 @@ std::string dongleDevicePath (boost::system::error_code& ec) {
 #ifdef _WIN32
 #include "dongledevicepath/win32.cpp"
 #elif defined(__linux__)
-#include "dongledevicepath/popen3.c"
 #include "dongledevicepath/linux.cpp"
 #elif defined(__APPLE__) && defined(__MACH__)
 #include "dongledevicepath/osx.cpp"
