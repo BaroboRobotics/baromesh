@@ -13,6 +13,9 @@ if(WIN32 AND NOT CMAKE_COMPILER_IS_GNUCXX)
   #)
 endif()
 
+# Give subprojects access to LinkbotLabs.cmake
+list(INSERT CMAKE_MODULE_PATH 0 "${PROJECT_SOURCE_DIR}/../../../cmake-modules")
+
 include(LinkbotLabs)
 ll_add_dependency(cxx-util cxx-util)
 ll_add_dependency(libsfp sfp)

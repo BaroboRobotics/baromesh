@@ -103,7 +103,7 @@ public:
         auto self = this->shared_from_this();
         asyncFire(mClient, args, std::chrono::seconds(60),
             [self, this, realHandler] (boost::system::error_code ec, MethodResult::transmitUnicast) {
-                mClient.get_io_service().post(std::bind(realHandler, ec));
+                this->mClient.get_io_service().post(std::bind(realHandler, ec));
             });
 
         return init.result.get();
@@ -120,18 +120,18 @@ public:
         auto self = this->shared_from_this();
         mStrand.post([self, this, serialId, buffer, realHandler] () {
             {
-                auto lock = util::BenchmarkedLock{mReceiveDataMutex};
-                auto iter = mReceiveData.find(serialId);
-                if (mReceiveData.end() == iter) {
-                    mClient.get_io_service().post(std::bind(realHandler, Status::UNREGISTERED_SERIALID, 0));
+                auto lock = util::BenchmarkedLock{this->mReceiveDataMutex};
+                auto iter = this->mReceiveData.find(serialId);
+                if (this->mReceiveData.end() == iter) {
+                    this->mClient.get_io_service().post(std::bind(realHandler, Status::UNREGISTERED_SERIALID, 0));
                 }
                 else {
-                    BOOST_LOG(mLog) << "Pushing a receive handler for " << serialId;
+                    BOOST_LOG(this->mLog) << "Pushing a receive handler for " << serialId;
                     iter->second.ops.push(std::make_pair(buffer, realHandler));
                 }
             }
-            postReceives();
-            startReceivePump();
+            this->postReceives();
+            this->startReceivePump();
         });
 
         return init.result.get();

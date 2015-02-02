@@ -54,7 +54,6 @@ int main(int argc, char** argv) {
 
     std::vector<std::thread> lavaLampThreads;
 
-    std::this_thread::sleep_for(std::chrono::seconds(1));
     for (auto s : serialIds) {
         lavaLampThreads.emplace_back(lavaLamp, s);
     }
