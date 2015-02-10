@@ -198,7 +198,7 @@ public:
             auto iter = mRobotProxies.find(serialId);
             Tcp::endpoint endpoint;
             if (mRobotProxies.end() == iter) {
-                BOOST_LOG(mLog) << "No proxy exists, buiding resolver query";
+                BOOST_LOG(mLog) << "No proxy exists, building resolver query";
                 // Bind to a random, free local port.
                 // FIXME this resolve is synchronous. Make it asynchronous.
                 // This will require us to enable asynchronous method invocation in
