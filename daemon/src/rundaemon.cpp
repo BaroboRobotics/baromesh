@@ -6,7 +6,7 @@
 
 #include <boost/log/common.hpp>
 #include <boost/log/expressions.hpp>
-#include <boost/log/attributes/timer.hpp>
+#include <boost/log/attributes/clock.hpp>
 #include <boost/log/sources/logger.hpp>
 #include <boost/log/support/date_time.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
@@ -29,12 +29,11 @@ static void initializeLoggingCore () {
     boost::log::add_common_attributes();
 
     auto core = boost::log::core::get();
-    core->add_global_attribute("Timeline", attrs::timer());
     core->add_global_attribute("Scope", attrs::named_scope());
 
     boost::log::formatter formatter =
         expr::stream
-            << "[T+" << expr::attr<attrs::timer::value_type, util::LogSafely>("Timeline") << "]"
+            << "[" << expr::attr<attrs::local_clock::value_type, util::LogSafely>("TimeStamp") << "]"
             << "[thread=" << expr::attr<attrs::current_thread_id::value_type>("ThreadID") << "]"
             << expr::if_ (expr::has_attr<std::string>("SerialId")) [
                 expr::stream << "[robot=" << expr::attr<std::string>("SerialId") << "]"
