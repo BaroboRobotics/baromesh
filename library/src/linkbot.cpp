@@ -597,4 +597,79 @@ void Linkbot::writeEeprom(uint32_t address, const uint8_t *data, size_t size)
     }
 }
 
+void Linkbot::readEeprom(uint32_t address, size_t recvsize, uint8_t *buffer)
+{
+    if(recvsize > 128) {
+        throw Error(m->serialId + ": Payload size too large");
+    }
+    try {
+        MethodIn::readEeprom arg;
+        arg.address = address;
+        arg.size = recvsize;
+        auto result = asyncFire(m->robot, arg, requestTimeout(), use_future).get();
+        memcpy(buffer, result.data.bytes, result.data.size);
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
+void Linkbot::writeTwi(uint32_t address, const uint8_t *data, size_t size)
+{
+    if(size > 128) {
+        throw Error(m->serialId + ": Payload size too large");
+    }
+    try {
+        MethodIn::writeTwi arg;
+        arg.address = address;
+        memcpy(arg.data.bytes, data, size);
+        arg.data.size = size;
+        asyncFire(m->robot, arg, requestTimeout(), use_future).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
+void Linkbot::readTwi(uint32_t address, size_t recvsize, uint8_t *buffer)
+{
+    if(recvsize > 128) {
+        throw Error(m->serialId + ": Payload size too large");
+    }
+    try {
+        MethodIn::readTwi arg;
+        arg.address = address;
+        arg.recvsize = recvsize;
+        auto result = asyncFire(m->robot, arg, requestTimeout(), use_future).get();
+        memcpy(buffer, result.data.bytes, result.data.size);
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
+void Linkbot::writeReadTwi(
+    uint32_t address, 
+    const uint8_t *sendbuf, 
+    size_t sendsize,
+    uint8_t* recvbuf,
+    size_t recvsize)
+{
+    if((recvsize > 128) || (sendsize > 128)) {
+        throw Error(m->serialId + ": Payload size too large");
+    }
+    try {
+        MethodIn::writeReadTwi arg;
+        arg.address = address;
+        arg.recvsize = recvsize;
+        memcpy(arg.data.bytes, sendbuf, sendsize);
+        arg.data.size = sendsize;
+        auto result = asyncFire(m->robot, arg, requestTimeout(), use_future).get();
+        memcpy(recvbuf, result.data.bytes, result.data.size);
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
 } // namespace

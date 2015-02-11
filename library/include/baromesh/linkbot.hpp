@@ -88,6 +88,15 @@ public:
 
     /* MISC */
     void writeEeprom(uint32_t address, const uint8_t *data, size_t size);
+    void readEeprom(uint32_t address, size_t recvsize, uint8_t *buffer);
+    void writeTwi(uint32_t address, const uint8_t *data, size_t size);
+    void readTwi(uint32_t address, size_t recvsize, uint8_t *buffer);
+    void writeReadTwi(
+        uint32_t address, 
+        const uint8_t *sendbuf, 
+        size_t sendsize,
+        uint8_t* recvbuf,
+        size_t recvsize);
 
 private:
     struct Impl;
