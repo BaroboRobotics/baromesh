@@ -32,32 +32,15 @@ using Broadcast = rpc::Broadcast<barobo::Robot>;
 using boost::asio::use_future;
 
 struct Linkbot::Impl {
-    Impl (const std::string& id)
+    Impl (const std::string& id, const std::string& host, const std::string& service)
         : serialId(id)
         , ioCore(baromesh::IoCore::get(false))
         , resolver(ioCore->ios())
-        , daemon(ioCore->ios(), log)
         , robot(ioCore->ios(), log)
     {
-        auto daemonQuery = decltype(resolver)::query {
-            baromesh::daemonHostName(), baromesh::daemonServiceName()
-        };
-        BOOST_LOG(log) << "Connecting to the daemon at "
-                       << daemonQuery.host_name() << ":" << daemonQuery.service_name();
-        auto daemonIter = resolver.resolve(daemonQuery);
-        baromesh::asyncInitTcpClient(daemon, daemonIter, use_future).get();
-        rpc::asio::asyncConnect<barobo::Daemon>(daemon, requestTimeout(), use_future).get();
-        daemonRunDone = rpc::asio::asyncRunClient<barobo::Daemon>(daemon, *this, use_future);
-
-        // FIXME rename asyncResolveSerialId since it returns a resolver query,
-        // not an endpoint iterator.
-        auto robotHostServicePair = baromesh::asyncResolveSerialId(daemon,
-            serialId, requestTimeout(), use_future).get();
         BOOST_LOG(log) << "Connecting to " << serialId << " proxy at "
-                       << robotHostServicePair.first << ":"
-                       << robotHostServicePair.second;
-        auto robotIter = resolver.resolve(decltype(resolver)::query{
-            robotHostServicePair.first, robotHostServicePair.second});
+                       << host << ":" << service;
+        auto robotIter = resolver.resolve(decltype(resolver)::query{host, service});
         baromesh::asyncInitTcpClient(robot, robotIter, use_future).get();
         rpc::asio::asyncConnect<barobo::Robot>(robot, requestTimeout(), use_future).get();
         robotRunDone = rpc::asio::asyncRunClient<barobo::Robot>(robot, *this, use_future);
@@ -75,28 +58,40 @@ struct Linkbot::Impl {
                 BOOST_LOG(log) << "Exception during disconnect: " << e.what();
             }
         }
-        if (daemonRunDone.valid()) {
-            try {
-                BOOST_LOG(log) << "Disconnecting daemon client";
-                asyncDisconnect(daemon, requestTimeout(), use_future).get();
-                daemon.close();
-                daemonRunDone.get();
-            }
-            catch (std::exception& e) {
-                BOOST_LOG(log) << "Exception during disconnect: " << e.what();
-            }
-        }
+    }
+
+    // Use the daemon to resolve a serial ID to a TCP/IP host:service pair and
+    // construct a Linkbot::Impl backed by this host:service. The caller has
+    // ownership of the returned pointer.
+    static Impl* fromSerialId (const std::string& serialId) {
+        auto ioCore = baromesh::IoCore::get(false);
+        boost::log::sources::logger log;
+        boost::asio::ip::tcp::resolver resolver {ioCore->ios()};
+        baromesh::TcpClient daemon {ioCore->ios(), log};
+
+        auto daemonQuery = decltype(resolver)::query {
+            baromesh::daemonHostName(), baromesh::daemonServiceName()
+        };
+        BOOST_LOG(log) << "Connecting to the daemon at "
+                       << daemonQuery.host_name() << ":" << daemonQuery.service_name();
+        auto daemonIter = resolver.resolve(daemonQuery);
+        baromesh::asyncInitTcpClient(daemon, daemonIter, use_future).get();
+        rpc::asio::asyncConnect<barobo::Daemon>(daemon, requestTimeout(), use_future).get();
+
+        std::string host, service;
+        std::tie(host, service) = baromesh::asyncResolveSerialId(daemon,
+            serialId, requestTimeout(), use_future).get();
+
+        BOOST_LOG(log) << "Disconnecting daemon client";
+        asyncDisconnect(daemon, requestTimeout(), use_future).get();
+        daemon.close();
+
+        return new Impl{serialId, host, service};
     }
 
     template <class B>
     void broadcast (B&& args) {
         onBroadcast(std::forward<B>(args));
-    }
-
-    void onBroadcast (rpc::Broadcast<barobo::Daemon>::dongleEvent b) {
-        if (!b.status) {
-            BOOST_LOG(log) << "Dongle available";
-        }
     }
 
     void onBroadcast (Broadcast::buttonEvent b) {
@@ -137,11 +132,8 @@ struct Linkbot::Impl {
     std::shared_ptr<baromesh::IoCore> ioCore;
     boost::asio::ip::tcp::resolver resolver;
 
-    baromesh::TcpClient daemon;
     baromesh::TcpClient robot;
-
     std::future<void> robotRunDone;
-    std::future<void> daemonRunDone;
 
     std::function<void(Button::Type, ButtonState::Type, int)> buttonEventCallback;
     std::function<void(int,double, int)> encoderEventCallback;
@@ -149,8 +141,15 @@ struct Linkbot::Impl {
     std::function<void(double,double,double,int)> accelerometerEventCallback;
 };
 
+Linkbot::Linkbot (const std::string& host, const std::string& service) try
+    : m(new Linkbot::Impl{"unkn", host, service})
+{}
+catch (std::exception& e) {
+    throw Error(std::string{"unkn"} + ": " + e.what());
+}
+
 Linkbot::Linkbot (const std::string& id) try
-    : m(new Linkbot::Impl{id})
+    : m(Linkbot::Impl::fromSerialId(id))
 {}
 catch (std::exception& e) {
     throw Error(id + ": " + e.what());
