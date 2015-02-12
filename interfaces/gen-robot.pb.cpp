@@ -33,6 +33,10 @@ RPCDEF_CPP((barobo, Robot),
         (resetEncoderRevs)
         (stop)
         (writeEeprom)
+        (readEeprom)
+        (writeTwi)
+        (readTwi)
+        (writeReadTwi)
         ,
         // all broadcasts
         (buttonEvent)

@@ -315,6 +315,46 @@ message writeEeprom {
     message Result { }
 }
 
+message readEeprom {
+    message In {
+        required uint32 address = 1;
+        required uint32 size = 2;
+    }
+    message Result {
+        required bytes data = 1[ (nanopb).max_size = 128];
+    }
+}
+
+message writeTwi {
+    message In {
+        required uint32 address = 1;
+        required bytes data = 2 [(nanopb).max_size = 128];
+    }
+    
+    message Result { }
+}
+
+message readTwi {
+    message In { 
+        required uint32 address = 1; 
+        required uint32 recvsize = 2;
+    } 
+    message Result {
+        required bytes data = 2 [(nanopb).max_size = 128];
+    }
+}
+
+message writeReadTwi {
+    message In {
+        required uint32 address = 1;
+        required uint32 recvsize = 2;
+        required bytes data = 3 [(nanopb).max_size = 128];
+    }
+    message Result {
+        required bytes data = 2 [(nanopb).max_size = 128];
+    }
+}
+
 //////////////////////////////////////////////////////////////////////////////
 // Broadcasts
 
