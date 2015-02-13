@@ -221,13 +221,15 @@ message getEncoderValues {
     }
 }
 
+enum JointState {
+    COAST = 0;
+    HOLD = 1;
+    MOVING = 2;
+    NOJOINT = 3;
+    ERROR = 4;
+}
+
 message getJointStates {
-    enum JointState {
-        COAST = 0;
-        HOLD = 1;
-        MOVING = 2;
-        NOJOINT = 3;
-    }
     message In {}
     message Result{
         required uint32 timestamp = 1;
@@ -388,16 +390,10 @@ message accelerometerEvent {
     required float z = 4;
 }
 
-enum JointEventType {
-    HOLD = 0;
-    STOP = 1;
-    FAIL = 2; // Joint could not reach desired position
-}
-
 message jointEvent {
     required uint32 timestamp = 1;
     required uint32 joint = 2;
-    required JointEventType event = 3;
+    required JointState event = 3;
 }
 
 message debugMessageEvent {

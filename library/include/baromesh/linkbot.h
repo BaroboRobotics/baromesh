@@ -41,7 +41,8 @@ namespace JointState {
         STOP,
         HOLD,
         MOVING,
-        FAIL
+        NO_MOTOR,
+        ERROR
     };
 }
 
