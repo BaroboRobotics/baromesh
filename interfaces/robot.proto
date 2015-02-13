@@ -227,6 +227,7 @@ message getJointStates {
         HOLD = 1;
         MOVING = 2;
         NOJOINT = 3;
+        ERROR = 4;
     }
     message In {}
     message Result{

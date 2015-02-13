@@ -46,6 +46,7 @@ public:
                         JointState::Type & s3);
     void getLedColor (int&, int&, int&);
     void getVersions (uint32_t&, uint32_t&, uint32_t&);
+    void getSerialId();
 
     /* SETTERS */
     void resetEncoderRevs();
