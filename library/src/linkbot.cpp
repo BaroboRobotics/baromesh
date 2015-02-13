@@ -41,7 +41,7 @@ struct Linkbot::Impl {
         BOOST_LOG(log) << "Connecting to " << serialId << " proxy at "
                        << host << ":" << service;
         auto robotIter = resolver.resolve(decltype(resolver)::query{host, service});
-        baromesh::asyncInitTcpClient(robot, robotIter, use_future).get();
+        rpc::asio::asyncInitTcpClient(robot, robotIter, use_future).get();
         rpc::asio::asyncConnect<barobo::Robot>(robot, requestTimeout(), use_future).get();
         robotRunDone = rpc::asio::asyncRunClient<barobo::Robot>(robot, *this, use_future);
     }
@@ -67,7 +67,7 @@ struct Linkbot::Impl {
         auto ioCore = baromesh::IoCore::get(false);
         boost::log::sources::logger log;
         boost::asio::ip::tcp::resolver resolver {ioCore->ios()};
-        baromesh::TcpClient daemon {ioCore->ios(), log};
+        rpc::asio::TcpClient daemon {ioCore->ios(), log};
 
         auto daemonQuery = decltype(resolver)::query {
             baromesh::daemonHostName(), baromesh::daemonServiceName()
@@ -75,7 +75,7 @@ struct Linkbot::Impl {
         BOOST_LOG(log) << "Connecting to the daemon at "
                        << daemonQuery.host_name() << ":" << daemonQuery.service_name();
         auto daemonIter = resolver.resolve(daemonQuery);
-        baromesh::asyncInitTcpClient(daemon, daemonIter, use_future).get();
+        rpc::asio::asyncInitTcpClient(daemon, daemonIter, use_future).get();
         rpc::asio::asyncConnect<barobo::Daemon>(daemon, requestTimeout(), use_future).get();
 
         std::string host, service;
@@ -132,7 +132,7 @@ struct Linkbot::Impl {
     std::shared_ptr<baromesh::IoCore> ioCore;
     boost::asio::ip::tcp::resolver resolver;
 
-    baromesh::TcpClient robot;
+    rpc::asio::TcpClient robot;
     std::future<void> robotRunDone;
 
     std::function<void(Button::Type, ButtonState::Type, int)> buttonEventCallback;
