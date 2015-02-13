@@ -263,6 +263,21 @@ void Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
     }
 }
 
+void Linkbot::getJointSafetyThresholds(int& t1, int& t2, int& t3)
+{
+    try {
+        auto value = asyncFire(m->robot,
+            MethodIn::getMotorControllerSafetyThreshold{},
+            requestTimeout(), use_future).get();
+        t1 = value.values[0];
+        t2 = value.values[1];
+        t3 = value.values[2];
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
 /* SETTERS */
 void Linkbot::resetEncoderRevs() {
     try {
@@ -354,6 +369,25 @@ void Linkbot::setLedColor (int r, int g, int b) {
         asyncFire(m->robot, MethodIn::setLedColor{
             uint32_t(r << 16 | g << 8 | b)
         }, requestTimeout(), use_future).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
+void Linkbot::setJointSafetyThresholds(int mask, int t0, int t1, int t2) {
+    try {
+        MethodIn::setMotorControllerSafetyThreshold arg;
+        arg.mask = mask;
+        arg.values_count = 0;
+        int jointFlag = 0x01;
+        for (auto& t : { t0, t1, t2 }) {
+            if (jointFlag & mask) {
+                arg.values[arg.values_count++] = t;
+            }
+            jointFlag <<= 1;
+        }
+        asyncFire(m->robot, arg, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
         throw Error(m->serialId + ": " + e.what());

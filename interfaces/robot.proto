@@ -171,6 +171,7 @@ message getMotorControllerSafetyThreshold {
         repeated uint32 values = 1[packed=true, (nanopb).max_count=32]; // acceleration
     }
 }
+
 // used by smooth acceleration
 message getMotorControllerAlphaI {
     message In {

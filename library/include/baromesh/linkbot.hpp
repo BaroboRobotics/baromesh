@@ -47,6 +47,7 @@ public:
     void getLedColor (int&, int&, int&);
     void getVersions (uint32_t&, uint32_t&, uint32_t&);
     void getSerialId();
+    void getJointSafetyThresholds(int&, int&, int&);
 
     /* SETTERS */
     void resetEncoderRevs();
@@ -58,6 +59,7 @@ public:
         JointState::Type s2, double d2,
         JointState::Type s3, double d3);
     void setLedColor (int, int, int);
+    void setJointSafetyThresholds(int mask, int t1=100, int t2=100, int t3=100);
 
     /* MOVEMENT */
     // Member functions take angles in degrees.
