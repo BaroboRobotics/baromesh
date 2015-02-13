@@ -101,6 +101,14 @@ message enableAccelerometerEvent {
     message Result{}
 }
 
+message setMotorControllerSafetyThreshold {
+    message In {
+        required uint32 mask = 1;
+        repeated uint32 values = 2 [packed=true, (nanopb).max_count=32]; 
+    }
+    message Result {}
+}
+
 // used by smooth acceleration
 message setMotorControllerAlphaI {
     message In {
@@ -156,6 +164,13 @@ message setMotorControllerDerivativeGain {
     }
 }
 
+message getMotorControllerSafetyThreshold {
+    message In {
+    }
+    message Result {
+        repeated uint32 values = 1[packed=true, (nanopb).max_count=32]; // acceleration
+    }
+}
 // used by smooth acceleration
 message getMotorControllerAlphaI {
     message In {
