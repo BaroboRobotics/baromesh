@@ -52,7 +52,7 @@ target_link_libraries(baromeshd
 
 if(WIN32)
     target_link_libraries(baromeshd
-        PRIVATE setupapi ws2_32 mswsock
+        PRIVATE ws2_32 mswsock
         )
 endif()
 

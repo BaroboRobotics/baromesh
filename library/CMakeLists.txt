@@ -52,6 +52,10 @@ target_link_libraries(baromesh
            ${CMAKE_THREAD_LIBS_INIT}
     )
 
+if(WIN32)
+    target_link_libraries(baromesh PUBLIC ws2_32 mswsock)
+endif()
+
 set_target_properties(baromesh PROPERTIES
     VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
     SOVERSION ${VERSION_MAJOR}
