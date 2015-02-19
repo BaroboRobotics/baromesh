@@ -281,6 +281,8 @@ message Goal {
     required Type type = 1;
     required float goal = 2; // absolute, relative angles; or coefficient in infinite case
     optional Controller controller = 3;
+    optional float timeout = 4; // Seconds from now to time out
+    optional JointState modeOnTimeout = 5;
 }
 
 // notes: make motor controller attributes per motor

@@ -278,6 +278,14 @@ void Linkbot::getJointSafetyThresholds(int& t1, int& t2, int& t3)
     }
 }
 
+std::string Linkbot::getSerialId()
+{
+    char buf[5];
+    readEeprom(0x412, 4, (uint8_t*)buf);
+    buf[4] = '\0';
+    return std::string(buf);
+}
+
 /* SETTERS */
 void Linkbot::resetEncoderRevs() {
     try {

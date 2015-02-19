@@ -46,7 +46,7 @@ public:
                         JointState::Type & s3);
     void getLedColor (int&, int&, int&);
     void getVersions (uint32_t&, uint32_t&, uint32_t&);
-    void getSerialId();
+    std::string getSerialId();
     void getJointSafetyThresholds(int&, int&, int&);
 
     /* SETTERS */
