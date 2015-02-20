@@ -32,13 +32,12 @@ using Broadcast = rpc::Broadcast<barobo::Robot>;
 using boost::asio::use_future;
 
 struct Linkbot::Impl {
-    Impl (const std::string& id, const std::string& host, const std::string& service)
-        : serialId(id)
-        , ioCore(baromesh::IoCore::get(false))
+    Impl (const std::string& host, const std::string& service)
+        : ioCore(baromesh::IoCore::get(false))
         , resolver(ioCore->ios())
         , robot(ioCore->ios(), log)
     {
-        BOOST_LOG(log) << "Connecting to " << serialId << " proxy at "
+        BOOST_LOG(log) << "Connecting to Linkbot proxy at "
                        << host << ":" << service;
         auto robotIter = resolver.resolve(decltype(resolver)::query{host, service});
         rpc::asio::asyncInitTcpClient(robot, robotIter, use_future).get();
@@ -86,7 +85,7 @@ struct Linkbot::Impl {
         asyncDisconnect(daemon, requestTimeout(), use_future).get();
         daemon.close();
 
-        return new Impl{serialId, host, service};
+        return new Impl{host, service};
     }
 
     template <class B>
@@ -127,8 +126,6 @@ struct Linkbot::Impl {
 
     mutable boost::log::sources::logger log;
 
-    std::string serialId;
-
     std::shared_ptr<baromesh::IoCore> ioCore;
     boost::asio::ip::tcp::resolver resolver;
 
@@ -142,10 +139,10 @@ struct Linkbot::Impl {
 };
 
 Linkbot::Linkbot (const std::string& host, const std::string& service) try
-    : m(new Linkbot::Impl{"unkn", host, service})
+    : m(new Linkbot::Impl{host, service})
 {}
 catch (std::exception& e) {
-    throw Error(std::string{"unkn"} + ": " + e.what());
+    throw Error(e.what());
 }
 
 Linkbot::Linkbot (const std::string& id) try
@@ -157,10 +154,6 @@ catch (std::exception& e) {
 
 Linkbot::~Linkbot () {
     delete m;
-}
-
-std::string Linkbot::serialId () const {
-    return m->serialId;
 }
 
 using namespace std::placeholders; // _1, _2, etc.
@@ -176,7 +169,7 @@ void Linkbot::getAccelerometer (int& timestamp, double&x, double&y, double&z)
         z = value.z;
     } 
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -187,7 +180,7 @@ void Linkbot::getFormFactor(FormFactor::Type& form)
         form = FormFactor::Type(value.value);
     } 
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -201,7 +194,7 @@ void Linkbot::getJointAngles (int& timestamp, double& a0, double& a1, double& a2
         timestamp = values.timestamp;
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -215,7 +208,7 @@ void Linkbot::getJointSpeeds(double&s1, double&s2, double&s3)
         s3 = baromesh::radToDeg(values.values[2]);
     } 
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -232,7 +225,7 @@ void Linkbot::getJointStates(int& timestamp,
         s3 = static_cast<JointState::Type>(values.values[2]);
     } 
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -244,7 +237,7 @@ void Linkbot::getLedColor (int& r, int& g, int& b) {
         b = 0xff & color.value;
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -254,11 +247,11 @@ void Linkbot::getVersions (uint32_t& major, uint32_t& minor, uint32_t& patch) {
         major = version.major;
         minor = version.minor;
         patch = version.patch;
-        BOOST_LOG(m->log) << m->serialId << " Firmware version "
+        BOOST_LOG(m->log) << "Firmware version "
                            << major << '.' << minor << '.' << patch;
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -273,7 +266,7 @@ void Linkbot::getJointSafetyThresholds(int& t1, int& t2, int& t3)
         t3 = value.values[2];
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -291,7 +284,7 @@ void Linkbot::resetEncoderRevs() {
         asyncFire(m->robot, MethodIn::resetEncoderRevs{}, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -300,7 +293,7 @@ void Linkbot::setBuzzerFrequency (double freq) {
         asyncFire(m->robot, MethodIn::setBuzzerFrequency{float(freq)}, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -319,7 +312,7 @@ void Linkbot::setJointSpeeds (int mask, double s0, double s1, double s2) {
         asyncFire(m->robot, arg, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -367,7 +360,7 @@ void Linkbot::setJointStates(
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -378,7 +371,7 @@ void Linkbot::setLedColor (int r, int g, int b) {
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -397,7 +390,7 @@ void Linkbot::setJointSafetyThresholds(int mask, int t0, int t1, int t2) {
         asyncFire(m->robot, arg, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -425,7 +418,7 @@ void Linkbot::drive (int mask, double a0, double a1, double a2)
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -451,7 +444,7 @@ void Linkbot::driveTo (int mask, double a0, double a1, double a2)
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -470,7 +463,7 @@ void Linkbot::move (int mask, double a0, double a1, double a2) {
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -483,7 +476,7 @@ void Linkbot::moveContinuous (int mask, double c0, double c1, double c2) {
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -496,7 +489,7 @@ void Linkbot::moveTo (int mask, double a0, double a1, double a2) {
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -522,7 +515,7 @@ void Linkbot::motorPower(int mask, int m1, int m2, int m3)
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -531,7 +524,7 @@ void Linkbot::stop (int mask) {
         asyncFire(m->robot, MethodIn::stop{true, static_cast<uint32_t>(mask)}, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -547,7 +540,7 @@ void Linkbot::setAccelerometerEventCallback (AccelerometerEventCallback cb, void
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 
     if (enable) {
@@ -565,7 +558,7 @@ void Linkbot::setButtonEventCallback (ButtonEventCallback cb, void* userData) {
         asyncFire(m->robot, MethodIn::enableButtonEvent{enable}, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 
     if (enable) {
@@ -590,7 +583,7 @@ void Linkbot::setEncoderEventCallback (EncoderEventCallback cb,
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 
     if (enable) {
@@ -609,7 +602,7 @@ void Linkbot::setJointEventCallback (JointEventCallback cb, void* userData) {
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 
     if (enable) {
@@ -623,7 +616,7 @@ void Linkbot::setJointEventCallback (JointEventCallback cb, void* userData) {
 void Linkbot::writeEeprom(uint32_t address, const uint8_t *data, size_t size)
 {
     if(size > 128) {
-        throw Error(m->serialId + ": Payload size too large");
+        throw Error("Payload size too large");
     }
     try {
         MethodIn::writeEeprom arg;
@@ -633,14 +626,14 @@ void Linkbot::writeEeprom(uint32_t address, const uint8_t *data, size_t size)
         asyncFire(m->robot, arg, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
 void Linkbot::readEeprom(uint32_t address, size_t recvsize, uint8_t *buffer)
 {
     if(recvsize > 128) {
-        throw Error(m->serialId + ": Payload size too large");
+        throw Error("Payload size too large");
     }
     try {
         MethodIn::readEeprom arg;
@@ -650,14 +643,14 @@ void Linkbot::readEeprom(uint32_t address, size_t recvsize, uint8_t *buffer)
         memcpy(buffer, result.data.bytes, result.data.size);
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
 void Linkbot::writeTwi(uint32_t address, const uint8_t *data, size_t size)
 {
     if(size > 128) {
-        throw Error(m->serialId + ": Payload size too large");
+        throw Error("Payload size too large");
     }
     try {
         MethodIn::writeTwi arg;
@@ -667,14 +660,14 @@ void Linkbot::writeTwi(uint32_t address, const uint8_t *data, size_t size)
         asyncFire(m->robot, arg, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
 void Linkbot::readTwi(uint32_t address, size_t recvsize, uint8_t *buffer)
 {
     if(recvsize > 128) {
-        throw Error(m->serialId + ": Payload size too large");
+        throw Error("Payload size too large");
     }
     try {
         MethodIn::readTwi arg;
@@ -684,7 +677,7 @@ void Linkbot::readTwi(uint32_t address, size_t recvsize, uint8_t *buffer)
         memcpy(buffer, result.data.bytes, result.data.size);
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
@@ -696,7 +689,7 @@ void Linkbot::writeReadTwi(
     size_t recvsize)
 {
     if((recvsize > 128) || (sendsize > 128)) {
-        throw Error(m->serialId + ": Payload size too large");
+        throw Error("Payload size too large");
     }
     try {
         MethodIn::writeReadTwi arg;
@@ -708,7 +701,7 @@ void Linkbot::writeReadTwi(
         memcpy(recvbuf, result.data.bytes, result.data.size);
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 

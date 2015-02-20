@@ -28,16 +28,6 @@ private:
     Linkbot& operator= (const Linkbot&);
 
 public:
-    std::string serialId () const;
-
-    bool operator== (const Linkbot& that) const {
-      return this->serialId() == that.serialId();
-    }
-
-    bool operator!= (const Linkbot& that) const {
-        return !operator==(that);
-    }
-
     // All member functions may throw a barobo::Error exception on failure.
 
     /* GETTERS */
