@@ -34,15 +34,12 @@ namespace FormFactor {
     };
 }
 
-// hlh: I got rid of MotorDir. Its values were FORWARD, BACKWARD, NEUTRAL, and
-// HOLD. We were considering merging MotorDir with JointState, as I recall.
 namespace JointState {
     enum Type {
-        STOP,
+        COAST,
         HOLD,
         MOVING,
-        NO_MOTOR,
-        ERROR
+        FAILURE
     };
 }
 

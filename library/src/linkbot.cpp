@@ -115,7 +115,6 @@ struct Linkbot::Impl {
 
     void onBroadcast (Broadcast::jointEvent b) {
         if (jointEventCallback) {
-#warning b.state is barobo_rpc_Robot_JointEventType, which has different values from JointState::Type!!!
             jointEventCallback(b.joint, static_cast<JointState::Type>(b.event), b.timestamp);
         }
     }
@@ -335,7 +334,7 @@ void Linkbot::setJointStates(
     coefficients[2] = d3;
     for(int i = 0; i < 3; i++) {
         switch(jointStates[i]) {
-            case JointState::STOP:
+            case JointState::COAST:
                 goalType[i] = barobo_Robot_Goal_Type_INFINITE;
                 controllerType[i] = barobo_Robot_Goal_Controller_PID;
                 coefficients[i] = 0;
