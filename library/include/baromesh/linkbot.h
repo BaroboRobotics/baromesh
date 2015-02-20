@@ -73,6 +73,9 @@ int linkbotGetJointStates(baromesh::Linkbot*, int *timestamp, barobo::JointState
                           barobo::JointState::Type *j2, 
                           barobo::JointState::Type *j3);
 int linkbotGetLedColor(baromesh::Linkbot *l, int *r, int *g, int *b);
+int linkbotGetVersions (baromesh::Linkbot *l, unsigned*, unsigned*, unsigned*);
+int linkbotGetSerialId(baromesh::Linkbot* l, char* serialId);
+int linkbotGetJointSafetyThresholds(baromesh::Linkbot* l, int*, int*, int*);
 
 /* SETTERS */
 int linkbotResetEncoderRevs(baromesh::Linkbot *l);

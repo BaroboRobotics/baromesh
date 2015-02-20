@@ -1,4 +1,5 @@
 #include <iostream>
+#include <string>
 #include "baromesh/linkbot.h"
 #include "baromesh/linkbot.hpp"
 
@@ -74,6 +75,30 @@ int linkbotGetLedColor(Linkbot *l, int *r, int *g, int *b)
 {
     LINKBOT_C_WRAPPER_FUNC_IMPL(getLedColor, *r, *g, *b);
 }
+
+int linkbotGetVersions (Linkbot* l, unsigned* major, unsigned* minor, unsigned* patch)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(getVersions, *major, *minor, *patch);
+}
+
+int linkbotGetSerialId(Linkbot* l, char* serialId)
+{
+    std::string id;
+    try {
+        l->impl.getSerialId(id);
+        snprintf(serialId, 5, "%s", id.c_str());
+        return 0;
+    }
+    catch (std::exception& e) {
+        fprintf(stderr, "Runtime exception: %s\n", e.what());
+        return -1;
+    }
+}
+int linkbotGetJointSafetyThresholds(Linkbot* l, int* t1, int* t2, int* t3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(getJointSafetyThresholds, *t1, *t2, *t3);
+}
+
 
 /* SETTERS */
 
