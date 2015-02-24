@@ -9,5 +9,5 @@ int main(int argc, char** argv)
     }
 
     baromesh::Linkbot* l;
-    l = linkbotNew(argv[1]);
+    l = linkbotFromSerialId(argv[1]);
 }

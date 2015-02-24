@@ -6,9 +6,14 @@
 namespace baromesh {
 
 struct Linkbot {
-    Linkbot (const char* serialId) : impl(std::string(serialId))
-    {
-    }
+    Linkbot (const char* host, const char* service)
+        : impl(std::string(host), std::string(service))
+    {}
+
+    Linkbot (const char* serialId)
+        : impl(std::string(serialId))
+    {}
+
     barobo::Linkbot impl;
 };
 
@@ -16,7 +21,12 @@ struct Linkbot {
 
 using namespace baromesh;
 
-Linkbot* linkbotNew(const char* serialId)
+Linkbot* linkbotFromTcpEndpoint(const char* host, const char* service)
+{
+    return new Linkbot(host, service);
+}
+
+Linkbot* linkbotFromSerialId(const char* serialId)
 {
     return new Linkbot(serialId);
 }

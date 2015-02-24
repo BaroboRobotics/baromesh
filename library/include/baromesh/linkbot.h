@@ -56,7 +56,8 @@ namespace baromesh {
 typedef struct Linkbot Linkbot;
 }
 
-baromesh::Linkbot* linkbotNew(const char* serialId);
+baromesh::Linkbot* linkbotFromTcpEndpoint(const char* host, const char* service);
+baromesh::Linkbot* linkbotFromSerialId(const char* serialId);
 void linkbotDelete(baromesh::Linkbot* l);
 
 /* MISC */
