@@ -23,12 +23,24 @@ using namespace baromesh;
 
 Linkbot* linkbotFromTcpEndpoint(const char* host, const char* service)
 {
-    return new Linkbot(host, service);
+    try {
+        return new Linkbot(host, service);
+    }
+    catch (std::exception& e) {
+        fprintf(stderr, "Runtime exception: %s\n", e.what());
+        return nullptr;
+    }
 }
 
 Linkbot* linkbotFromSerialId(const char* serialId)
 {
-    return new Linkbot(serialId);
+    try {
+        return new Linkbot(serialId);
+    }
+    catch (std::exception& e) {
+        fprintf(stderr, "Runtime exception: %s\n", e.what());
+        return nullptr;
+    }
 }
 
 void linkbotDelete(Linkbot* l)
