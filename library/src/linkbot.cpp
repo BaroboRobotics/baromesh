@@ -372,6 +372,79 @@ void Linkbot::setJointStates(
     }
 }
 
+void Linkbot::setJointStates(
+        int mask,
+        JointState::Type s1, double d1, double timeout1, JointState::Type end1,
+        JointState::Type s2, double d2, double timeout2, JointState::Type end2,
+        JointState::Type s3, double d3, double timeout3, JointState::Type end3
+        )
+{
+    barobo_Robot_Goal_Type goalType[3];
+    barobo_Robot_Goal_Controller controllerType[3];
+    JointState::Type jointStates[3];
+    float coefficients[3];
+    jointStates[0] = s1;
+    jointStates[1] = s2;
+    jointStates[2] = s3;
+    coefficients[0] = d1;
+    coefficients[1] = d2;
+    coefficients[2] = d3;
+    bool hasTimeouts[3];
+    hasTimeouts[0] = (timeout1 != 0.0);
+    hasTimeouts[1] = (timeout2 != 0.0);
+    hasTimeouts[2] = (timeout3 != 0.0);
+
+
+    for(int i = 0; i < 3; i++) {
+        switch(jointStates[i]) {
+            case JointState::STOP:
+                goalType[i] = barobo_Robot_Goal_Type_INFINITE;
+                controllerType[i] = barobo_Robot_Goal_Controller_PID;
+                coefficients[i] = 0;
+                break;
+            case JointState::HOLD:
+                goalType[i] = barobo_Robot_Goal_Type_RELATIVE;
+                controllerType[i] = barobo_Robot_Goal_Controller_PID;
+                coefficients[i] = 0;
+            case JointState::MOVING:
+                goalType[i] = barobo_Robot_Goal_Type_INFINITE;
+                controllerType[i] = barobo_Robot_Goal_Controller_CONSTVEL;
+                break;
+            default:
+                break;
+        }
+    }
+    try {
+        auto js_to_int = [] (JointState::Type js) {
+            switch(js) {
+                case JointState::STOP:
+                    return barobo_Robot_JointState_COAST;
+                case JointState::HOLD:
+                    return barobo_Robot_JointState_HOLD;
+                case JointState::MOVING:
+                    return barobo_Robot_JointState_MOVING;
+                default:
+                    return barobo_Robot_JointState_COAST;
+            }
+        };
+
+        asyncFire(m->robot, MethodIn::move {
+            bool(mask&0x01), 
+            { goalType[0], coefficients[0], true, controllerType[0], 
+                hasTimeouts[0], timeout1, hasTimeouts[0], js_to_int(end1)},
+            bool(mask&0x02), 
+            { goalType[1], coefficients[1], true, controllerType[1], 
+                hasTimeouts[1], timeout2, hasTimeouts[1], js_to_int(end2)},
+            bool(mask&0x04), 
+            { goalType[2], coefficients[2], true, controllerType[2], 
+                hasTimeouts[2], timeout3, hasTimeouts[2], js_to_int(end3)}
+        }, requestTimeout(), use_future).get();
+    }
+    catch (std::exception& e) {
+        throw Error(m->serialId + ": " + e.what());
+    }
+}
+
 void Linkbot::setLedColor (int r, int g, int b) {
     try {
         asyncFire(m->robot, MethodIn::setLedColor{

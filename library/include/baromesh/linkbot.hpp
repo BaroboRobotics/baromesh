@@ -58,6 +58,12 @@ public:
         JointState::Type s1, double d1,
         JointState::Type s2, double d2,
         JointState::Type s3, double d3);
+    void setJointStates(
+        int mask,
+        JointState::Type s1, double d1, double timeout1, JointState::Type end1,
+        JointState::Type s2, double d2, double timeout2, JointState::Type end2,
+        JointState::Type s3, double d3, double timeout3, JointState::Type end3
+        );
     void setLedColor (int, int, int);
     void setJointSafetyThresholds(int mask, int t1=100, int t2=100, int t3=100);
 
