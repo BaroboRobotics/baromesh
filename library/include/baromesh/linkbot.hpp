@@ -11,7 +11,15 @@ namespace barobo {
 /* A C++03-compatible Linkbot API. */
 class Linkbot {
 public:
+    // Construct a Linkbot backed by a given TCP/IP host and service. For
+    // example, Linkbot{"127.0.0.1", "42010"} would attempt to start
+    // communicating with a robot interface at localhost:42010.
+    Linkbot (const std::string& host, const std::string& service);
+
+    // Ask the daemon to resolve the given serial ID to a TCP/IP host:service,
+    // and construct a Linkbot backed by this TCP endpoint.
     explicit Linkbot (const std::string& serialId);
+
     ~Linkbot ();
 
 private:
@@ -20,16 +28,6 @@ private:
     Linkbot& operator= (const Linkbot&);
 
 public:
-    std::string serialId () const;
-
-    bool operator== (const Linkbot& that) const {
-      return this->serialId() == that.serialId();
-    }
-
-    bool operator!= (const Linkbot& that) const {
-        return !operator==(that);
-    }
-
     // All member functions may throw a barobo::Error exception on failure.
 
     /* GETTERS */
@@ -46,7 +44,7 @@ public:
                         JointState::Type & s3);
     void getLedColor (int&, int&, int&);
     void getVersions (uint32_t&, uint32_t&, uint32_t&);
-    std::string getSerialId();
+    void getSerialId(std::string& serialId);
     void getJointSafetyThresholds(int&, int&, int&);
 
     /* SETTERS */

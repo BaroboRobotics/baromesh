@@ -34,15 +34,12 @@ namespace FormFactor {
     };
 }
 
-// hlh: I got rid of MotorDir. Its values were FORWARD, BACKWARD, NEUTRAL, and
-// HOLD. We were considering merging MotorDir with JointState, as I recall.
 namespace JointState {
     enum Type {
-        STOP,
+        COAST,
         HOLD,
         MOVING,
-        NO_MOTOR,
-        ERROR
+        FAILURE
     };
 }
 
@@ -59,7 +56,8 @@ namespace baromesh {
 typedef struct Linkbot Linkbot;
 }
 
-baromesh::Linkbot* linkbotNew(const char* serialId);
+baromesh::Linkbot* linkbotFromTcpEndpoint(const char* host, const char* service);
+baromesh::Linkbot* linkbotFromSerialId(const char* serialId);
 void linkbotDelete(baromesh::Linkbot* l);
 
 /* MISC */
@@ -76,6 +74,9 @@ int linkbotGetJointStates(baromesh::Linkbot*, int *timestamp, barobo::JointState
                           barobo::JointState::Type *j2, 
                           barobo::JointState::Type *j3);
 int linkbotGetLedColor(baromesh::Linkbot *l, int *r, int *g, int *b);
+int linkbotGetVersions (baromesh::Linkbot *l, unsigned*, unsigned*, unsigned*);
+int linkbotGetSerialId(baromesh::Linkbot* l, char* serialId);
+int linkbotGetJointSafetyThresholds(baromesh::Linkbot* l, int*, int*, int*);
 
 /* SETTERS */
 int linkbotResetEncoderRevs(baromesh::Linkbot *l);

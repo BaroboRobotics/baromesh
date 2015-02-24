@@ -4,7 +4,6 @@
 #include <chrono>
 #include <iostream>
 #include <thread>
-#include <vector>
 
 #include <cassert>
 #include <cmath>
@@ -20,11 +19,11 @@ void sendNewColor(barobo::Linkbot& linkbot, double tim) {
     linkbot.setLedColor(red, green, blue);
 }
 
-void lavaLamp (std::string serialId) {
+void lavaLamp (std::string host, std::string service) {
     double t = 0;
     try {
-        barobo::Linkbot linkbot { serialId };
-        std::cout << serialId << ": connected\n";
+        barobo::Linkbot linkbot { host, service };
+        std::cout << host << ":" << service << ": connected\n";
 
         while (1) {
             sendNewColor(linkbot, t);
@@ -35,34 +34,17 @@ void lavaLamp (std::string serialId) {
         std::cout << std::hex;
         // FIXME: This serial ID should be information baked into e.what() in
         // some cases.
-        std::cout << "(" << serialId << ") error setting color(" << t << "): "
+        std::cout << "(" << host << ":" << service << ") error setting color(" << t << "): "
                   << e.what() << '\n';
     }
 }
 
 
 int main(int argc, char** argv) {
-    if (argc < 2) {
-        printf("Usage: %s <serial-id> [<serial-id> ...]\n", argv[0]);
+    if (argc < 3) {
+        printf("Usage: %s <host> <service>\ne.g., %s 127.0.0.1 42010", argv[0], argv[0]);
         return 1;
     }
 
-    // Get list of serial IDs from command line.
-    std::vector<std::string> serialIds { argv + 1, argv + argc };
-
-    // Ensure they all sorta look like serial IDs.
-    assert(std::all_of(serialIds.cbegin(), serialIds.cend(),
-                [] (const std::string& s) { return 4 == s.size(); }));
-
-    std::vector<std::thread> lavaLampThreads;
-
-    for (auto s : serialIds) {
-        lavaLampThreads.emplace_back(lavaLamp, s);
-    }
-
-    for (auto& t: lavaLampThreads) {
-        t.join();
-    }
-
-    return 0;
+    lavaLamp(argv[1], argv[2]);
 }

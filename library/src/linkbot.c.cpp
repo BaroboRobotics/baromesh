@@ -1,13 +1,19 @@
 #include <iostream>
+#include <string>
 #include "baromesh/linkbot.h"
 #include "baromesh/linkbot.hpp"
 
 namespace baromesh {
 
 struct Linkbot {
-    Linkbot (const char* serialId) : impl(std::string(serialId))
-    {
-    }
+    Linkbot (const char* host, const char* service)
+        : impl(std::string(host), std::string(service))
+    {}
+
+    Linkbot (const char* serialId)
+        : impl(std::string(serialId))
+    {}
+
     barobo::Linkbot impl;
 };
 
@@ -15,7 +21,12 @@ struct Linkbot {
 
 using namespace baromesh;
 
-Linkbot* linkbotNew(const char* serialId)
+Linkbot* linkbotFromTcpEndpoint(const char* host, const char* service)
+{
+    return new Linkbot(host, service);
+}
+
+Linkbot* linkbotFromSerialId(const char* serialId)
 {
     return new Linkbot(serialId);
 }
@@ -74,6 +85,30 @@ int linkbotGetLedColor(Linkbot *l, int *r, int *g, int *b)
 {
     LINKBOT_C_WRAPPER_FUNC_IMPL(getLedColor, *r, *g, *b);
 }
+
+int linkbotGetVersions (Linkbot* l, unsigned* major, unsigned* minor, unsigned* patch)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(getVersions, *major, *minor, *patch);
+}
+
+int linkbotGetSerialId(Linkbot* l, char* serialId)
+{
+    std::string id;
+    try {
+        l->impl.getSerialId(id);
+        snprintf(serialId, 5, "%s", id.c_str());
+        return 0;
+    }
+    catch (std::exception& e) {
+        fprintf(stderr, "Runtime exception: %s\n", e.what());
+        return -1;
+    }
+}
+int linkbotGetJointSafetyThresholds(Linkbot* l, int* t1, int* t2, int* t3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(getJointSafetyThresholds, *t1, *t2, *t3);
+}
+
 
 /* SETTERS */
 
