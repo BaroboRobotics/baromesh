@@ -140,7 +140,7 @@ int linkbotSetJointSpeeds(Linkbot *l, int mask, double j1, double j2,
     LINKBOT_C_WRAPPER_FUNC_IMPL(setJointSpeeds, mask, j1, j2, j3);
 }
 
-int linkbotSetJointStates(Linkbot *l, int mask, 
+int linkbotSetJointStates(Linkbot *l, int mask,
         barobo::JointState::Type s1, double d1,
         barobo::JointState::Type s2, double d2,
         barobo::JointState::Type s3, double d3
@@ -150,6 +150,18 @@ int linkbotSetJointStates(Linkbot *l, int mask,
         s1, d1,
         s2, d2,
         s3, d3);
+}
+
+int linkbotSetJointStatesTimed(Linkbot *l, int mask,
+        barobo::JointState::Type s1, double d1, double timeout1, barobo::JointState::Type end1,
+        barobo::JointState::Type s2, double d2, double timeout2, barobo::JointState::Type end2,
+        barobo::JointState::Type s3, double d3, double timeout3, barobo::JointState::Type end3
+        )
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(setJointStates, mask,
+        s1, d1, timeout1, end1,
+        s2, d2, timeout2, end2,
+        s3, d3, timeout3, end3);
 }
 
 int linkbotSetLedColor(baromesh::Linkbot *l, int r, int g, int b)

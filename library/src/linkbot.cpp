@@ -388,7 +388,7 @@ void Linkbot::setJointStates(
 
     for(int i = 0; i < 3; i++) {
         switch(jointStates[i]) {
-            case JointState::STOP:
+            case JointState::COAST:
                 goalType[i] = barobo_Robot_Goal_Type_INFINITE;
                 controllerType[i] = barobo_Robot_Goal_Controller_PID;
                 coefficients[i] = 0;
@@ -408,7 +408,7 @@ void Linkbot::setJointStates(
     try {
         auto js_to_int = [] (JointState::Type js) {
             switch(js) {
-                case JointState::STOP:
+                case JointState::COAST:
                     return barobo_Robot_JointState_COAST;
                 case JointState::HOLD:
                     return barobo_Robot_JointState_HOLD;
@@ -420,19 +420,19 @@ void Linkbot::setJointStates(
         };
 
         asyncFire(m->robot, MethodIn::move {
-            bool(mask&0x01), 
-            { goalType[0], coefficients[0], true, controllerType[0], 
-                hasTimeouts[0], timeout1, hasTimeouts[0], js_to_int(end1)},
-            bool(mask&0x02), 
-            { goalType[1], coefficients[1], true, controllerType[1], 
-                hasTimeouts[1], timeout2, hasTimeouts[1], js_to_int(end2)},
-            bool(mask&0x04), 
-            { goalType[2], coefficients[2], true, controllerType[2], 
-                hasTimeouts[2], timeout3, hasTimeouts[2], js_to_int(end3)}
+            bool(mask&0x01),
+            { goalType[0], coefficients[0], true, controllerType[0],
+                hasTimeouts[0], float(timeout1), hasTimeouts[0], js_to_int(end1)},
+            bool(mask&0x02),
+            { goalType[1], coefficients[1], true, controllerType[1],
+                hasTimeouts[1], float(timeout2), hasTimeouts[1], js_to_int(end2)},
+            bool(mask&0x04),
+            { goalType[2], coefficients[2], true, controllerType[2],
+                hasTimeouts[2], float(timeout3), hasTimeouts[2], js_to_int(end3)}
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
-        throw Error(m->serialId + ": " + e.what());
+        throw Error(e.what());
     }
 }
 
