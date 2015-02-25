@@ -16,3 +16,7 @@ add_test(NAME speeddial COMMAND speeddial)
 add_executable(test_c test_c.cpp)
 target_link_libraries(test_c baromesh)
 add_test(NAME test_c COMMAND test_c)
+
+add_executable(tcp tcp.cpp)
+target_link_libraries(tcp baromesh)
+add_test(NAME tcp COMMAND tcp)
