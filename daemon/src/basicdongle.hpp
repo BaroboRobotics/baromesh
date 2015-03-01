@@ -226,16 +226,9 @@ private:
                 throw boost::system::system_error(ec);
             }
 
-            rpc::ComponentBroadcastUnion<barobo::Dongle> argument;
-            auto status = decodeBroadcastPayload(argument, broadcast.id, broadcast.payload);
-            if (hasError(status)) {
-                ec = status;
-                BOOST_LOG(mLog) << "Dongle broadcast decode error: " << ec.message();
-                throw boost::system::system_error(ec);
-            }
-
-            //BOOST_LOG(mLog) << "Receive pump: received broadcast";
-            status = invokeBroadcast(*this, argument, broadcast.id);
+            rpc::BroadcastUnion<barobo::Dongle> b;
+            rpc::Status status;
+            b.invoke(*this, broadcast.id, broadcast.payload, status);
             if (hasError(status)) {
                 ec = status;
                 BOOST_LOG(mLog) << "Dongle broadcast invocation error: " << ec.message();
