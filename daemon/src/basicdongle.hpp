@@ -17,8 +17,14 @@
 
 namespace baromesh {
 
-using SendHandlerSignature = void(boost::system::error_code);
-using ReceiveHandlerSignature = void(boost::system::error_code, size_t);
+// This *HandlerSignature typedef is all over the place in our libraries, but
+// its syntax represents a portability challenge.
+// using T = void(boost::system::error_code) results in a parse error in VS 2013
+// using T = void(mutable boost::system::error_code) results in a parse error in gcc
+// using T = void(const boost::system::error_code&) results in a run-time error at sfp/asio/messagequeue.hpp:219
+// typedef void T(boost::system::error_code) works
+typedef void SendHandlerSignature(boost::system::error_code);
+typedef void ReceiveHandlerSignature(boost::system::error_code, size_t);
 using ReceiveHandler = std::function<ReceiveHandlerSignature>;
 
 using namespace std::placeholders;
@@ -385,16 +391,16 @@ public:
         }
     }
 
-    friend void swap (BasicDongle& lhs, BasicDongle& rhs) noexcept {
+    friend void swap (BasicDongle& lhs, BasicDongle& rhs) BOOST_NOEXCEPT {
         using std::swap;
         swap(lhs.mImpl, rhs.mImpl);
     }
 
-    BasicDongle (BasicDongle&& other) noexcept {
+    BasicDongle (BasicDongle&& other) BOOST_NOEXCEPT {
         swap(*this, other);
     }
 
-    BasicDongle& operator= (BasicDongle&& other) noexcept {
+    BasicDongle& operator= (BasicDongle&& other) BOOST_NOEXCEPT {
         swap(*this, other);
         return *this;
     }

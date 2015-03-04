@@ -27,7 +27,8 @@ ll_add_dependency(baromesh/interfaces daemon-interface)
 # projects we'll want to use shared libraries and defined -DBOOST_ALL_DYN_LINK
 # or the like.
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.54.0 REQUIRED COMPONENTS system log filesystem thread)
+find_package(Boost 1.54.0 REQUIRED COMPONENTS system log filesystem thread
+  date_time log_setup chrono)
 
 find_package(Threads)
 
@@ -45,7 +46,7 @@ target_include_directories(baromeshd
     )
 target_link_libraries(baromeshd
     PRIVATE baromesh-common sfp rpc cxx-util
-            dongle-interface daemon-interface
+            dongle-interface
             ${Boost_LIBRARIES}
             ${CMAKE_THREAD_LIBS_INIT}
    )

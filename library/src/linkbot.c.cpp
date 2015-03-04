@@ -1,7 +1,10 @@
-#include <iostream>
-#include <string>
 #include "baromesh/linkbot.h"
 #include "baromesh/linkbot.hpp"
+
+#include <iostream>
+#include <string>
+
+#include <cstdio>
 
 namespace baromesh {
 
@@ -108,7 +111,8 @@ int linkbotGetSerialId(Linkbot* l, char* serialId)
     std::string id;
     try {
         l->impl.getSerialId(id);
-        snprintf(serialId, 5, "%s", id.c_str());
+        memcpy(serialId, id.c_str(), 4);
+        serialId[4] = 0;
         return 0;
     }
     catch (std::exception& e) {
