@@ -40,7 +40,8 @@ std::string daemonServiceName () {
 
 }
 
-using ResolveSerialIdHandlerSignature = void(boost::system::error_code, std::pair<std::string, std::string>);
+using StringPair = std::pair<std::string, std::string>;
+typedef void ResolveSerialIdHandlerSignature(boost::system::error_code, StringPair);
 using ResolveSerialIdHandler = std::function<ResolveSerialIdHandlerSignature>;
 
 template <class Duration, class Handler>

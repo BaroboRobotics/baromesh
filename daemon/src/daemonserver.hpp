@@ -388,7 +388,7 @@ private:
 
         }
         using BStatus = decltype(Broadcast::dongleEvent::status);
-        asyncBroadcast(mServer, Broadcast::dongleEvent{BStatus(ec.value())},
+        rpc::asio::asyncBroadcast(mServer, Broadcast::dongleEvent{BStatus(ec.value())},
             [] (boost::system::error_code ec2) {
                 if (ec2 && boost::asio::error::operation_aborted != ec2) {
                     boost::log::sources::logger log;

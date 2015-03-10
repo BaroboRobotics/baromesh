@@ -13,6 +13,13 @@ set_source_files_properties(
     gen-daemon.pb.cpp
     PROPERTIES COMPILE_FLAGS -std=c++11)
 
+if(MSVC)
+	# Without this, the PB_STATIC_ASSERT line generated in robot.pb.c will
+	# cause MSVC to choke on a 4K+ long token (error C1064).
+	target_compile_definitions(robot-interface PRIVATE PB_NO_STATIC_ASSERT)
+	message(WARNING "Disabling PB_STATIC_ASSERT for robot-interface due to Visual C++ token length limit")
+endif()
+
 target_link_libraries(robot-interface commontypes-proto rpc)
 target_link_libraries(dongle-interface commontypes-proto rpc)
 target_link_libraries(daemon-interface commontypes-proto rpc)

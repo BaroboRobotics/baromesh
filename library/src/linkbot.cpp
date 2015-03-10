@@ -28,6 +28,7 @@ std::chrono::milliseconds requestTimeout () {
 using MethodIn = rpc::MethodIn<barobo::Robot>;
 using MethodResult = rpc::MethodResult<barobo::Robot>;
 using Broadcast = rpc::Broadcast<barobo::Robot>;
+using rpc::asio::asyncFire;
 
 using boost::asio::use_future;
 

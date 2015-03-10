@@ -17,8 +17,14 @@
 
 namespace baromesh {
 
-using SendHandlerSignature = void(boost::system::error_code);
-using ReceiveHandlerSignature = void(boost::system::error_code, size_t);
+// This *HandlerSignature typedef is all over the place in our libraries, but
+// its syntax represents a portability challenge.
+// using T = void(boost::system::error_code) results in a parse error in VS 2013
+// using T = void(mutable boost::system::error_code) results in a parse error in gcc
+// using T = void(const boost::system::error_code&) results in a run-time error at sfp/asio/messagequeue.hpp:219
+// typedef void T(boost::system::error_code) works
+typedef void SendHandlerSignature(boost::system::error_code);
+typedef void ReceiveHandlerSignature(boost::system::error_code, size_t);
 using ReceiveHandler = std::function<ReceiveHandlerSignature>;
 
 using namespace std::placeholders;
@@ -226,16 +232,9 @@ private:
                 throw boost::system::system_error(ec);
             }
 
-            rpc::ComponentBroadcastUnion<barobo::Dongle> argument;
-            auto status = decodeBroadcastPayload(argument, broadcast.id, broadcast.payload);
-            if (hasError(status)) {
-                ec = status;
-                BOOST_LOG(mLog) << "Dongle broadcast decode error: " << ec.message();
-                throw boost::system::system_error(ec);
-            }
-
-            //BOOST_LOG(mLog) << "Receive pump: received broadcast";
-            status = invokeBroadcast(*this, argument, broadcast.id);
+            rpc::BroadcastUnion<barobo::Dongle> b;
+            rpc::Status status;
+            b.invoke(*this, broadcast.id, broadcast.payload, status);
             if (hasError(status)) {
                 ec = status;
                 BOOST_LOG(mLog) << "Dongle broadcast invocation error: " << ec.message();
@@ -392,16 +391,16 @@ public:
         }
     }
 
-    friend void swap (BasicDongle& lhs, BasicDongle& rhs) noexcept {
+    friend void swap (BasicDongle& lhs, BasicDongle& rhs) BOOST_NOEXCEPT {
         using std::swap;
         swap(lhs.mImpl, rhs.mImpl);
     }
 
-    BasicDongle (BasicDongle&& other) noexcept {
+    BasicDongle (BasicDongle&& other) BOOST_NOEXCEPT {
         swap(*this, other);
     }
 
-    BasicDongle& operator= (BasicDongle&& other) noexcept {
+    BasicDongle& operator= (BasicDongle&& other) BOOST_NOEXCEPT {
         swap(*this, other);
         return *this;
     }
