@@ -143,11 +143,6 @@ public:
         return init.result.get();
     }
 
-    template <class B>
-    void broadcast (B&& args) {
-        onBroadcast(std::forward<B>(args));
-    }
-
     void onBroadcast (Broadcast::receiveUnicast broadcast) {
         {
             auto lock = util::BenchmarkedLock{mReceiveDataMutex};

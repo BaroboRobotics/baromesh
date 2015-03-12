@@ -171,11 +171,6 @@ public:
         }
     }
 
-    template <class In, class Result = typename rpc::ResultOf<In>::type>
-    Result fire (In&& x) {
-        return onFire(std::forward<In>(x));
-    }
-
     MethodResult::cycleDongle onFire (MethodIn::cycleDongle args) {
         BOOST_LOG(mLog) << "firing barobo.Daemon.cycleDongle("
                         << args.seconds << " seconds)";

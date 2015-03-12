@@ -89,11 +89,6 @@ struct Linkbot::Impl {
         return new Impl{host, service};
     }
 
-    template <class B>
-    void broadcast (B&& args) {
-        onBroadcast(std::forward<B>(args));
-    }
-
     void onBroadcast (Broadcast::buttonEvent b) {
         if (buttonEventCallback) {
             buttonEventCallback(static_cast<Button::Type>(b.button),
