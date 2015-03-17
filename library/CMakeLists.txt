@@ -48,8 +48,8 @@ target_include_directories(baromesh
 target_link_libraries(baromesh
     PUBLIC baromesh-common sfp rpc cxx-util
            robot-interface daemon-interface
+           Threads::Threads
            ${Boost_LIBRARIES}
-           ${CMAKE_THREAD_LIBS_INIT}
     )
 
 if(WIN32)
