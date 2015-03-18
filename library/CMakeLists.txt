@@ -38,8 +38,15 @@ set(SOURCES
 
 add_library(baromesh ${SOURCES})
 
-set_source_files_properties(${SOURCES}
-    PROPERTIES COMPILE_FLAGS "-std=c++11")
+if(CMAKE_CL_64)
+    # 64-bit VS compiles need /bigobj
+    # specific template instantiation might fix this
+    set_source_files_properties(src/linkbot.cpp
+        PROPERTIES COMPILE_FLAGS "/bigobj")
+elseif(CMAKE_COMPILER_IS_GNUCXX)
+    set_source_files_properties(${SOURCES}
+        PROPERTIES COMPILE_FLAGS "-std=c++11")
+endif()
 
 target_include_directories(baromesh
     PUBLIC ${Boost_INCLUDE_DIRS}
