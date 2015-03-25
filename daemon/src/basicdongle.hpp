@@ -15,6 +15,8 @@
 #include <mutex>
 #include <vector>
 
+#include <cstring>
+
 namespace baromesh {
 
 // This *HandlerSignature typedef is all over the place in our libraries, but
@@ -97,7 +99,7 @@ public:
 
         MethodIn::transmitUnicast args = decltype(args)();
 
-        strncpy(args.serialId.value, serialId.data(), 4);
+        std::strncpy(args.serialId.value, serialId.data(), 4);
         args.serialId.value[4] = 0;
 
         auto& payload = args.payload.value;

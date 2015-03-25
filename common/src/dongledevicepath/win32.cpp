@@ -19,7 +19,7 @@
 //#include <sal.h>
 
 /* One more SAL define is required for setupapi.h */
-#define __deref_out_range(a,b)
+//#define __deref_out_range(a,b)
 #include <setupapi.h>
 
 #if _MSC_VER

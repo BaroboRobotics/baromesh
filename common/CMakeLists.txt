@@ -28,7 +28,9 @@ set(SOURCES
 add_library(baromesh-common STATIC ${SOURCES})
 
 set_source_files_properties(${SOURCES}
-    PROPERTIES COMPILE_FLAGS "-std=c++11")
+    PROPERTIES CXX_STANDARD 11
+               CXX_STANDARD_REQUIRED ON
+               )
 
 target_include_directories(baromesh-common
     PUBLIC ${Boost_INCLUDE_DIRS}

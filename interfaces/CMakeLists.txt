@@ -11,7 +11,9 @@ set_source_files_properties(
     gen-robot.pb.cpp
     gen-dongle.pb.cpp
     gen-daemon.pb.cpp
-    PROPERTIES COMPILE_FLAGS -std=c++11)
+    PROPERTIES CXX_STANDARD 11
+               CXX_STANDARD_REQUIRED ON
+			   )
 
 if(MSVC)
 	# Without this, the PB_STATIC_ASSERT line generated in robot.pb.c will

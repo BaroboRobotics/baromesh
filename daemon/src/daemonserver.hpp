@@ -228,7 +228,7 @@ public:
                             << " at " << endpoint;
 
             if (endpoint.address().to_string().size() < sizeof(result.endpoint.address)) {
-                strncpy(result.endpoint.address,
+                std::strncpy(result.endpoint.address,
                     endpoint.address().to_string().data(),
                     sizeof(result.endpoint.address) - 1);
                 result.endpoint.address[sizeof(result.endpoint.address) - 1] = 0;
