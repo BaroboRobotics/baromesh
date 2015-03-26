@@ -47,7 +47,7 @@ public:
     void getVersions (uint32_t&, uint32_t&, uint32_t&);
     void getSerialId(std::string& serialId);
     void getJointSafetyThresholds(int&, int&, int&);
-    void getJointSafetyAngles(float&, float&, float&);
+    void getJointSafetyAngles(double&, double&, double&);
 
     /* SETTERS */
     void resetEncoderRevs();
