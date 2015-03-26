@@ -109,6 +109,14 @@ message setMotorControllerSafetyThreshold {
     message Result {}
 }
 
+message setMotorControllerSafetyAngle {
+    message In {
+        required uint32 mask = 1;
+        repeated uint32 values = 2 [packed=true, (nanopb).max_count=32]; 
+    }
+    message Result {}
+}
+
 // used by smooth acceleration
 message setMotorControllerAlphaI {
     message In {
@@ -164,7 +172,23 @@ message setMotorControllerDerivativeGain {
     }
 }
 
+message getBatteryVoltage {
+    message In {
+    }
+    message Result {
+        required float v = 1;
+    }
+}
+
 message getMotorControllerSafetyThreshold {
+    message In {
+    }
+    message Result {
+        repeated uint32 values = 1[packed=true, (nanopb).max_count=32]; // acceleration
+    }
+}
+
+message getMotorControllerSafetyAngle{
     message In {
     }
     message Result {

@@ -35,6 +35,7 @@ public:
     // All functions are non-blocking. Use moveWait() to wait for non-blocking
     // movement functions.
     void getAccelerometer (int& timestamp, double&, double&, double&);
+    void getBatteryVoltage(double& voltage);
     void getFormFactor(FormFactor::Type & form);
     void getJointAngles (int& timestamp, double&, double&, double&);
     void getJointSpeeds(double&, double&, double&);
@@ -46,6 +47,7 @@ public:
     void getVersions (uint32_t&, uint32_t&, uint32_t&);
     void getSerialId(std::string& serialId);
     void getJointSafetyThresholds(int&, int&, int&);
+    void getJointSafetyAngles(float&, float&, float&);
 
     /* SETTERS */
     void resetEncoderRevs();
@@ -64,6 +66,7 @@ public:
         );
     void setLedColor (int, int, int);
     void setJointSafetyThresholds(int mask, int t1=100, int t2=100, int t3=100);
+    void setJointSafetyAngles(int mask, float t1=10, float t2=10, float t3=10);
 
     /* MOVEMENT */
     // Member functions take angles in degrees.

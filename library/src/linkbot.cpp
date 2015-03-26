@@ -168,6 +168,17 @@ void Linkbot::getAccelerometer (int& timestamp, double&x, double&y, double&z)
     }
 }
 
+void Linkbot::getBatteryVoltage(double &volts)
+{
+    try {
+        auto value = asyncFire(m->robot, MethodIn::getBatteryVoltage{}, requestTimeout(), use_future).get();
+        volts = value.v;
+    } 
+    catch (std::exception& e) {
+        throw Error(e.what());
+    }
+}
+
 void Linkbot::getFormFactor(FormFactor::Type& form)
 {
     try {
@@ -255,6 +266,21 @@ void Linkbot::getJointSafetyThresholds(int& t1, int& t2, int& t3)
     try {
         auto value = asyncFire(m->robot,
             MethodIn::getMotorControllerSafetyThreshold{},
+            requestTimeout(), use_future).get();
+        t1 = value.values[0];
+        t2 = value.values[1];
+        t3 = value.values[2];
+    }
+    catch (std::exception& e) {
+        throw Error(e.what());
+    }
+}
+
+void Linkbot::getJointSafetyAngles(float& t1, float& t2, float& t3)
+{
+    try {
+        auto value = asyncFire(m->robot,
+            MethodIn::getMotorControllerSafetyAngle{},
             requestTimeout(), use_future).get();
         t1 = value.values[0];
         t2 = value.values[1];
@@ -446,6 +472,25 @@ void Linkbot::setLedColor (int r, int g, int b) {
 void Linkbot::setJointSafetyThresholds(int mask, int t0, int t1, int t2) {
     try {
         MethodIn::setMotorControllerSafetyThreshold arg;
+        arg.mask = mask;
+        arg.values_count = 0;
+        int jointFlag = 0x01;
+        for (auto& t : { t0, t1, t2 }) {
+            if (jointFlag & mask) {
+                arg.values[arg.values_count++] = t;
+            }
+            jointFlag <<= 1;
+        }
+        asyncFire(m->robot, arg, requestTimeout(), use_future).get();
+    }
+    catch (std::exception& e) {
+        throw Error(e.what());
+    }
+}
+
+void Linkbot::setJointSafetyAngles(int mask, float t0, float t1, float t2) {
+    try {
+        MethodIn::setMotorControllerSafetyAngle arg;
         arg.mask = mask;
         arg.values_count = 0;
         int jointFlag = 0x01;
