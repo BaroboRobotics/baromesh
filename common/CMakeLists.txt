@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.12) 
+cmake_minimum_required(VERSION 3.2.1)
 project(baromesh-common CXX C)
 
 set(VERSION_MAJOR 0)
@@ -27,7 +27,7 @@ set(SOURCES
 
 add_library(baromesh-common STATIC ${SOURCES})
 
-set_source_files_properties(${SOURCES}
+set_target_properties(baromesh-common
     PROPERTIES CXX_STANDARD 11
                CXX_STANDARD_REQUIRED ON
                )

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.12) 
+cmake_minimum_required(VERSION 3.2.1)
 project(baromesh-library CXX C)
 
 set(VERSION_MAJOR 0)
@@ -43,11 +43,12 @@ if(CMAKE_CL_64)
     # specific template instantiation might fix this
     set_source_files_properties(src/linkbot.cpp
         PROPERTIES COMPILE_FLAGS "/bigobj")
-elseif(CMAKE_COMPILER_IS_GNUCXX)
-    set_source_files_properties(${SOURCES}
-        PROPERTIES COMPILE_FLAGS "-std=c++11")
 endif()
 
+set_target_properties(baromesh
+    PROPERTIES CXX_STANDARD 11
+               CXX_STANDARD_REQUIRED ON
+               )
 target_include_directories(baromesh
     PUBLIC ${Boost_INCLUDE_DIRS}
            include
