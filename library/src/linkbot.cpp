@@ -279,7 +279,7 @@ void Linkbot::getJointSafetyThresholds(int& t1, int& t2, int& t3)
 void Linkbot::getJointSafetyAngles(double& t1, double& t2, double& t3)
 {
     try {
-        auto rad2deg = [] (double x) {return x*180.0/M_PI;}
+        auto rad2deg = [] (double x) {return x*180.0/M_PI;};
         auto value = asyncFire(m->robot,
             MethodIn::getMotorControllerSafetyAngle{},
             requestTimeout(), use_future).get();
@@ -497,7 +497,7 @@ void Linkbot::setJointSafetyAngles(int mask, float t0, float t1, float t2) {
         int jointFlag = 0x01;
         for (auto& t : { t0, t1, t2 }) {
             if (jointFlag & mask) {
-                arg.values[arg.values_count++] = baromesh::deg2rad(t);
+                arg.values[arg.values_count++] = baromesh::degToRad(t);
             }
             jointFlag <<= 1;
         }
