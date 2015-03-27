@@ -66,7 +66,7 @@ public:
         );
     void setLedColor (int, int, int);
     void setJointSafetyThresholds(int mask, int t1=100, int t2=100, int t3=100);
-    void setJointSafetyAngles(int mask, float t1=10, float t2=10, float t3=10);
+    void setJointSafetyAngles(int mask, double t1=10, double t2=10, double t3=10);
 
     /* MOVEMENT */
     // Member functions take angles in degrees.
