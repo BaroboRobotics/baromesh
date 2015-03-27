@@ -6,7 +6,7 @@
 
 RPCDEF_HPP(
         // the interface we're defining and it's version triplet
-        (barobo, Robot), (0, 1, 0),
+        (barobo, Robot), (0, 2, 0),
         // all methods
         (getAccelerometerData)
         (getLedColor)
