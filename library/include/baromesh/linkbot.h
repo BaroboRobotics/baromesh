@@ -66,6 +66,7 @@ int linkbotWriteEeprom(baromesh::Linkbot *l, unsigned int address, const char *d
 /* GETTERS */
 int linkbotGetAccelerometer(baromesh::Linkbot *l, int *timestamp, double *x, double *y, 
                             double *z);
+int linkbotGetBatteryVoltage(baromesh::Linkbot *l, double*);
 int linkbotGetFormFactor(baromesh::Linkbot *l, barobo::FormFactor::Type *form);
 int linkbotGetJointAngles(baromesh::Linkbot *l, int* timestamp, double *j1, double *j2, 
                           double *j3);
@@ -77,6 +78,7 @@ int linkbotGetLedColor(baromesh::Linkbot *l, int *r, int *g, int *b);
 int linkbotGetVersions (baromesh::Linkbot *l, unsigned*, unsigned*, unsigned*);
 int linkbotGetSerialId(baromesh::Linkbot* l, char* serialId);
 int linkbotGetJointSafetyThresholds(baromesh::Linkbot* l, int*, int*, int*);
+int linkbotGetJointSafetyAngles(baromesh::Linkbot* l, double*, double*, double*);
 
 /* SETTERS */
 int linkbotResetEncoderRevs(baromesh::Linkbot *l);
@@ -92,6 +94,8 @@ int linkbotSetJointStatesTimed(baromesh::Linkbot *l, int mask,
         barobo::JointState::Type s2, double d2, double timeout2, barobo::JointState::Type end2,
         barobo::JointState::Type s3, double d3, double timeout3, barobo::JointState::Type end3);
 int linkbotSetLedColor(baromesh::Linkbot *l, int r, int g, int b);
+int linkbotSetJointSafetyThresholds(baromesh::Linkbot *l, int mask, int t1, int t2, int t3);
+int linkbotSetJointSafetyAngles(baromesh::Linkbot *l, int mask, double t1, double t2, double t3);
 
 /* MOVEMENT */
 int linkbotMoveContinuous(baromesh::Linkbot *l, int mask, 
