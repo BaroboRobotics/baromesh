@@ -489,7 +489,7 @@ void Linkbot::setJointSafetyThresholds(int mask, int t0, int t1, int t2) {
     }
 }
 
-void Linkbot::setJointSafetyAngles(int mask, float t0, float t1, float t2) {
+void Linkbot::setJointSafetyAngles(int mask, double t0, double t1, double t2) {
     try {
         MethodIn::setMotorControllerSafetyAngle arg;
         arg.mask = mask;
@@ -497,7 +497,7 @@ void Linkbot::setJointSafetyAngles(int mask, float t0, float t1, float t2) {
         int jointFlag = 0x01;
         for (auto& t : { t0, t1, t2 }) {
             if (jointFlag & mask) {
-                arg.values[arg.values_count++] = baromesh::degToRad(t);
+                arg.values[arg.values_count++] = float(baromesh::degToRad(t));
             }
             jointFlag <<= 1;
         }

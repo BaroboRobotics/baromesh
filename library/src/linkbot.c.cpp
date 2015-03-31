@@ -73,6 +73,10 @@ int linkbotGetAccelerometer(Linkbot *l, int *timestamp, double *x, double *y,
     LINKBOT_C_WRAPPER_FUNC_IMPL(getAccelerometer, *timestamp, *x, *y, *z);
 }
 
+int linkbotGetBatteryVoltage(Linkbot *l, double* voltage)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(getBatteryVoltage, *voltage);
+}
 
 int linkbotGetFormFactor(Linkbot *l, barobo::FormFactor::Type *form)
 {
@@ -126,6 +130,10 @@ int linkbotGetJointSafetyThresholds(Linkbot* l, int* t1, int* t2, int* t3)
     LINKBOT_C_WRAPPER_FUNC_IMPL(getJointSafetyThresholds, *t1, *t2, *t3);
 }
 
+int linkbotGetJointSafetyAngles(Linkbot* l, double* t1, double* t2, double* t3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(getJointSafetyAngles, *t1, *t2, *t3);
+}
 
 /* SETTERS */
 
@@ -172,6 +180,16 @@ int linkbotSetJointStatesTimed(Linkbot *l, int mask,
 int linkbotSetLedColor(baromesh::Linkbot *l, int r, int g, int b)
 {
     LINKBOT_C_WRAPPER_FUNC_IMPL(setLedColor, r, g, b);
+}
+
+int linkbotSetJointSafetyThresholds(baromesh::Linkbot *l, int mask, int t1, int t2, int t3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(setJointSafetyThresholds, mask, t1, t2, t3);
+}
+
+int linkbotSetJointSafetyAngles(baromesh::Linkbot *l, int mask, double t1, double t2, double t3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(setJointSafetyAngles, mask, t1, t2, t3);
 }
 
 /* MOVEMENT */
