@@ -112,7 +112,7 @@ message setMotorControllerSafetyThreshold {
 message setMotorControllerSafetyAngle {
     message In {
         required uint32 mask = 1;
-        repeated uint32 values = 2 [packed=true, (nanopb).max_count=32]; 
+        repeated float values = 2 [packed=true, (nanopb).max_count=32]; 
     }
     message Result {}
 }
@@ -192,7 +192,7 @@ message getMotorControllerSafetyAngle{
     message In {
     }
     message Result {
-        repeated uint32 values = 1[packed=true, (nanopb).max_count=32]; // acceleration
+        repeated float values = 1[packed=true, (nanopb).max_count=32]; // acceleration
     }
 }
 
