@@ -20,3 +20,8 @@ add_test(NAME test_c COMMAND test_c)
 add_executable(tcp tcp.cpp)
 target_link_libraries(tcp baromesh)
 add_test(NAME tcp COMMAND tcp)
+
+add_executable(safetyangles safetyangles.cpp)
+target_link_libraries(safetyangles baromesh)
+target_compile_options(safetyangles PRIVATE "-std=c++11")
+add_test(NAME safetyangles COMMAND safetyangles)
