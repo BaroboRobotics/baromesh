@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
     }
 
     auto serialId = std::string{argv[1]};
-    assert(4 == s.size());
+    assert(4 == serialId.size());
 
     testSafetyAngles(serialId);
 
