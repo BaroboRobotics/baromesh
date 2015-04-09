@@ -5,4 +5,5 @@ RPCDEF_CPP((barobo, Dongle),
         (transmitUnicast)
         ,
         (receiveUnicast)
+        (receiveRobotEvent)
         )

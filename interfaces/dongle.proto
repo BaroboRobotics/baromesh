@@ -11,7 +11,7 @@ message Payload {
 
 message transmitUnicast {
     message In {
-        required barobo.commontypes.SerialId serialId = 1;
+        required barobo.SerialId serialId = 1;
         required Payload payload = 2;
     }
     message Result { }
@@ -21,6 +21,11 @@ message transmitUnicast {
 // Broadcasts
 
 message receiveUnicast {
-    required barobo.commontypes.SerialId serialId = 1;
+    required barobo.SerialId serialId = 1;
     required Payload payload = 2;
+}
+
+message receiveRobotEvent {
+	required barobo.SerialId serialId = 1;
+	required barobo.RobotEvent robotEvent = 2;
 }

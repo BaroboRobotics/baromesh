@@ -12,6 +12,7 @@ RPCDEF_HPP(
         ,
         // all broadcasts
         (receiveUnicast)
+        (receiveRobotEvent)
         )
 
 #endif

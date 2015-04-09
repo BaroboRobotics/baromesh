@@ -13,6 +13,7 @@
 #include <memory>
 #include <queue>
 #include <mutex>
+#include <sstream>
 #include <vector>
 
 #include <cstring>
@@ -162,6 +163,17 @@ public:
             }
         }
         postReceives();
+    }
+
+    void onBroadcast (Broadcast::receiveRobotEvent broadcast) {
+        auto ss = std::stringstream{};
+        ss << broadcast.serialId.value << " is " << (broadcast.robotEvent.poweredOn ? "ON" : "OFF");
+
+        if (broadcast.robotEvent.has_ledColor) {
+            ss << ", and is connected to the dongle (color: "
+               << std::setfill('0') << std::setw(6) << std::hex << broadcast.robotEvent.ledColor << ")";
+        }
+        BOOST_LOG(mLog) << "robot event: " << ss.str();
     }
 
 private:
