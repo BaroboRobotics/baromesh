@@ -166,7 +166,7 @@ public:
     }
 
     void onBroadcast (Broadcast::receiveRobotEvent broadcast) {
-        auto ss = std::stringstream{};
+        std::stringstream ss {};
         ss << broadcast.serialId.value << " is " << (broadcast.robotEvent.poweredOn ? "ON" : "OFF");
 
         if (broadcast.robotEvent.has_ledColor) {
