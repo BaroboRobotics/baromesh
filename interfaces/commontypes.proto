@@ -10,13 +10,7 @@ message Payload {
     required bytes value = 1 [(nanopb).max_size = 128];
 }
 
-// Can be part of a RadioBroadcastMessage, or part of the Daemon interface
-// broadcasts.
-enum RobotPowerEvent {
-	OFF = 0;
-	ON = 1;
-}
-
+// Radio broadcast from the daemon to multiple robots. Use the toRobot port.
 message MulticastRpcRequest {
 	repeated SerialId destinations = 1 [(nanopb).max_count = 8];
 
@@ -28,14 +22,9 @@ message MulticastRpcRequest {
 	required barobo.rpc.Request request = 2;
 }
 
-// Can be broadcast over the radio from either a dongle or a robot.
-message RadioBroadcastMessage {
-	enum Type {
-		ROBOT_POWER_EVENT = 0;
-		MULTICAST_RPC_REQUEST = 1;
-	}
-
-	required Type type = 1;
-	optional RobotPowerEvent robotPowerEvent = 2;
-	optional MulticastRpcRequest multicastRpcRequest = 3;
+// Radio broadcast from a robot to all daemons. Use the toComputer port.
+message RobotPowerOnEvent {
+	required SerialId serialId = 1;
+	required barobo.rpc.VersionTriplet firmwareVersion = 2;
+	required barobo.rpc.Versions rpcVersions = 3;
 }

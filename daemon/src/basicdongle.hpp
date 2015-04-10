@@ -49,6 +49,7 @@ public:
     DongleImpl (boost::asio::io_service& ios, boost::log::sources::logger log)
         : mClient(ios, log)
         , mStrand(mClient.get_io_service())
+        , mRadioBroadcastReceiveData(log)
         , mLog(log)
     {}
 
@@ -146,7 +147,7 @@ public:
         return init.result.get();
     }
 
-    template <class Stringclass Handler>
+    template <class Handler>
     BOOST_ASIO_INITFN_RESULT_TYPE(Handler, SendHandlerSignature)
     asyncTransmitRadioBroadcast (boost::asio::const_buffer buffer, Handler&& handler) {
         boost::asio::detail::async_result_init<
@@ -226,7 +227,7 @@ public:
             auto lock = util::BenchmarkedLock{mReceiveDataMutex};
             auto& inbox = mRadioBroadcastReceiveData.inbox;
             auto& payload = broadcast.payload.value;
-            inbox.push(std::vector<uint8_t>(payload.bytes, payloads.bytes + payload.size));
+            inbox.push(std::vector<uint8_t>(payload.bytes, payload.bytes + payload.size));
         }
         postReceives();
 
@@ -236,7 +237,7 @@ private:
     void postReceives () {
         auto lock = util::BenchmarkedLock{mReceiveDataMutex};
 
-        static auto postReceiveImpl = [=] (ReceiveData& data) {
+        static auto postReceivesImpl = [=] (ReceiveData& data) {
             while (data.inbox.size() && data.ops.size()) {
                 auto op = data.ops.front();
                 data.ops.pop();
@@ -396,7 +397,7 @@ public:
 
         auto dongle = mDongle.lock();
         if (dongle) {
-            dongle->asyncSendTo(mSerialId, buffer, realHandler);
+            dongle->asyncTransmitUnicast(mSerialId, buffer, realHandler);
         }
         else {
             mIos.post(std::bind(realHandler, Status::DONGLE_NOT_FOUND));
@@ -415,8 +416,8 @@ public:
 
         auto dongle = mDongle.lock();
         if (dongle) {
-            BOOST_LOG(mLog) << "Calling dongle->asyncReceiveFrom(" << mSerialId << ")";
-            dongle->asyncReceiveFrom(mSerialId, buffer, realHandler);
+            BOOST_LOG(mLog) << "Calling dongle->asyncReceiveUnicast(" << mSerialId << ")";
+            dongle->asyncReceiveUnicast(mSerialId, buffer, realHandler);
         }
         else {
             mIos.post(std::bind(realHandler, Status::DONGLE_NOT_FOUND, 0));

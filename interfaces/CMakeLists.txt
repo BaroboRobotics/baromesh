@@ -19,6 +19,8 @@ if(MSVC)
 	message(WARNING "Disabling PB_STATIC_ASSERT for robot-interface due to Visual C++ token length limit")
 endif()
 
+target_link_libraries(commontypes-proto rpc-proto)
+
 target_link_libraries(robot-interface commontypes-proto rpc)
 target_link_libraries(dongle-interface commontypes-proto rpc)
 target_link_libraries(daemon-interface commontypes-proto rpc)
