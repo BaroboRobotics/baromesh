@@ -254,6 +254,7 @@ SET_EVENT_CALLBACK(ButtonEventCallback)
 //SET_EVENT_CALLBACK(EncoderEventCallback)
 SET_EVENT_CALLBACK(JointEventCallback)
 SET_EVENT_CALLBACK(AccelerometerEventCallback)
+SET_EVENT_CALLBACK(ConnectionTerminatedCallback)
 
 int linkbotSetEncoderEventCallback(Linkbot* l, 
                                    barobo::EncoderEventCallback cb,

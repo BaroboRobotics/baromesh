@@ -88,6 +88,7 @@ public:
     typedef void (*EncoderEventCallback)(int jointNo, double anglePosition, int timestamp, void* userData);
     typedef void (*JointEventCallback)(int jointNo, JointState::Type event, int timestamp, void* userData);
     typedef void (*AccelerometerEventCallback)(double x, double y, double z, int timestamp, void* userData);
+    typedef void (*ConnectionTerminatedCallback)(int timestamp, void* userData);
 
     // Passing a null pointer as the first parameter of those three functions
     // will disable its respective events.
@@ -95,6 +96,7 @@ public:
     void setEncoderEventCallback (EncoderEventCallback, double granularity, void* userData);
     void setJointEventCallback (JointEventCallback, void* userData);
     void setAccelerometerEventCallback (AccelerometerEventCallback, void* userData);
+    void setConnectionTerminatedCallback (ConnectionTerminatedCallback, void* userData);
 
     /* MISC */
     void writeEeprom(uint32_t address, const uint8_t *data, size_t size);
