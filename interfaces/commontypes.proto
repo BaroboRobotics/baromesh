@@ -1,42 +1,41 @@
 import "nanopb.proto";
+import "rpc.proto";
 package barobo;
 
 message SerialId {
     required string value = 1 [(nanopb).max_size = 5];
 }
 
-// Can either be unicast to port two, or part of a RadioBroadcastMessage, or
-// part of the Dongle and Daemon interface broadcasts. A RadioBroadcastMessage
-// containing a RobotEvent with event.has_ledColor = true should not make,
-// because that would imply the robot is connected to all of the recipients.
-message RobotEvent {
-	// Combinations:
-	// poweredOn has_ledColor MEANING
-	// 0         0            Robot is powering off
-	// 0         1            ditto or meaningless
-	// 1         0            Robot just powered on, is disconnected from any dongle
-	// 1         1            Robot is accepting a multicast connection request
-	required bool poweredOn = 1;
-	optional uint32 ledColor = 2;
+message Payload {
+    required bytes value = 1 [(nanopb).max_size = 128];
 }
 
-// Can be broadcast over the radio from either a dongle or a robot.
-message RadioBroadcastMessage {
-	enum Type {
-		ROBOT_EVENT = 0;
-		MULTICAST_CONNECT = 1;
-	}
+// Can be part of a RadioBroadcastMessage, or part of the Daemon interface
+// broadcasts.
+enum RobotPowerEvent {
+	OFF = 0;
+	ON = 1;
+}
 
-	required Type type = 1;
-
-	// has_robotEvent = true if type = ROBOT_EVENT
-	optional RobotEvent robotEvent = 2;
-
-	// destinations_count != 0 if type = MULTICAST_CONNECT
-	repeated SerialId destinations = 3 [(nanopb).max_count = 8];
+message MulticastRpcRequest {
+	repeated SerialId destinations = 1 [(nanopb).max_count = 8];
 
 	// To access destinations:
 	// for (auto i = 0; i < self.destinations_count; ++i) {
 	//     // self.destinations[i] is a null-terminated char[5]
 	// }
+
+	required barobo.rpc.Request request = 2;
+}
+
+// Can be broadcast over the radio from either a dongle or a robot.
+message RadioBroadcastMessage {
+	enum Type {
+		ROBOT_POWER_EVENT = 0;
+		MULTICAST_RPC_REQUEST = 1;
+	}
+
+	required Type type = 1;
+	optional RobotPowerEvent robotPowerEvent = 2;
+	optional MulticastRpcRequest multicastRpcRequest = 3;
 }

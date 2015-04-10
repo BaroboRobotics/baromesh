@@ -9,11 +9,11 @@ RPCDEF_HPP(
         (barobo, Dongle), (0, 1, 1),
         // all methods
         (transmitUnicast)
-        (transmitBroadcast)
+        (transmitRadioBroadcast)
         ,
         // all broadcasts
         (receiveUnicast)
-        (receiveRobotEvent)
+        (receiveRadioBroadcast)
         )
 
 #endif
