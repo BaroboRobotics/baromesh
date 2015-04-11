@@ -393,6 +393,29 @@ private:
             });
     }
 
+    void receiveUnregisteredTransmissions (std::function<void(boost::system::error_code)> ohShit,
+                                           std::shared_ptr<std::vector<uint8_t>> buf) {
+        mDongle->asyncReceiveTransmission(boost::asio::buffer(*buf), mStrand.wrap(
+            std::bind(&DaemonServerImpl::handleUnregisteredTransmission,
+                this->shared_from_this(), ohShit, buf, _1, _2, _3, _4)));
+    }
+
+    void handleUnregisteredTransmission (std::function<void(boost::system::error_code)> ohShit,
+                                         std::shared_ptr<std::vector<uint8_t>> buf,
+                                         boost::system::error_code ec,
+                                         bool isRadioBroadcast,
+                                         std::string serialId,
+                                         size_t nWritten) {
+        if (!ec) {
+            BOOST_LOG(mLog) << "Received " << nWritten << " bytes in a(n) " << (isRadioBroadcast ? "radio broadcast" : "unregistered unicast")
+                            << " transmission from " << serialId;
+            receiveUnregisteredTransmissions(ohShit, buf);
+        }
+        else {
+            ohShit(ec);
+        }
+    }
+
     void setDongleIoTraps () {
         assert(mDongle);
 
@@ -414,17 +437,8 @@ private:
 
         // Set up a read trap--a read operation that should never complete, and
         // will just inform us when the dongle encounters an error.
-        auto mqLog = mLog;
-        mqLog.add_attribute("SerialId", boost::log::attributes::constant<std::string>("...."));
-
-        auto buf = std::make_shared<uint8_t>();
-        auto nullMq = std::make_shared<Dongle::MessageQueue>(mIos, mqLog);
-
-        nullMq->setRoute(*mDongle, "....");
-        nullMq->asyncReceive(boost::asio::buffer(buf.get(), 1), mStrand.wrap(
-            [resetDongle, nullMq] (boost::system::error_code ec, size_t) {
-                resetDongle(ec);
-            }));
+        auto buf = std::make_shared<std::vector<uint8_t>>(1024);
+        receiveUnregisteredTransmissions(resetDongle, buf);
 
         // Set up a write trap--a periodic write operation to detect when the
         // dongle has an error.

@@ -24,7 +24,6 @@ message MulticastRpcRequest {
 
 // Radio broadcast from a robot to all daemons. Use the toComputer port.
 message RobotPowerOnEvent {
-	required SerialId serialId = 1;
 	required barobo.rpc.VersionTriplet firmwareVersion = 2;
 	required barobo.rpc.Versions rpcVersions = 3;
 }

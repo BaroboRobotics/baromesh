@@ -12,8 +12,7 @@ RPCDEF_HPP(
         (transmitRadioBroadcast)
         ,
         // all broadcasts
-        (receiveUnicast)
-        (receiveRadioBroadcast)
+        (receiveTransmission)
         )
 
 #endif

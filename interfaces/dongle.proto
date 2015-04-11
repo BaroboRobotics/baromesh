@@ -24,11 +24,8 @@ message transmitRadioBroadcast {
 //////////////////////////////////////////////////////////////////////////////
 // Broadcasts
 
-message receiveUnicast {
-    required barobo.SerialId serialId = 1;
-    required barobo.Payload payload = 2;
-}
-
-message receiveRadioBroadcast {
-    required barobo.Payload payload = 1;
+message receiveTransmission {
+    required bool isRadioBroadcast = 1;
+    required barobo.SerialId serialId = 2;
+    required barobo.Payload payload = 3;
 }

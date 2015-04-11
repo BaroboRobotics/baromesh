@@ -5,6 +5,5 @@ RPCDEF_CPP((barobo, Dongle),
         (transmitUnicast)
         (transmitRadioBroadcast)
         ,
-        (receiveUnicast)
-        (receiveRadioBroadcast)
+        (receiveTransmission)
         )
