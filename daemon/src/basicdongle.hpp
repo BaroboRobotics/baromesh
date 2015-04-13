@@ -135,6 +135,7 @@ public:
         boost::asio::detail::async_result_init<
             Handler, SendHandlerSignature
         > init { std::forward<Handler>(handler) };
+        auto& realHandler = init.handler;
 
         MethodIn::transmitRadioBroadcast args = decltype(args)();
 
