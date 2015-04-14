@@ -38,7 +38,7 @@ using boost::asio::use_future;
 using SerialMessageQueue = sfp::asio::MessageQueue<boost::asio::serial_port>;
 using SerialClient = rpc::asio::Client<SerialMessageQueue>;
 using Dongle = baromesh::BasicDongle<SerialClient>;
-using ZigbeeClient = rpc::asio::Client<Dongle::MessageQueue>;
+using ZigbeeClient = rpc::asio::Client<Dongle::RobotMessageQueue>;
 
 static const int kDongleBaudRate = 230400;
 
@@ -185,7 +185,7 @@ public:
         MethodResult::resolveSerialId result = decltype(result)();
         try {
             if (!mDongle) {
-                throw std::runtime_error("no dongle present");
+                throw boost::system::system_error(Status::DONGLE_NOT_FOUND);
             }
 
             BOOST_LOG(mLog) << "searching for proxy for " << serialId;
@@ -234,15 +234,58 @@ public:
                 result.endpoint.address[sizeof(result.endpoint.address) - 1] = 0;
                 result.endpoint.port = endpoint.port();
                 result.has_endpoint = true;
+                result.status = decltype(result.status)(Status::OK);
             }
             else {
-                throw std::runtime_error("address buffer overflow");
+                throw boost::system::system_error(Status::BUFFER_OVERFLOW);
             }
         }
-        catch (std::exception& e) {
+        catch (boost::system::system_error& e) {
             BOOST_LOG(mLog) << "Error (re)starting proxy server for "
                             << std::string(serialId) << ": " << e.what();
             result.has_endpoint = false;
+            result.status = e.code().category() == errorCategory()
+                            ? decltype(result.status)(e.code().value())
+                            : decltype(result.status)(Status::OTHER_ERROR);
+        }
+        return result;
+    }
+
+    MethodResult::sendRobotPing onFire (MethodIn::sendRobotPing args) {
+        {
+            auto serialIds = std::string{};
+            if (args.destinations_count) {
+                serialIds += args.destinations[0].value;
+                for (auto i = 1; i < args.destinations_count; ++i) {
+                    serialIds += std::string{", "} + args.destinations[i].value;
+                }
+            }
+            BOOST_LOG(mLog) << "firing barobo.Daemon.sendRobotPing(" << serialIds << ")";
+        }
+
+        MethodResult::sendRobotPing result = decltype(result)();
+        try {
+            if (!mDongle) {
+                throw boost::system::system_error(Status::DONGLE_NOT_FOUND);
+            }
+
+            std::list<std::string> serialIds;
+            for (auto i = 0; i < args.destinations_count; ++i) {
+                serialIds.push_back(args.destinations[i].value);
+            }
+            auto self = this->shared_from_this();
+            mDongle->asyncSendRobotPing(serialIds, [this, self] (boost::system::error_code ec) {
+                if (ec) {
+                    BOOST_LOG(mLog) << "Error sending robot ping (" << ec.message() << "), resetting dongle";
+                    cycleDongleImpl(kDongleDowntimeAfterError);
+                }
+            });
+        }
+        catch (boost::system::system_error& e) {
+            BOOST_LOG(mLog) << "Error sending robot ping: " << e.what();
+            result.status = e.code().category() == errorCategory()
+                ? decltype(result.status)(e.code().value())
+                : decltype(result.status)(Status::OTHER_ERROR);
         }
         return result;
     }
@@ -380,7 +423,6 @@ private:
             BOOST_LOG(mLog) << "Replacing \"" << ec.message()
                            << "\" with \"" << newEc.message() << "\"";
             ec = newEc;
-
         }
         using BStatus = decltype(Broadcast::dongleEvent::status);
         rpc::asio::asyncBroadcast(mServer, Broadcast::dongleEvent{BStatus(ec.value())},
@@ -393,26 +435,35 @@ private:
             });
     }
 
-    void receiveUnregisteredTransmissions (std::function<void(boost::system::error_code)> ohShit,
-                                           std::shared_ptr<std::vector<uint8_t>> buf) {
-        mDongle->asyncReceiveTransmission(boost::asio::buffer(*buf), mStrand.wrap(
-            std::bind(&DaemonServerImpl::handleUnregisteredTransmission,
-                this->shared_from_this(), ohShit, buf, _1, _2, _3, _4)));
+    void receiveRobotEvents () {
+        mDongle->asyncReceiveRobotEvent(mStrand.wrap(
+            std::bind(&DaemonServerImpl::handleRobotEvent,
+                this->shared_from_this(), _1, _2, _3)));
     }
 
-    void handleUnregisteredTransmission (std::function<void(boost::system::error_code)> ohShit,
-                                         std::shared_ptr<std::vector<uint8_t>> buf,
-                                         boost::system::error_code ec,
-                                         bool isRadioBroadcast,
-                                         std::string serialId,
-                                         size_t nWritten) {
+    void handleRobotEvent (boost::system::error_code ec,
+                           std::string serialId,
+                           barobo_RobotEvent event) {
         if (!ec) {
-            BOOST_LOG(mLog) << "Received " << nWritten << " bytes in a(n) " << (isRadioBroadcast ? "radio broadcast" : "unregistered unicast")
-                            << " transmission from " << serialId;
-            receiveUnregisteredTransmissions(ohShit, buf);
+            Broadcast::robotEvent robotEvent = decltype(robotEvent)();
+            std::strncpy(robotEvent.serialId.value, serialId.c_str(), 4);
+            robotEvent.serialId.value[4] = 0;
+            robotEvent.event = event;
+
+            rpc::asio::asyncBroadcast(mServer, robotEvent,
+            [] (boost::system::error_code ec2) {
+                if (ec2 && boost::asio::error::operation_aborted != ec2) {
+                    boost::log::sources::logger log;
+                    BOOST_LOG(log) << "robotEvent broadcast completed"
+                                   << " with " << ec2.message();
+                }
+            });
+
+            receiveRobotEvents();
         }
         else {
-            ohShit(ec);
+            BOOST_LOG(mLog) << "Error receiving robot event (" << ec.message() << "), resetting dongle";
+            cycleDongleImpl(kDongleDowntimeAfterError);
         }
     }
 
@@ -437,8 +488,7 @@ private:
 
         // Set up a read trap--a read operation that should never complete, and
         // will just inform us when the dongle encounters an error.
-        auto buf = std::make_shared<std::vector<uint8_t>>(1024);
-        receiveUnregisteredTransmissions(resetDongle, buf);
+        receiveRobotEvents();
 
         // Set up a write trap--a periodic write operation to detect when the
         // dongle has an error.

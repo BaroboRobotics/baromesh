@@ -4,6 +4,8 @@
 RPCDEF_CPP((barobo, Daemon),
         (resolveSerialId)
         (cycleDongle)
+        (sendRobotPing)
         ,
         (dongleEvent)
+        (robotEvent)
         )

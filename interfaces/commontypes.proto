@@ -10,20 +10,24 @@ message Payload {
     required bytes value = 1 [(nanopb).max_size = 128];
 }
 
-// Radio broadcast from the daemon to multiple robots. Use the toRobot port.
-message MulticastRpcRequest {
-	repeated SerialId destinations = 1 [(nanopb).max_count = 8];
+enum RadioPort {
+	ROBOT_SERVER = 0;
+	ROBOT_CLIENT = 1;
+	ROBOT_PING = 2;
+	ROBOT_EVENT = 3;
+}
 
+// Radio broadcast from the daemon to multiple robots. Use the STATUS_PING port.
+message RobotPing {
+	repeated SerialId destinations = 1 [(nanopb).max_count = 8];
 	// To access destinations:
 	// for (auto i = 0; i < self.destinations_count; ++i) {
 	//     // self.destinations[i] is a null-terminated char[5]
 	// }
-
-	required barobo.rpc.Request request = 2;
 }
 
-// Radio broadcast from a robot to all daemons. Use the toComputer port.
-message RobotPowerOnEvent {
+// Radio broadcast from a robot to all daemons. Use the STATUS_EVENT port.
+message RobotEvent {
 	required barobo.rpc.VersionTriplet firmwareVersion = 2;
 	required barobo.rpc.Versions rpcVersions = 3;
 }

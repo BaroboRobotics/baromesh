@@ -18,7 +18,10 @@ enum class Status {
     DAEMON_UNAVAILABLE      = barobo_Daemon_Status_DAEMON_UNAVAILABLE,
 
     STRANGE_DONGLE          = barobo_Daemon_Status_STRANGE_DONGLE,
-    DONGLE_VERSION_MISMATCH = barobo_Daemon_Status_DONGLE_VERSION_MISMATCH
+    DONGLE_VERSION_MISMATCH = barobo_Daemon_Status_DONGLE_VERSION_MISMATCH,
+
+    BUFFER_OVERFLOW         = barobo_Daemon_Status_BUFFER_OVERFLOW,
+    OTHER_ERROR             = barobo_Daemon_Status_OTHER_ERROR,
 };
 
 } // namespace baromesh

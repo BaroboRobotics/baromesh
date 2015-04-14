@@ -8,15 +8,19 @@ package barobo.Dongle;
 message transmitUnicast {
     message In {
         required barobo.SerialId serialId = 1;
-        required barobo.Payload payload = 2;
-        required uint32 nRetries = 3; // exponential backoff parameter
+        required uint32 destinationPort = 2;
+        required uint32 sourcePort = 3;
+        required barobo.Payload payload = 4;
+        required uint32 nRetries = 5; // exponential backoff parameter
     }
     message Result { }
 }
 
 message transmitRadioBroadcast {
     message In {
-        required barobo.Payload payload = 1;
+        required uint32 destinationPort = 1;
+        required uint32 sourcePort = 2;
+        required barobo.Payload payload = 3;
     }
     message Result { }
 }
@@ -25,7 +29,8 @@ message transmitRadioBroadcast {
 // Broadcasts
 
 message receiveTransmission {
-    required bool isRadioBroadcast = 1;
-    required barobo.SerialId serialId = 2;
-    required barobo.Payload payload = 3;
+    required barobo.SerialId serialId = 1;
+    required uint32 destinationPort = 2;
+    required uint32 sourcePort = 3;
+    required barobo.Payload payload = 4;
 }
