@@ -257,6 +257,7 @@ public:
                     else {
                         BOOST_LOG(mLog) << "Discarding Robot message from " << serialId;
                     }
+                    break;
                 }
                 case barobo_RadioPort_ROBOT_EVENT:
                     mRobotEventReceiveData.inbox.push(std::make_tuple(serialId, buf));
