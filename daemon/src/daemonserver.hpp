@@ -185,7 +185,7 @@ public:
         MethodResult::resolveSerialId result = decltype(result)();
         try {
             if (!mDongle) {
-                throw std::runtime_error("no dongle present");
+                throw boost::system::system_error(Status::DONGLE_NOT_FOUND);
             }
 
             BOOST_LOG(mLog) << "searching for proxy for " << serialId;
@@ -234,15 +234,58 @@ public:
                 result.endpoint.address[sizeof(result.endpoint.address) - 1] = 0;
                 result.endpoint.port = endpoint.port();
                 result.has_endpoint = true;
+                result.status = decltype(result.status)(Status::OK);
             }
             else {
-                throw std::runtime_error("address buffer overflow");
+                throw boost::system::system_error(Status::BUFFER_OVERFLOW);
             }
         }
-        catch (std::exception& e) {
+        catch (boost::system::system_error& e) {
             BOOST_LOG(mLog) << "Error (re)starting proxy server for "
                             << std::string(serialId) << ": " << e.what();
             result.has_endpoint = false;
+            result.status = e.code().category() == errorCategory()
+                            ? decltype(result.status)(e.code().value())
+                            : decltype(result.status)(Status::OTHER_ERROR);
+        }
+        return result;
+    }
+
+    MethodResult::sendRobotPing onFire (MethodIn::sendRobotPing args) {
+        {
+            auto serialIds = std::string{};
+            if (args.destinations_count) {
+                serialIds += args.destinations[0].value;
+                for (auto i = 1; i < args.destinations_count; ++i) {
+                    serialIds += std::string{", "} + args.destinations[i].value;
+                }
+            }
+            BOOST_LOG(mLog) << "firing barobo.Daemon.sendRobotPing(" << serialIds << ")";
+        }
+
+        MethodResult::sendRobotPing result = decltype(result)();
+        try {
+            if (!mDongle) {
+                throw boost::system::system_error(Status::DONGLE_NOT_FOUND);
+            }
+
+            std::list<std::string> serialIds;
+            for (auto i = 0; i < args.destinations_count; ++i) {
+                serialIds.push_back(args.destinations[i].value);
+            }
+            auto self = this->shared_from_this();
+            mDongle->asyncSendRobotPing(serialIds, [this, self] (boost::system::error_code ec) {
+                if (ec) {
+                    BOOST_LOG(mLog) << "Error sending robot ping (" << ec.message() << "), resetting dongle";
+                    cycleDongleImpl(kDongleDowntimeAfterError);
+                }
+            });
+        }
+        catch (boost::system::system_error& e) {
+            BOOST_LOG(mLog) << "Error sending robot ping: " << e.what();
+            result.status = e.code().category() == errorCategory()
+                ? decltype(result.status)(e.code().value())
+                : decltype(result.status)(Status::OTHER_ERROR);
         }
         return result;
     }
@@ -380,7 +423,6 @@ private:
             BOOST_LOG(mLog) << "Replacing \"" << ec.message()
                            << "\" with \"" << newEc.message() << "\"";
             ec = newEc;
-
         }
         using BStatus = decltype(Broadcast::dongleEvent::status);
         rpc::asio::asyncBroadcast(mServer, Broadcast::dongleEvent{BStatus(ec.value())},
@@ -391,6 +433,50 @@ private:
                                    << " with " << ec2.message();
                 }
             });
+    }
+
+    void receiveRobotEvents () {
+        mDongle->asyncReceiveRobotEvent(mStrand.wrap(
+            std::bind(&DaemonServerImpl::handleRobotEvent,
+                this->shared_from_this(), _1, _2, _3)));
+    }
+
+    void handleRobotEvent (boost::system::error_code ec,
+                           std::string serialId,
+                           barobo_RobotEvent event) {
+        if (!ec) {
+            Broadcast::robotEvent robotEvent = decltype(robotEvent)();
+            std::strncpy(robotEvent.serialId.value, serialId.c_str(), 4);
+            robotEvent.serialId.value[4] = 0;
+            robotEvent.event = event;
+
+            auto& fVer = event.firmwareVersion;
+            auto& rVer = event.rpcVersions.rpc;
+            auto& iVer = event.rpcVersions.interface;
+            BOOST_LOG(mLog) << serialId << " powered on: Firmware v"
+                           << fVer.major << "." << fVer.minor << "." << fVer.patch
+                           << ", RPC v"
+                           << rVer.major << "." << rVer.minor << "." << rVer.patch
+                           << ", barobo.Robot interface v"
+                           << iVer.major << "." << iVer.minor << "." << iVer.patch;
+
+            rpc::asio::asyncBroadcast(mServer, robotEvent,
+            [] (boost::system::error_code ec2) {
+                if (ec2 && boost::asio::error::operation_aborted != ec2) {
+                    boost::log::sources::logger log;
+                    BOOST_LOG(log) << "robotEvent broadcast completed"
+                                   << " with " << ec2.message();
+                }
+            });
+
+            receiveRobotEvents();
+        }
+        else {
+            BOOST_LOG(mLog) << "Error receiving robot event (" << ec.message() << "), resetting dongle";
+            if (boost::asio::error::operation_aborted != ec) {
+                cycleDongleImpl(kDongleDowntimeAfterError);
+            }
+        }
     }
 
     void setDongleIoTraps () {
@@ -414,17 +500,7 @@ private:
 
         // Set up a read trap--a read operation that should never complete, and
         // will just inform us when the dongle encounters an error.
-        auto mqLog = mLog;
-        mqLog.add_attribute("SerialId", boost::log::attributes::constant<std::string>("...."));
-
-        auto buf = std::make_shared<uint8_t>();
-        auto nullMq = std::make_shared<Dongle::MessageQueue>(mIos, mqLog);
-
-        nullMq->setRoute(*mDongle, "....");
-        nullMq->asyncReceive(boost::asio::buffer(buf.get(), 1), mStrand.wrap(
-            [resetDongle, nullMq] (boost::system::error_code ec, size_t) {
-                resetDongle(ec);
-            }));
+        receiveRobotEvents();
 
         // Set up a write trap--a periodic write operation to detect when the
         // dongle has an error.

@@ -21,6 +21,9 @@ std::string ErrorCategory::message (int ev) const BOOST_NOEXCEPT {
 
         ITEM(STRANGE_DONGLE)
         ITEM(DONGLE_VERSION_MISMATCH)
+
+        ITEM(BUFFER_OVERFLOW)
+        ITEM(OTHER_ERROR)
 #undef ITEM
         default: return "(unknown status)";
     }

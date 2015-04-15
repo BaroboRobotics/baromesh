@@ -119,6 +119,12 @@ struct Linkbot::Impl {
         BOOST_LOG(log) << "Debug message from robot: " << e.bytestring;
     }
 
+    void onBroadcast (Broadcast::connectionTerminated b) {
+        BOOST_LOG(log) << "Connection terminated at " << b.timestamp;
+        if (connectionTerminatedCallback) {
+            connectionTerminatedCallback(b.timestamp);
+        }
+    }
     mutable boost::log::sources::logger log;
 
     std::shared_ptr<baromesh::IoCore> ioCore;
@@ -131,6 +137,7 @@ struct Linkbot::Impl {
     std::function<void(int,double, int)> encoderEventCallback;
     std::function<void(int,JointState::Type, int)> jointEventCallback;
     std::function<void(double,double,double,int)> accelerometerEventCallback;
+    std::function<void(int)> connectionTerminatedCallback;
 };
 
 Linkbot::Linkbot (const std::string& host, const std::string& service) try
@@ -726,6 +733,11 @@ void Linkbot::setJointEventCallback (JointEventCallback cb, void* userData) {
         m->jointEventCallback = nullptr;
     }
 }
+
+void Linkbot::setConnectionTerminatedCallback (ConnectionTerminatedCallback cb, void* userData) {
+    m->connectionTerminatedCallback = std::bind(cb, _1, userData);
+}
+
 
 void Linkbot::writeEeprom(uint32_t address, const uint8_t *data, size_t size)
 {

@@ -9,10 +9,15 @@
 
 #include "util/benchmarkedlock.hpp"
 
+#include "pb_encode.h"
+#include "pb_decode.h"
+
 #include <functional>
 #include <memory>
 #include <queue>
 #include <mutex>
+#include <sstream>
+#include <tuple>
 #include <vector>
 
 #include <cstring>
@@ -27,17 +32,27 @@ namespace baromesh {
 // typedef void T(boost::system::error_code) works
 typedef void SendHandlerSignature(boost::system::error_code);
 typedef void ReceiveHandlerSignature(boost::system::error_code, size_t);
+typedef void RobotEventReceiveHandlerSignature(boost::system::error_code, std::string, barobo_RobotEvent);
+
 using ReceiveHandler = std::function<ReceiveHandlerSignature>;
+using RobotEventReceiveHandler = std::function<RobotEventReceiveHandlerSignature>;
 
 using namespace std::placeholders;
 
 template <class RpcClient>
 class DongleImpl : public std::enable_shared_from_this<DongleImpl<RpcClient>> {
+    // serialId-specific buffers
     struct ReceiveData {
         ReceiveData (boost::log::sources::logger lg) : log(lg) {}
         std::queue<std::pair<boost::asio::mutable_buffer, ReceiveHandler>> ops;
         std::queue<std::vector<uint8_t>> inbox;
         boost::log::sources::logger log;
+    };
+
+    // buffers which contain serialId values
+    struct RobotEventReceiveData {
+        std::queue<RobotEventReceiveHandler> ops;
+        std::queue<std::tuple<std::string, std::vector<uint8_t>>> inbox; // serialId, buffer
     };
 
     using MethodIn = rpc::MethodIn<barobo::Dongle>;
@@ -62,16 +77,16 @@ public:
     // default, the Dongle object will ignore any messages destined for a
     // "closed" serial ID). Return false if the buffer already exists, true
     // otherwise.
-    bool openMessageQueue (std::string serialId, boost::log::sources::logger log) {
+    bool openRobotMessageQueue (std::string serialId, boost::log::sources::logger log) {
         auto lock = util::BenchmarkedLock{mReceiveDataMutex};
-        return mReceiveData.insert(std::make_pair(serialId, ReceiveData(log))).second;
+        return mRobotReceiveData.insert(std::make_pair(serialId, ReceiveData(log))).second;
     }
 
     // Remove the incoming messages buffer for the given serial ID, if one exists.
-    void closeMessageQueue (std::string serialId) {
+    void closeRobotMessageQueue (std::string serialId) {
         auto lock = util::BenchmarkedLock{mReceiveDataMutex};
-        auto iter = mReceiveData.find(serialId);
-        if (iter != mReceiveData.end()) {
+        auto iter = mRobotReceiveData.find(serialId);
+        if (iter != mRobotReceiveData.end()) {
             auto& data = iter->second;
             // FIXME code duplication with voidHandlers
             while (data.ops.size()) {
@@ -81,13 +96,15 @@ public:
                 mClient.get_io_service().post(
                     std::bind(handler, boost::asio::error::operation_aborted, 0));
             }
-            mReceiveData.erase(iter);
+            mRobotReceiveData.erase(iter);
         }
     }
 
     template <class Handler>
     BOOST_ASIO_INITFN_RESULT_TYPE(Handler, SendHandlerSignature)
-    asyncSendTo (std::string serialId, boost::asio::const_buffer buffer, Handler&& handler) {
+    asyncSendRobotMessage (std::string serialId,
+                          boost::asio::const_buffer buffer,
+                          Handler&& handler) {
         boost::asio::detail::async_result_init<
             Handler, SendHandlerSignature
         > init { std::forward<Handler>(handler) };
@@ -101,6 +118,9 @@ public:
 
         std::strncpy(args.serialId.value, serialId.data(), 4);
         args.serialId.value[4] = 0;
+
+        args.destinationPort = barobo_RadioPort_ROBOT_SERVER;
+        args.sourcePort = barobo_RadioPort_ROBOT_CLIENT;
 
         auto& payload = args.payload.value;
         payload.size = boost::asio::buffer_copy(
@@ -119,7 +139,7 @@ public:
 
     template <class Handler>
     BOOST_ASIO_INITFN_RESULT_TYPE(Handler, ReceiveHandlerSignature)
-    asyncReceiveFrom (std::string serialId, boost::asio::mutable_buffer buffer, Handler&& handler) {
+    asyncReceiveRobotMessage (std::string serialId, boost::asio::mutable_buffer buffer, Handler&& handler) {
         boost::asio::detail::async_result_init<
             Handler, ReceiveHandlerSignature
         > init { std::forward<Handler>(handler) };
@@ -129,8 +149,8 @@ public:
         mStrand.post([self, this, serialId, buffer, realHandler] () {
             {
                 auto lock = util::BenchmarkedLock{this->mReceiveDataMutex};
-                auto iter = this->mReceiveData.find(serialId);
-                if (this->mReceiveData.end() == iter) {
+                auto iter = this->mRobotReceiveData.find(serialId);
+                if (this->mRobotReceiveData.end() == iter) {
                     this->mClient.get_io_service().post(std::bind(realHandler, Status::UNREGISTERED_SERIALID, 0));
                 }
                 else {
@@ -145,20 +165,108 @@ public:
         return init.result.get();
     }
 
-    void onBroadcast (Broadcast::receiveUnicast broadcast) {
-        {
-            auto lock = util::BenchmarkedLock{mReceiveDataMutex};
-            auto serialId = std::string(broadcast.serialId.value);
-            auto iter = mReceiveData.find(serialId);
-            if (iter != mReceiveData.end()) {
-                BOOST_LOG(mLog) << "received message from " << serialId;
-                auto& inbox = iter->second.inbox;
-                auto& payload = broadcast.payload.value;
-                inbox.push(std::vector<uint8_t>(payload.bytes, payload.bytes + payload.size));
+    template <class StringContainer, class Handler>
+    BOOST_ASIO_INITFN_RESULT_TYPE(Handler, SendHandlerSignature)
+    asyncSendRobotPing (StringContainer destinations, Handler&& handler) {
+        boost::asio::detail::async_result_init<
+            Handler, SendHandlerSignature
+        > init { std::forward<Handler>(handler) };
+        auto& realHandler = init.handler;
+
+        MethodIn::transmitRadioBroadcast args = decltype(args)();
+
+        args.destinationPort = barobo_RadioPort_ROBOT_PING;
+        args.sourcePort = barobo_RadioPort_ROBOT_EVENT;
+
+        auto& payload = args.payload.value;
+
+        barobo_RobotPing robotPing = decltype(robotPing)();
+
+        if (destinations.size() > sizeof(robotPing.destinations)/sizeof(*robotPing.destinations)) {
+            throw boost::system::system_error(Status::BUFFER_OVERFLOW);
+        }
+
+        auto i = 0;
+        for (auto serialId : destinations) {
+            std::strncpy(robotPing.destinations[i].value, serialId.c_str(), 4);
+            robotPing.destinations[i].value[4] = 0;
+            ++i;
+        }
+
+        robotPing.destinations_count = destinations.size();
+
+        auto stream = pb_ostream_from_buffer(payload.bytes, sizeof(payload.bytes));
+        if (!pb_encode(&stream, barobo_RobotPing_fields, &robotPing)) {
+            BOOST_LOG(mLog) << "Encoding failure: " << PB_GET_ERROR(&stream);
+            throw boost::system::system_error(rpc::Status::ENCODING_FAILURE);
+        }
+        payload.size = stream.bytes_written;
+
+        std::string s;
+        for (auto serialId : destinations) {
+            s += serialId + ", ";
+        }
+        BOOST_LOG(mLog) << "Pinging " << s;
+
+        auto self = this->shared_from_this();
+        asyncFire(mClient, args, std::chrono::seconds(60),
+            [self, this, realHandler] (boost::system::error_code ec, MethodResult::transmitRadioBroadcast) {
+                this->mClient.get_io_service().post(std::bind(realHandler, ec));
+            });
+
+        return init.result.get();
+    }
+
+    template <class Handler>
+    BOOST_ASIO_INITFN_RESULT_TYPE(Handler, RobotEventReceiveHandlerSignature)
+    asyncReceiveRobotEvent (Handler&& handler) {
+        boost::asio::detail::async_result_init<
+            Handler, RobotEventReceiveHandlerSignature
+        > init { std::forward<Handler>(handler) };
+        auto& realHandler = init.handler;
+
+        auto self = this->shared_from_this();
+        mStrand.post([self, this, realHandler] () {
+            {
+                auto lock = util::BenchmarkedLock{this->mReceiveDataMutex};
+                BOOST_LOG(this->mLog) << "Pushing a robot event receive handler";
+                this->mRobotEventReceiveData.ops.push(realHandler);
             }
-            else {
-                BOOST_LOG(mLog) << "discarding message from unregistered serial ID "
-                                << serialId;
+            this->postReceives();
+            this->startReceivePump();
+        });
+
+        return init.result.get();
+    }
+
+    void onBroadcast (Broadcast::receiveTransmission broadcast) {
+        {
+            auto serialId = std::string(broadcast.serialId.value);
+            auto& payload = broadcast.payload.value;
+            auto buf = std::vector<uint8_t>(payload.bytes, payload.bytes + payload.size);
+            BOOST_LOG(mLog) << "received message from " << serialId;
+
+            auto lock = util::BenchmarkedLock{mReceiveDataMutex};
+
+            switch (broadcast.destinationPort) {
+                case barobo_RadioPort_ROBOT_CLIENT: {
+                    auto iter = mRobotReceiveData.find(serialId);
+                    if (iter != mRobotReceiveData.end()) {
+                        iter->second.inbox.push(buf);
+                    }
+                    else {
+                        BOOST_LOG(mLog) << "Discarding Robot message from " << serialId;
+                    }
+                    break;
+                }
+                case barobo_RadioPort_ROBOT_EVENT:
+                    mRobotEventReceiveData.inbox.push(std::make_tuple(serialId, buf));
+                    break;
+                case barobo_RadioPort_ROBOT_SERVER: // fall-through
+                case barobo_RadioPort_ROBOT_PING:  // fall-through
+                default:
+                    BOOST_LOG(mLog) << "Discarding a nonsense transmission";
+                    break;
             }
         }
         postReceives();
@@ -167,10 +275,9 @@ public:
 private:
     void postReceives () {
         auto lock = util::BenchmarkedLock{mReceiveDataMutex};
-        for (auto& kv : mReceiveData) {
+
+        for (auto& kv : mRobotReceiveData) {
             auto& data = kv.second;
-            //BOOST_LOG(data.log) << "posting ready receive operations (ops: "
-            //                    << data.ops.size() << ", inbox: " << data.inbox.size() << ")";
             while (data.inbox.size() && data.ops.size()) {
                 auto op = data.ops.front();
                 data.ops.pop();
@@ -191,6 +298,28 @@ private:
                 mClient.get_io_service().post(std::bind(handler, ec, nCopied));
             }
         }
+        auto& data = mRobotEventReceiveData;
+        while (data.inbox.size() && data.ops.size()) {
+            auto handler = data.ops.front();
+            data.ops.pop();
+
+            auto& t = data.inbox.front();
+            auto& serialId = std::get<0>(t);
+            auto& srcBuf = std::get<1>(t);
+
+            barobo_RobotEvent robotEvent = decltype(robotEvent)();
+
+            auto stream = pb_istream_from_buffer(srcBuf.data(), srcBuf.size());
+            if (!pb_decode(&stream, barobo_RobotEvent_fields, &robotEvent)) {
+                BOOST_LOG(mLog) << "Decoding failure: " << PB_GET_ERROR(&stream);
+                mClient.get_io_service().post(std::bind(handler, rpc::Status::DECODING_FAILURE, serialId, robotEvent));
+            }
+            else {
+                mClient.get_io_service().post(std::bind(handler, Status::OK, serialId, robotEvent));
+            }
+
+            data.inbox.pop();
+        }
     }
 
     void startReceivePump () {
@@ -203,8 +332,9 @@ private:
 
     bool thereArePendingOperations () {
         auto lock = util::BenchmarkedLock{mReceiveDataMutex};
-        using KeyValue = typename decltype(mReceiveData)::value_type;
-        return std::any_of(mReceiveData.begin(), mReceiveData.end(),
+        using KeyValue = typename decltype(mRobotReceiveData)::value_type;
+        return !!mRobotEventReceiveData.ops.size() ||
+               std::any_of(mRobotReceiveData.begin(), mRobotReceiveData.end(),
             [] (KeyValue& kv) {
                 auto& data = kv.second;
                 return !!data.ops.size();
@@ -248,15 +378,21 @@ private:
 
     void voidHandlers (boost::system::error_code ec) {
         auto lock = util::BenchmarkedLock{mReceiveDataMutex};
-        for (auto& kv : mReceiveData) {
+
+        for (auto& kv : mRobotReceiveData) {
             auto& data = kv.second;
             while (data.ops.size()) {
                 auto op = data.ops.front();
                 data.ops.pop();
                 auto& handler = op.second;
-                BOOST_LOG(mLog) << "Voiding handler for " << kv.first;
                 mClient.get_io_service().post(std::bind(handler, ec, 0));
             }
+        }
+        auto& data = mRobotEventReceiveData;
+        while (data.ops.size()) {
+            auto handler = data.ops.front();
+            data.ops.pop();
+            mClient.get_io_service().post(std::bind(handler, ec, "", barobo_RobotEvent{}));
         }
     }
 
@@ -265,30 +401,31 @@ private:
     RpcClient mClient;
     boost::asio::io_service::strand mStrand;
 
-    std::map<std::string, ReceiveData> mReceiveData;
+    std::map<std::string, ReceiveData> mRobotReceiveData;
+    RobotEventReceiveData mRobotEventReceiveData;
     std::mutex mReceiveDataMutex;
 
     mutable boost::log::sources::logger mLog;
 };
 
 template <class D>
-class DongleMessageQueue {
+class RobotMessageQueue {
 public:
-    DongleMessageQueue (boost::asio::io_service& ios, boost::log::sources::logger log)
+    RobotMessageQueue (boost::asio::io_service& ios, boost::log::sources::logger log)
         : mIos(ios)
         , mLog(log)
     {
         mLog.add_attribute("Protocol", boost::log::attributes::constant<std::string>("DMQ"));
     }
 
-    ~DongleMessageQueue () {
+    ~RobotMessageQueue () {
         boost::system::error_code ec;
         close(ec);
     }
 
     // noncopyable
-    DongleMessageQueue (const DongleMessageQueue&) = delete;
-    DongleMessageQueue& operator= (const DongleMessageQueue&) = delete;
+    RobotMessageQueue (const RobotMessageQueue&) = delete;
+    RobotMessageQueue& operator= (const RobotMessageQueue&) = delete;
 
     void close () {
         boost::system::error_code ec;
@@ -302,7 +439,7 @@ public:
         BOOST_LOG(mLog) << "Closing message queue for " << mSerialId;
         auto dongle = mDongle.lock();
         if (dongle) {
-            dongle->closeMessageQueue(mSerialId);
+            dongle->closeRobotMessageQueue(mSerialId);
         }
     }
 
@@ -320,7 +457,7 @@ public:
 
         auto dongle = mDongle.lock();
         if (dongle) {
-            dongle->asyncSendTo(mSerialId, buffer, realHandler);
+            dongle->asyncSendRobotMessage(mSerialId, buffer, realHandler);
         }
         else {
             mIos.post(std::bind(realHandler, Status::DONGLE_NOT_FOUND));
@@ -339,8 +476,8 @@ public:
 
         auto dongle = mDongle.lock();
         if (dongle) {
-            BOOST_LOG(mLog) << "Calling dongle->asyncReceiveFrom(" << mSerialId << ")";
-            dongle->asyncReceiveFrom(mSerialId, buffer, realHandler);
+            BOOST_LOG(mLog) << "Calling dongle->asyncReceiveRobotMessage(" << mSerialId << ")";
+            dongle->asyncReceiveRobotMessage(mSerialId, buffer, realHandler);
         }
         else {
             mIos.post(std::bind(realHandler, Status::DONGLE_NOT_FOUND, 0));
@@ -353,7 +490,7 @@ public:
         mDongle = dongle.impl();
         auto d = mDongle.lock();
         assert(d);
-        auto success = d->openMessageQueue(serialId, mLog);
+        auto success = d->openRobotMessageQueue(serialId, mLog);
         assert(success);
         (void)success;
 
@@ -373,7 +510,7 @@ class BasicDongle {
 public:
     using Client = C;
     using Impl = DongleImpl<Client>;
-    using MessageQueue = DongleMessageQueue<BasicDongle>;
+    using MessageQueue = RobotMessageQueue<BasicDongle>;
     friend MessageQueue;
 
     template <class... Args>
@@ -420,6 +557,18 @@ public:
 
     Client& client () { return mImpl->client(); }
     boost::asio::io_service& get_io_service () { return client().get_io_service(); }
+
+    template <class StringContainer, class Handler>
+    BOOST_ASIO_INITFN_RESULT_TYPE(Handler, SendHandlerSignature)
+    asyncSendRobotPing (StringContainer&& c, Handler&& handler) {
+        return mImpl->asyncSendRobotPing(std::forward<StringContainer>(c), std::forward<Handler>(handler));
+    }
+
+    template <class Handler>
+    BOOST_ASIO_INITFN_RESULT_TYPE(Handler, RobotEventReceiveHandlerSignature)
+    asyncReceiveRobotEvent (Handler&& handler) {
+        return mImpl->asyncReceiveRobotEvent(std::forward<Handler>(handler));
+    }
 
 private:
     std::shared_ptr<Impl> impl () {

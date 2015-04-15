@@ -63,7 +63,13 @@ asyncResolveSerialId (rpc::asio::TcpClient& daemon, std::string serialId, Durati
             auto log = daemon.log();
             try {
                 if (ec) {
-                    BOOST_LOG(log) << "resolveSerialId reported error: " << ec.message();
+                    BOOST_LOG(log) << "Error firing resolveSerialId: " << ec.message();
+                    throw boost::system::system_error(ec);
+                }
+
+                if (result.status) {
+                    ec = Status(result.status);
+                    BOOST_LOG(log) << "resolveSerialId resulted in error: " << ec.message();
                     throw boost::system::system_error(ec);
                 }
 

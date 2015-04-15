@@ -441,3 +441,7 @@ message debugMessageEvent {
     required uint32 timestamp = 1;
     required string bytestring = 2 [(nanopb).max_size=128];
 }
+
+message connectionTerminated {
+    required uint32 timestamp = 1;
+}

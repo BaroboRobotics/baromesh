@@ -49,4 +49,5 @@ RPCDEF_CPP((barobo, Robot),
         (accelerometerEvent)
         (jointEvent)
         (debugMessageEvent)
+        (connectionTerminated)
         )

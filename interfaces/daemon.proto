@@ -17,6 +17,9 @@ enum Status {
 
     STRANGE_DONGLE = 8;
     DONGLE_VERSION_MISMATCH = 9;
+
+    BUFFER_OVERFLOW = 10;
+    OTHER_ERROR = 11;
 }
 
 message TcpEndpoint {
@@ -28,10 +31,11 @@ message TcpEndpoint {
 
 message resolveSerialId {
     message In {
-        required barobo.commontypes.SerialId serialId = 1;
+        required barobo.SerialId serialId = 1;
     }
     message Result {
-        optional TcpEndpoint endpoint = 1;
+        required Status status = 1;
+        optional TcpEndpoint endpoint = 2;
     }
 }
 
@@ -44,6 +48,15 @@ message cycleDongle {
     message Result {}
 }
 
+message sendRobotPing {
+    message In {
+        repeated SerialId destinations = 1 [(nanopb).max_count = 8];
+    }
+    message Result {
+        required Status status = 1;
+    }
+}
+
 // TODO: getDongleSerialId method
 
 // Broadcasts
@@ -52,4 +65,9 @@ message dongleEvent {
     // TODO probably want a form factor here. For that matter, maybe this
     // should be a more generic devicePluggedIn broadcast.
     required Status status = 1;
+}
+
+message robotEvent {
+    required barobo.SerialId serialId = 1;
+    required barobo.RobotEvent event = 2;
 }

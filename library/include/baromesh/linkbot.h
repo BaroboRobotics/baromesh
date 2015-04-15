@@ -48,6 +48,7 @@ typedef void (*ButtonEventCallback)(Button::Type button, ButtonState::Type event
 typedef void (*EncoderEventCallback)(int jointNo, double anglePosition, int timestamp, void* userData);
 typedef void (*JointEventCallback)(int jointNo, JointState::Type event, int timestamp, void* userData);
 typedef void (*AccelerometerEventCallback)(double x, double y, double z, int timestamp, void* userData);
+typedef void (*ConnectionTerminatedCallback)(int timestamp, void* userData);
 
 } // namespace barobo
 
@@ -116,6 +117,7 @@ SET_EVENT_CALLBACK(ButtonEventCallback);
 //SET_EVENT_CALLBACK(EncoderEventCallback);
 SET_EVENT_CALLBACK(JointEventCallback);
 SET_EVENT_CALLBACK(AccelerometerEventCallback);
+SET_EVENT_CALLBACK(ConnectionTerminatedCallback);
 #undef SET_EVENT_CALLBACK
 
 int linkbotSetEncoderEventCallback(baromesh::Linkbot* l, 
