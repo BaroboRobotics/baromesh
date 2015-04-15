@@ -450,6 +450,16 @@ private:
             robotEvent.serialId.value[4] = 0;
             robotEvent.event = event;
 
+            auto& fVer = event.firmwareVersion;
+            auto& rVer = event.rpcVersions.rpc;
+            auto& iVer = event.rpcVersions.interface;
+            BOOST_LOG(mLog) << serialId << " powered on: Firmware v"
+                           << fVer.major << "." << fVer.minor << "." << fVer.patch
+                           << ", RPC v"
+                           << rVer.major << "." << rVer.minor << "." << rVer.patch
+                           << ", barobo.Robot interface v"
+                           << iVer.major << "." << iVer.minor << "." << iVer.patch;
+
             rpc::asio::asyncBroadcast(mServer, robotEvent,
             [] (boost::system::error_code ec2) {
                 if (ec2 && boost::asio::error::operation_aborted != ec2) {
