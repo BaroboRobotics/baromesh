@@ -463,7 +463,9 @@ private:
         }
         else {
             BOOST_LOG(mLog) << "Error receiving robot event (" << ec.message() << "), resetting dongle";
-            cycleDongleImpl(kDongleDowntimeAfterError);
+            if (boost::asio::error::operation_aborted != ec) {
+                cycleDongleImpl(kDongleDowntimeAfterError);
+            }
         }
     }
 
