@@ -510,8 +510,8 @@ class BasicDongle {
 public:
     using Client = C;
     using Impl = DongleImpl<Client>;
-    using RobotMessageQueue = RobotMessageQueue<BasicDongle>;
-    friend RobotMessageQueue;
+    using MessageQueue = RobotMessageQueue<BasicDongle>;
+    friend MessageQueue;
 
     template <class... Args>
     explicit BasicDongle (Args&&... args)

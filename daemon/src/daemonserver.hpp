@@ -38,7 +38,7 @@ using boost::asio::use_future;
 using SerialMessageQueue = sfp::asio::MessageQueue<boost::asio::serial_port>;
 using SerialClient = rpc::asio::Client<SerialMessageQueue>;
 using Dongle = baromesh::BasicDongle<SerialClient>;
-using ZigbeeClient = rpc::asio::Client<Dongle::RobotMessageQueue>;
+using ZigbeeClient = rpc::asio::Client<Dongle::MessageQueue>;
 
 static const int kDongleBaudRate = 230400;
 
