@@ -11,7 +11,6 @@ message transmitUnicast {
         required uint32 destinationPort = 2;
         required uint32 sourcePort = 3;
         required barobo.Payload payload = 4;
-        required uint32 nRetries = 5; // exponential backoff parameter
     }
     message Result { }
 }

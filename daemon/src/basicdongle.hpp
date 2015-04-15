@@ -121,7 +121,6 @@ public:
 
         args.destinationPort = barobo_RadioPort_ROBOT_SERVER;
         args.sourcePort = barobo_RadioPort_ROBOT_CLIENT;
-        args.nRetries = kNBackoffRetries;
 
         auto& payload = args.payload.value;
         payload.size = boost::asio::buffer_copy(
@@ -276,7 +275,6 @@ private:
     void postReceives () {
         auto lock = util::BenchmarkedLock{mReceiveDataMutex};
 
-
         for (auto& kv : mRobotReceiveData) {
             auto& data = kv.second;
             while (data.inbox.size() && data.ops.size()) {
@@ -396,8 +394,6 @@ private:
             mClient.get_io_service().post(std::bind(handler, ec, "", barobo_RobotEvent{}));
         }
     }
-
-    static const uint32_t kNBackoffRetries = 10;
 
     bool mReceivePumpRunning = false;
 
