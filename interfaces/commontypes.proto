@@ -10,6 +10,25 @@ message Payload {
     required bytes value = 1 [(nanopb).max_size = 128];
 }
 
+enum Status {
+    OK = 0;
+    CANNOT_OPEN_DONGLE = 1;
+    DONGLE_NOT_FOUND = 2;
+    PORT_OUT_OF_RANGE = 3;
+    NO_ROBOT_ENDPOINT = 4;
+
+    UNREGISTERED_SERIALID = 5;
+    INVALID_SERIALID = 6;
+
+    DAEMON_UNAVAILABLE = 7;
+
+    STRANGE_DONGLE = 8;
+    DONGLE_VERSION_MISMATCH = 9;
+
+    BUFFER_OVERFLOW = 10;
+    OTHER_ERROR = 11;
+}
+
 enum RadioPort {
 	ROBOT_SERVER = 0;
 	ROBOT_CLIENT = 1;
