@@ -12,7 +12,9 @@ message transmitUnicast {
         required uint32 sourcePort = 3;
         required barobo.Payload payload = 4;
     }
-    message Result { }
+    message Result {
+        required barobo.Status status = 1;
+    }
 }
 
 message transmitRadioBroadcast {
@@ -21,7 +23,9 @@ message transmitRadioBroadcast {
         required uint32 sourcePort = 2;
         required barobo.Payload payload = 3;
     }
-    message Result { }
+    message Result {
+        required barobo.Status status = 1;
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////////

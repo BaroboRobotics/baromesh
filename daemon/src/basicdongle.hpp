@@ -130,7 +130,10 @@ public:
 
         auto self = this->shared_from_this();
         asyncFire(mClient, args, std::chrono::seconds(60),
-            [self, this, realHandler] (boost::system::error_code ec, MethodResult::transmitUnicast) {
+            [self, this, realHandler] (boost::system::error_code ec, MethodResult::transmitUnicast result) {
+                if (!ec) {
+                    ec = Status(result.status);
+                }
                 this->mClient.get_io_service().post(std::bind(realHandler, ec));
             });
 
@@ -210,7 +213,10 @@ public:
 
         auto self = this->shared_from_this();
         asyncFire(mClient, args, std::chrono::seconds(60),
-            [self, this, realHandler] (boost::system::error_code ec, MethodResult::transmitRadioBroadcast) {
+            [self, this, realHandler] (boost::system::error_code ec, MethodResult::transmitRadioBroadcast result) {
+                if (!ec) {
+                    ec = Status(result.status);
+                }
                 this->mClient.get_io_service().post(std::bind(realHandler, ec));
             });
 
