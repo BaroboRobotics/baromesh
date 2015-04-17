@@ -10,7 +10,7 @@ message transmitUnicast {
         required barobo.SerialId serialId = 1;
         required uint32 destinationPort = 2;
         required uint32 sourcePort = 3;
-        required barobo.Payload payload = 4;
+        required barobo.SessionMessage sessionMessage = 4;
     }
     message Result {
         required barobo.Status status = 1;
@@ -21,7 +21,7 @@ message transmitRadioBroadcast {
     message In {
         required uint32 destinationPort = 1;
         required uint32 sourcePort = 2;
-        required barobo.Payload payload = 3;
+        required barobo.SessionMessage sessionMessage = 3;
     }
     message Result {
         required barobo.Status status = 1;
@@ -35,5 +35,5 @@ message receiveTransmission {
     required barobo.SerialId serialId = 1;
     required uint32 destinationPort = 2;
     required uint32 sourcePort = 3;
-    required barobo.Payload payload = 4;
+    required barobo.SessionMessage sessionMessage = 4;
 }
