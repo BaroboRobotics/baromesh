@@ -4,6 +4,7 @@
 #include "gen-daemon.pb.hpp"
 
 #include "basicdongle.hpp"
+#include "computerid.hpp"
 #include "baromesh/dongledevicepath.hpp"
 
 #include "rpc/asio/client.hpp"
@@ -77,14 +78,6 @@ static const std::chrono::milliseconds kDongleDowntimeAfterError { 500 };
 // ninjitsu in order to work, adjust this value as necessary.
 static const std::chrono::milliseconds kDongleSettleTimeAfterOpen { 500 };
 
-static uint32_t computerId () {
-    static auto rd = std::random_device{};
-    static auto gen = std::mt19937{rd()};
-    static auto dis = std::uniform_int_distribution<uint32_t>{};
-    static auto id = dis(gen);
-    return id;
-}
-
 class DaemonServerImpl : public std::enable_shared_from_this<DaemonServerImpl> {
     using Tcp = boost::asio::ip::tcp;
     using TcpPolyServer = rpc::asio::TcpPolyServer;
@@ -112,7 +105,7 @@ public:
         , mDongleTimer(ios)
         , mLog(log)
     {
-        BOOST_LOG(mLog) << "Daemon server starting with computer ID " << computerId();
+        BOOST_LOG(mLog) << "Daemon server starting with computer ID " << baromesh::computerId();
     }
 
     void init () {
