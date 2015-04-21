@@ -368,6 +368,9 @@ private:
                 std::bind(&DongleImpl::handleReceive,
                     this->shared_from_this(), _1, _2)));
         }
+        else {
+            mReceivePumpRunning = false;
+        }
     }
 
     void handleReceive (boost::system::error_code ec, barobo_rpc_Broadcast broadcast) {
