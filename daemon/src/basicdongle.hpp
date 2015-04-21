@@ -114,19 +114,21 @@ public:
             throw boost::system::system_error(Status::INVALID_SERIALID);
         }
 
-        MethodIn::transmitUnicast args = decltype(args)();
+        auto args = MethodIn::transmitUnicast{};
 
         std::strncpy(args.serialId.value, serialId.data(), 4);
         args.serialId.value[4] = 0;
 
         args.destinationPort = barobo_RadioPort_ROBOT_SERVER;
         args.sourcePort = barobo_RadioPort_ROBOT_CLIENT;
+        args.sessionMessage.has_computerId = true;
+        args.sessionMessage.computerId = computerId();
 
-        auto& payload = args.payload.value;
-        payload.size = boost::asio::buffer_copy(
-            boost::asio::buffer(payload.bytes),
-            buffer);
-        assert(payload.size == boost::asio::buffer_size(buffer));
+        auto target = boost::asio::buffer(args.sessionMessage.payload.value.bytes);
+        args.sessionMessage.payload.value.size = boost::asio::buffer_copy(target, buffer);
+        if (args.sessionMessage.payload.value.size != boost::asio::buffer_size(buffer)) {
+            throw boost::system::system_error(Status::BUFFER_OVERFLOW);
+        }
 
         auto self = this->shared_from_this();
         asyncFire(mClient, args, std::chrono::seconds(60),
@@ -180,8 +182,8 @@ public:
 
         args.destinationPort = barobo_RadioPort_ROBOT_PING;
         args.sourcePort = barobo_RadioPort_ROBOT_EVENT;
-
-        auto& payload = args.payload.value;
+        args.sessionMessage.has_computerId = true;
+        args.sessionMessage.computerId = computerId();
 
         barobo_RobotPing robotPing = decltype(robotPing)();
 
@@ -198,12 +200,13 @@ public:
 
         robotPing.destinations_count = destinations.size();
 
-        auto stream = pb_ostream_from_buffer(payload.bytes, sizeof(payload.bytes));
+        auto& bytes = args.sessionMessage.payload.value.bytes;
+        auto stream = pb_ostream_from_buffer(bytes, sizeof(bytes));
         if (!pb_encode(&stream, barobo_RobotPing_fields, &robotPing)) {
             BOOST_LOG(mLog) << "Encoding failure: " << PB_GET_ERROR(&stream);
             throw boost::system::system_error(rpc::Status::ENCODING_FAILURE);
         }
-        payload.size = stream.bytes_written;
+        args.sessionMessage.payload.value.size = stream.bytes_written;
 
         std::string s;
         for (auto serialId : destinations) {
@@ -248,10 +251,18 @@ public:
     void onBroadcast (Broadcast::receiveTransmission broadcast) {
         {
             auto serialId = std::string(broadcast.serialId.value);
-            auto& payload = broadcast.payload.value;
-            auto buf = std::vector<uint8_t>(payload.bytes, payload.bytes + payload.size);
             BOOST_LOG(mLog) << "received message from " << serialId;
 
+            if (broadcast.sessionMessage.has_computerId
+                && broadcast.sessionMessage.computerId != computerId()) {
+                BOOST_LOG(mLog) << "computerId mismatch (local: " << computerId() << ", remote: "
+                                << broadcast.sessionMessage.computerId << "), discarding transmission";
+                return;
+            }
+
+            auto buf = std::vector<uint8_t>{broadcast.sessionMessage.payload.value.bytes,
+                                            broadcast.sessionMessage.payload.value.bytes +
+                                            broadcast.sessionMessage.payload.value.size};
             auto lock = util::BenchmarkedLock{mReceiveDataMutex};
 
             switch (broadcast.destinationPort) {

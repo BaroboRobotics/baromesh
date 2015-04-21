@@ -26,6 +26,7 @@
 
 #include <memory>
 #include <mutex>
+#include <random>
 #include <string>
 #include <utility>
 
@@ -76,6 +77,14 @@ static const std::chrono::milliseconds kDongleDowntimeAfterError { 500 };
 // ninjitsu in order to work, adjust this value as necessary.
 static const std::chrono::milliseconds kDongleSettleTimeAfterOpen { 500 };
 
+static uint32_t computerId () {
+    static auto rd = std::random_device{};
+    static auto gen = std::mt19937{rd()};
+    static auto dis = std::uniform_int_distribution<uint32_t>{};
+    static auto id = dis(gen);
+    return id;
+}
+
 class DaemonServerImpl : public std::enable_shared_from_this<DaemonServerImpl> {
     using Tcp = boost::asio::ip::tcp;
     using TcpPolyServer = rpc::asio::TcpPolyServer;
@@ -102,7 +111,9 @@ public:
         , mServer(mIos, *mResolver.resolve(decltype(mResolver)::query("127.0.0.1", "42000")), log)
         , mDongleTimer(ios)
         , mLog(log)
-    {}
+    {
+        BOOST_LOG(mLog) << "Daemon server starting with computer ID " << computerId();
+    }
 
     void init () {
         auto self = this->shared_from_this();
