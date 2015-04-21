@@ -399,7 +399,7 @@ private:
 
     void handleCycleDongleStepFour (std::shared_ptr<Dongle> dongle,
                                     std::shared_ptr<boost::asio::signal_set> sigSet,
-                                     boost::system::error_code ec) {
+                                    boost::system::error_code ec) {
         if (!ec) {
             sigSet->cancel();
             mDongle.reset(new Dongle{std::move(*dongle)});
