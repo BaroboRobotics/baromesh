@@ -77,3 +77,14 @@ catch (std::exception& e) {
     BOOST_LOG(log) << "baromeshd caught exception: " << e.what();
     return 1;
 }
+
+namespace baromesh {
+uint32_t computerId () {
+    static std::random_device rd{};
+    static auto gen = std::mt19937{rd()};
+    static auto dis = std::uniform_int_distribution<uint32_t>{};
+    static auto id = dis(gen);
+    return id;
+}
+}
+

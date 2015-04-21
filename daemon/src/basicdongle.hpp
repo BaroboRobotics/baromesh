@@ -4,6 +4,7 @@
 #include "gen-dongle.pb.hpp"
 
 #include "baromesh/system_error.hpp"
+#include "computerid.hpp"
 
 #include "rpc/asio/client.hpp"
 
@@ -122,7 +123,7 @@ public:
         args.destinationPort = barobo_RadioPort_ROBOT_SERVER;
         args.sourcePort = barobo_RadioPort_ROBOT_CLIENT;
         args.sessionMessage.has_computerId = true;
-        args.sessionMessage.computerId = computerId();
+        args.sessionMessage.computerId = baromesh::computerId();
 
         auto target = boost::asio::buffer(args.sessionMessage.payload.value.bytes);
         args.sessionMessage.payload.value.size = boost::asio::buffer_copy(target, buffer);
@@ -183,7 +184,7 @@ public:
         args.destinationPort = barobo_RadioPort_ROBOT_PING;
         args.sourcePort = barobo_RadioPort_ROBOT_EVENT;
         args.sessionMessage.has_computerId = true;
-        args.sessionMessage.computerId = computerId();
+        args.sessionMessage.computerId = baromesh::computerId();
 
         barobo_RobotPing robotPing = decltype(robotPing)();
 
@@ -254,8 +255,8 @@ public:
             BOOST_LOG(mLog) << "received message from " << serialId;
 
             if (broadcast.sessionMessage.has_computerId
-                && broadcast.sessionMessage.computerId != computerId()) {
-                BOOST_LOG(mLog) << "computerId mismatch (local: " << computerId() << ", remote: "
+                && broadcast.sessionMessage.computerId != baromesh::computerId()) {
+                BOOST_LOG(mLog) << "computerId mismatch (local: " << baromesh::computerId() << ", remote: "
                                 << broadcast.sessionMessage.computerId << "), discarding transmission";
                 return;
             }
