@@ -199,6 +199,7 @@ public:
             if (mRobotProxies.end() != iter) {
                 try {
                     endpoint = iter->second->server.endpoint();
+                    BOOST_LOG(mLog) << "Found proxy for " << serialId << " at " << endpoint;
                 }
                 catch (boost::system::system_error& e) {
                     BOOST_LOG(mLog) << "Terminating undead proxy for " << serialId << ". Caught " << e.what();
@@ -232,6 +233,7 @@ public:
 
                 auto& proxyClient = iter->second->client;
                 auto& proxyServer = iter->second->server;
+                endpoint = proxyServer.endpoint();
 
                 proxyClient.messageQueue().setRoute(*mDongle, serialId);
 
