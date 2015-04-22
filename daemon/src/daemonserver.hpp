@@ -196,6 +196,19 @@ public:
             std::lock_guard<std::mutex> lock { mRobotProxiesMutex };
             auto iter = mRobotProxies.find(serialId);
             Tcp::endpoint endpoint;
+            if (mRobotProxies.end() != iter) {
+                try {
+                    endpoint = iter->second->server.endpoint();
+                }
+                catch (boost::system::system_error& e) {
+                    BOOST_LOG(mLog) << "Terminating undead proxy for " << serialId << ". Caught " << e.what();
+                    iter->second->server.close();
+                    iter->second->client.close();
+                    mRobotProxies.erase(iter);
+                    iter = mRobotProxies.end();
+                }
+            }
+
             if (mRobotProxies.end() == iter) {
                 BOOST_LOG(mLog) << "No proxy exists, building resolver query";
                 // Bind to a random, free local port.
@@ -226,8 +239,6 @@ public:
                     std::bind(&DaemonServerImpl::handleProxyFinished,
                         this->shared_from_this(), serialId, proxy, _1)));
             }
-
-            endpoint = iter->second->server.endpoint();
             BOOST_LOG(mLog) << "Using proxy server for " << serialId
                             << " at " << endpoint;
 
