@@ -24,8 +24,11 @@ int runDaemon (int argc, char** argv) try {
         ("help", "display help information")
     ;
 
+    // On Windows this will get dumped into C:\Windows\{System32,SysWOW64},
+    // depending on architecture. On Mac and Linux we need to explicitly
+    // prepend /var/log to send it to the right place.
     auto defaultLogFile = std::string{"baromeshd.log"};
-    if (BOOST_OS_UNIX) {
+    if (BOOST_OS_MACOS || BOOST_OS_LINUX) {
         defaultLogFile.insert(0, "/var/log/");
     }
 
