@@ -15,7 +15,7 @@ int main (int argc, char** argv)
     // If there's a bug in the rest of the Windows service code, it's useful
     // to be able to start the daemon manually for testing.
     if (argc > 1) {
-        return runDaemon();
+        return runDaemon(argc, argv);
     }
     SERVICE_TABLE_ENTRY serviceTable[2];
     serviceTable[0].lpServiceName = "baromeshd";
@@ -67,7 +67,7 @@ void serviceMain (int argc, char** argv)
     serviceStatus().dwWaitHint           = 0;
     updateServiceStatus();
 
-    auto code = runDaemon();
+    auto code = runDaemon(argc, argv);
 
     if (code) {
         serviceStatus().dwWin32ExitCode = ERROR_SERVICE_SPECIFIC_ERROR;

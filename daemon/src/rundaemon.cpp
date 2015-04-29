@@ -1,17 +1,9 @@
 #include "daemonserver.hpp"
 
 #include "baromesh/iocore.hpp"
+#include "baromesh/log.hpp"
 
-#include "util/logsafely.hpp"
-
-#include <boost/log/common.hpp>
-#include <boost/log/expressions.hpp>
-#include <boost/log/attributes/clock.hpp>
-#include <boost/log/sources/logger.hpp>
-#include <boost/log/support/date_time.hpp>
-#include <boost/log/utility/setup/common_attributes.hpp>
-#include <boost/log/utility/setup/file.hpp>
-#include <boost/log/utility/setup/console.hpp>
+#include <boost/program_options/parsers.hpp>
 
 #include <exception>
 #include <functional>
@@ -21,51 +13,32 @@
 #include <thread>
 #include <chrono>
 
-static void initializeLoggingCore () {
-    namespace expr = boost::log::expressions;
-    namespace keywords = boost::log::keywords;
-    namespace attrs = boost::log::attributes;
-
-    boost::log::add_common_attributes();
-
-    auto core = boost::log::core::get();
-    core->add_global_attribute("Scope", attrs::named_scope());
-
-    boost::log::formatter formatter =
-        expr::stream
-            << "[" << expr::attr<attrs::local_clock::value_type, util::LogSafely>("TimeStamp") << "]"
-            << "[thread=" << expr::attr<attrs::current_thread_id::value_type>("ThreadID") << "]"
-            << expr::if_ (expr::has_attr<std::string>("SerialId")) [
-                expr::stream << "[robot=" << expr::attr<std::string>("SerialId") << "]"
-            ] // .else_ []
-            //<< "[" << expr::attr<attrs::named_scope::value_type>("Scope") << "]"
-            << " " << expr::attr<std::string>("Title")
-            << " " << expr::attr<std::string>("Protocol")
-            << expr::if_ (expr::has_attr<std::string>("RequestId")) [
-                expr::stream << "[RequestId=" << expr::attr<std::string>("RequestId") << "]"
-            ]
-            << " " << expr::smessage;
-
-    boost::log::add_file_log(
-        keywords::file_name = "baromeshd.log",
-        keywords::auto_flush = true
-    )->set_formatter(formatter);
-
-    boost::log::add_console_log(
-        std::clog,
-        keywords::auto_flush = true
-    )->set_formatter(formatter);
-}
-
+namespace po = boost::program_options;
 
 // The real main function.
-int runDaemon () try {
-    auto ioCore = baromesh::IoCore::get(true);
+int runDaemon (int argc, char** argv) try {
+    auto optsDesc = po::options_description{"Linkbot Labs Service command line options"};
+    optsDesc.add_options()
+        ("help", "display help information")
+    ;
 
-    initializeLoggingCore();
+    optsDesc.add(baromesh::log::optionsDescription(std::string{"baromeshd.log"}));
+
+    auto options = boost::program_options::variables_map{};
+    po::store(po::parse_command_line(argc, argv, optsDesc), options);
+    po::notify(options);
+
+    if (options.count("help")) {
+        std::cout << optsDesc << std::endl;
+        return 0;
+    }
+
+    baromesh::log::initialize("baromeshd", options);
+
     boost::log::sources::logger log;
     log.add_attribute("Title", boost::log::attributes::constant<std::string>("BAROMESHD"));
 
+    auto ioCore = baromesh::IoCore::get();
     baromesh::DaemonServer daemon { ioCore->ios(), log };
     daemon.run();
     BOOST_LOG(log) << "Shutting down";

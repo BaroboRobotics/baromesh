@@ -3,10 +3,9 @@
 
 #include <boost/asio/io_service.hpp>
 
-#include <boost/optional.hpp>
-
-#include <boost/log/core/core.hpp>
 #include <boost/log/sources/logger.hpp>
+
+#include <boost/optional.hpp>
 
 #include <future>
 #include <memory>
@@ -14,10 +13,10 @@
 namespace baromesh {
 
 class IoCore {
-    explicit IoCore (boost::optional<bool>);
+    explicit IoCore ();
 
 public:
-    static std::shared_ptr<IoCore> get (boost::optional<bool> enableLogging = boost::none);
+    static std::shared_ptr<IoCore> get ();
     ~IoCore ();
 
     boost::asio::io_service& ios () {
@@ -25,8 +24,6 @@ public:
     }
 
 private:
-    boost::log::core_ptr mLoggingCore;
-
     mutable boost::log::sources::logger_mt mLog;
 
     boost::asio::io_service mIos;

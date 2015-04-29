@@ -1,6 +1,7 @@
 #include "baromesh/linkbot.hpp"
 #include "baromesh/error.hpp"
 #include "baromesh/iocore.hpp"
+#include "baromesh/log.hpp"
 
 #include "baromesh/daemon.hpp"
 
@@ -10,6 +11,13 @@
 
 #include <boost/log/sources/logger.hpp>
 #include <boost/log/sources/record_ostream.hpp>
+
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/erase.hpp>
+#include <boost/algorithm/string/case_conv.hpp>
+
+#include <boost/program_options/parsers.hpp>
 
 #include <iostream>
 #include <memory>
@@ -33,8 +41,9 @@ using rpc::asio::asyncFire;
 using boost::asio::use_future;
 
 struct Linkbot::Impl {
+private:
     Impl (const std::string& host, const std::string& service)
-        : ioCore(baromesh::IoCore::get(false))
+        : ioCore(baromesh::IoCore::get())
         , resolver(ioCore->ios())
         , robot(ioCore->ios(), log)
     {
@@ -46,25 +55,43 @@ struct Linkbot::Impl {
         robotRunDone = rpc::asio::asyncRunClient<barobo::Robot>(robot, *this, use_future);
     }
 
-    ~Impl () {
-        if (robotRunDone.valid()) {
-            try {
-                BOOST_LOG(log) << "Disconnecting robot client";
-                asyncDisconnect(robot, requestTimeout(), use_future).get();
-                robot.close();
-                robotRunDone.get();
-            }
-            catch (std::exception& e) {
-                BOOST_LOG(log) << "Exception during disconnect: " << e.what();
-            }
-        }
+    static void initializeLoggingCore () {
+        static std::once_flag flag;
+        std::call_once(flag, [] {
+            namespace po = boost::program_options;
+
+            auto optsDesc = baromesh::log::optionsDescription(boost::none);
+
+            auto options = boost::program_options::variables_map{};
+            po::store(po::parse_environment(optsDesc, [] (std::string var) {
+                if (boost::starts_with(var, "BAROMESH_")) {
+                    boost::erase_first(var, "BAROMESH_");
+                    boost::replace_all(var, "_", "-");
+                    boost::to_lower(var);
+                    return var;
+                }
+                else {
+                    return std::string{};
+                }
+            }), options);
+            po::notify(options);
+
+            baromesh::log::initialize("baromesh", options);
+        });
+    }
+
+public:
+    static Impl* fromTcpEndpoint (const std::string& host, const std::string& service) {
+        initializeLoggingCore();
+        return new Impl{host, service};
     }
 
     // Use the daemon to resolve a serial ID to a TCP/IP host:service pair and
     // construct a Linkbot::Impl backed by this host:service. The caller has
     // ownership of the returned pointer.
     static Impl* fromSerialId (const std::string& serialId) {
-        auto ioCore = baromesh::IoCore::get(false);
+        initializeLoggingCore();
+        auto ioCore = baromesh::IoCore::get();
         boost::log::sources::logger log;
         boost::asio::ip::tcp::resolver resolver {ioCore->ios()};
         rpc::asio::TcpClient daemon {ioCore->ios(), log};
@@ -87,6 +114,20 @@ struct Linkbot::Impl {
         daemon.close();
 
         return new Impl{host, service};
+    }
+
+    ~Impl () {
+        if (robotRunDone.valid()) {
+            try {
+                BOOST_LOG(log) << "Disconnecting robot client";
+                asyncDisconnect(robot, requestTimeout(), use_future).get();
+                robot.close();
+                robotRunDone.get();
+            }
+            catch (std::exception& e) {
+                BOOST_LOG(log) << "Exception during disconnect: " << e.what();
+            }
+        }
     }
 
     void onBroadcast (Broadcast::buttonEvent b) {
@@ -141,7 +182,7 @@ struct Linkbot::Impl {
 };
 
 Linkbot::Linkbot (const std::string& host, const std::string& service) try
-    : m(new Linkbot::Impl{host, service})
+    : m(Linkbot::Impl::fromTcpEndpoint(host, service))
 {}
 catch (std::exception& e) {
     throw Error(e.what());

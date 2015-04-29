@@ -17,11 +17,15 @@ endif()
 # projects we'll want to use shared libraries and defined -DBOOST_ALL_DYN_LINK
 # or the like.
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.54.0 REQUIRED COMPONENTS system chrono)
+find_package(Boost 1.54.0 REQUIRED COMPONENTS system chrono log thread program_options)
+
+include(LinkbotLabs)
+ll_add_dependency(cxx-util cxx-util)
 
 set(SOURCES
     src/dongledevicepath.cpp
     src/iocore.cpp
+    src/log.cpp
     src/system_error.cpp
     )
 
@@ -38,6 +42,7 @@ target_include_directories(baromesh-common
     )
 target_link_libraries(baromesh-common
     PUBLIC daemon-interface
+           cxx-util
            ${Boost_LIBRARIES}
     )
 

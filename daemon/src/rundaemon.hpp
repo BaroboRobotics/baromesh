@@ -1,6 +1,6 @@
 #ifndef RUNDAEMON_HPP_
 #define RUNDAEMON_HPP_
 
-int runDaemon ();
+int runDaemon (int argc, char** argv);
 
 #endif
