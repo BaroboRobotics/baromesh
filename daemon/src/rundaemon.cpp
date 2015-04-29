@@ -5,6 +5,8 @@
 
 #include <boost/program_options/parsers.hpp>
 
+#include <boost/predef.h>
+
 #include <exception>
 #include <functional>
 #include <future>
@@ -22,7 +24,12 @@ int runDaemon (int argc, char** argv) try {
         ("help", "display help information")
     ;
 
-    optsDesc.add(baromesh::log::optionsDescription(std::string{"baromeshd.log"}));
+    auto defaultLogFile = std::string{"baromeshd.log"};
+    if (BOOST_OS_UNIX) {
+        defaultLogFile.insert(0, "/var/log/");
+    }
+
+    optsDesc.add(baromesh::log::optionsDescription(defaultLogFile));
 
     auto options = boost::program_options::variables_map{};
     po::store(po::parse_command_line(argc, argv, optsDesc), options);
