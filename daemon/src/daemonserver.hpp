@@ -428,7 +428,7 @@ private:
 
     void dongleEvent (boost::system::error_code ec) {
         if (sfp::Status::HANDSHAKE_FAILED == ec
-            || rpc::Status::INCONSISTENT_REPLY == ec
+            || rpc::Status::MESSAGE_SANITY_FAILURE == ec
             || rpc::Status::TIMED_OUT == ec) {
             ec = Status::STRANGE_DONGLE;
         }
