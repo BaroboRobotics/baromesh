@@ -20,7 +20,7 @@ std::string ErrorCategory::message (int ev) const BOOST_NOEXCEPT {
         ITEM(DAEMON_UNAVAILABLE)
 
         ITEM(STRANGE_DONGLE)
-        ITEM(DONGLE_VERSION_MISMATCH)
+        ITEM(RPC_VERSION_MISMATCH)
 
         ITEM(BUFFER_OVERFLOW)
         ITEM(OTHER_ERROR)

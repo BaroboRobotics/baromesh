@@ -414,10 +414,10 @@ private:
                                     std::shared_ptr<boost::asio::signal_set> sigSet,
                                     boost::system::error_code ec) {
         if (!ec) {
-            sigSet->cancel();
-            mDongle.reset(new Dongle{std::move(*dongle)});
-            setDongleIoTraps();
-            dongleEvent(Status::OK);
+            auto method = rpc::MethodIn<barobo::Dongle>::getFirmwareVersion{};
+            rpc::asio::asyncFire(dongle->client(), method, kDongleConnectTimeout, mStrand.wrap(
+                std::bind(&DaemonServerImpl::handleCycleDongleStepFive,
+                    this->shared_from_this(), dongle, sigSet, _1, _2)));
         }
         else if (boost::asio::error::operation_aborted != ec) {
             BOOST_LOG(mLog) << "Cannot RPC connect to the dongle: " << ec.message();
@@ -426,14 +426,31 @@ private:
         }
     }
 
-    void dongleEvent (boost::system::error_code ec) {
+    void handleCycleDongleStepFive (std::shared_ptr<Dongle> dongle,
+                                    std::shared_ptr<boost::asio::signal_set> sigSet,
+                                    boost::system::error_code ec,
+                                    rpc::MethodResult<barobo::Dongle>::getFirmwareVersion v) {
+        if (!ec) {
+            sigSet->cancel();
+            mDongle.reset(new Dongle{std::move(*dongle)});
+            setDongleIoTraps();
+            dongleEvent(Status::OK, v.major, v.minor, v.patch);
+        }
+        else if (boost::asio::error::operation_aborted != ec) {
+            BOOST_LOG(mLog) << "Cannot get dongle firmware version: " << ec.message();
+            dongleEvent(ec);
+            cycleDongleImpl(kDongleDevicePathPollTimeout);
+        }
+    }
+
+    void dongleEvent (boost::system::error_code ec, uint32_t major=0, uint32_t minor=0, uint32_t patch=0) {
         if (sfp::Status::HANDSHAKE_FAILED == ec
-            || rpc::Status::MESSAGE_SANITY_FAILURE == ec
+            || rpc::Status::PROTOCOL_ERROR == ec
             || rpc::Status::TIMED_OUT == ec) {
             ec = Status::STRANGE_DONGLE;
         }
         else if (rpc::Status::VERSION_MISMATCH == ec) {
-            ec = Status::DONGLE_VERSION_MISMATCH;
+            ec = Status::RPC_VERSION_MISMATCH;
         }
         else if (ec && errorCategory() != ec.category()) {
             auto newEc = make_error_code(Status::CANNOT_OPEN_DONGLE);
@@ -442,7 +459,8 @@ private:
             ec = newEc;
         }
         using BStatus = decltype(Broadcast::dongleEvent::status);
-        rpc::asio::asyncBroadcast(mServer, Broadcast::dongleEvent{BStatus(ec.value())},
+        auto brdcst = Broadcast::dongleEvent{BStatus(ec.value()), major, minor, patch};
+        rpc::asio::asyncBroadcast(mServer, brdcst,
             [] (boost::system::error_code ec2) {
                 if (ec2 && boost::asio::error::operation_aborted != ec2) {
                     boost::log::sources::logger log;
@@ -462,11 +480,6 @@ private:
                            std::string serialId,
                            barobo_RobotEvent event) {
         if (!ec) {
-            Broadcast::robotEvent robotEvent = decltype(robotEvent)();
-            std::strncpy(robotEvent.serialId.value, serialId.c_str(), 4);
-            robotEvent.serialId.value[4] = 0;
-            robotEvent.event = event;
-
             auto& fVer = event.firmwareVersion;
             auto& rVer = event.rpcVersions.rpc;
             auto& iVer = event.rpcVersions.interface;
@@ -476,6 +489,20 @@ private:
                            << rVer.major << "." << rVer.minor << "." << rVer.patch
                            << ", barobo.Robot interface v"
                            << iVer.major << "." << iVer.minor << "." << iVer.patch;
+
+            auto robotEvent = Broadcast::robotEvent{};
+            std::strncpy(robotEvent.serialId.value, serialId.c_str(), 4);
+            robotEvent.serialId.value[4] = 0;
+            // Only check the RPC version--the daemon knows nothing of the interface version
+            if (rVer.major != rpc::Version<>::major
+                || rVer.minor != rpc::Version<>::minor
+                || rVer.patch != rpc::Version<>::patch) {
+                robotEvent.status = barobo_Status(Status::RPC_VERSION_MISMATCH);
+            }
+            else {
+                robotEvent.status = barobo_Status(Status::OK);
+            }
+            robotEvent.firmwareVersion = fVer;
 
             rpc::asio::asyncBroadcast(mServer, robotEvent,
             [] (boost::system::error_code ec2) {

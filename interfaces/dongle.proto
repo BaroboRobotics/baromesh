@@ -5,6 +5,15 @@ package barobo.Dongle;
 //////////////////////////////////////////////////////////////////////////////
 // Methods
 
+message getFirmwareVersion {
+    message In {}
+    message Result {
+        required uint32 major = 1;
+        required uint32 minor = 2;
+        required uint32 patch = 3;
+    }
+}
+
 message transmitUnicast {
     message In {
         required barobo.SerialId serialId = 1;
