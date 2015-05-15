@@ -10,7 +10,6 @@ enum class Status {
     CANNOT_OPEN_DONGLE      = barobo_Status_CANNOT_OPEN_DONGLE,
     DONGLE_NOT_FOUND        = barobo_Status_DONGLE_NOT_FOUND,
     PORT_OUT_OF_RANGE       = barobo_Status_PORT_OUT_OF_RANGE,
-    NO_ROBOT_ENDPOINT       = barobo_Status_NO_ROBOT_ENDPOINT,
 
     UNREGISTERED_SERIALID   = barobo_Status_UNREGISTERED_SERIALID,
     INVALID_SERIALID        = barobo_Status_INVALID_SERIALID,
@@ -18,7 +17,7 @@ enum class Status {
     DAEMON_UNAVAILABLE      = barobo_Status_DAEMON_UNAVAILABLE,
 
     STRANGE_DONGLE          = barobo_Status_STRANGE_DONGLE,
-    DONGLE_VERSION_MISMATCH = barobo_Status_DONGLE_VERSION_MISMATCH,
+    INCOMPATIBLE_FIRMWARE   = barobo_Status_INCOMPATIBLE_FIRMWARE,
 
     BUFFER_OVERFLOW         = barobo_Status_BUFFER_OVERFLOW,
     OTHER_ERROR             = barobo_Status_OTHER_ERROR,

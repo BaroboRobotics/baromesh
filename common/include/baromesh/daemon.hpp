@@ -73,11 +73,6 @@ asyncResolveSerialId (rpc::asio::TcpClient& daemon, std::string serialId, Durati
                     throw boost::system::system_error(ec);
                 }
 
-                if (!result.has_endpoint) {
-                    BOOST_LOG(log) << "resolveSerialId result has no endpoint";
-                    throw boost::system::system_error(Status::NO_ROBOT_ENDPOINT);
-                }
-
                 auto port = uint16_t(result.endpoint.port);
                 if (port != result.endpoint.port) {
                     throw boost::system::system_error(Status::PORT_OUT_OF_RANGE);

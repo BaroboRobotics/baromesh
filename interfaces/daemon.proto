@@ -1,6 +1,7 @@
 import "nanopb.proto";
 //import "rpc-options.proto";
 import "commontypes.proto";
+import "rpc.proto";
 package barobo.Daemon;
 
 message TcpEndpoint {
@@ -16,7 +17,7 @@ message resolveSerialId {
     }
     message Result {
         required Status status = 1;
-        optional TcpEndpoint endpoint = 2;
+        required TcpEndpoint endpoint = 2;
     }
 }
 
@@ -43,12 +44,13 @@ message sendRobotPing {
 // Broadcasts
 
 message dongleEvent {
-    // TODO probably want a form factor here. For that matter, maybe this
-    // should be a more generic devicePluggedIn broadcast.
     required Status status = 1;
+    required barobo.rpc.VersionTriplet firmwareVersion = 2;
 }
 
 message robotEvent {
     required barobo.SerialId serialId = 1;
-    required barobo.RobotEvent event = 2;
+    required barobo.rpc.VersionTriplet firmwareVersion = 2;
+    required barobo.rpc.VersionTriplet rpcVersion = 3;
+    required barobo.rpc.VersionTriplet interfaceVersion = 4;
 }

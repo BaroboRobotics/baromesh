@@ -15,7 +15,6 @@ enum Status {
     CANNOT_OPEN_DONGLE = 1;
     DONGLE_NOT_FOUND = 2;
     PORT_OUT_OF_RANGE = 3;
-    NO_ROBOT_ENDPOINT = 4;
 
     UNREGISTERED_SERIALID = 5;
     INVALID_SERIALID = 6;
@@ -23,7 +22,7 @@ enum Status {
     DAEMON_UNAVAILABLE = 7;
 
     STRANGE_DONGLE = 8;
-    DONGLE_VERSION_MISMATCH = 9;
+    INCOMPATIBLE_FIRMWARE = 9;
 
     BUFFER_OVERFLOW = 10;
     OTHER_ERROR = 11;
@@ -36,7 +35,7 @@ enum RadioPort {
     ROBOT_EVENT = 3;
 }
 
-// Radio broadcast from the daemon to multiple robots. Use the STATUS_PING port.
+// Radio broadcast from the daemon to multiple robots.
 message RobotPing {
     repeated SerialId destinations = 1 [(nanopb).max_count = 8];
     // To access destinations:
@@ -45,7 +44,7 @@ message RobotPing {
     // }
 }
 
-// Radio broadcast from a robot to all daemons. Use the STATUS_EVENT port.
+// Radio broadcast from a robot to all daemons.
 message RobotEvent {
     required barobo.rpc.VersionTriplet firmwareVersion = 2;
     required barobo.rpc.Versions rpcVersions = 3;
