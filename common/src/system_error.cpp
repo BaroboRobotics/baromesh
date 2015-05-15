@@ -13,7 +13,6 @@ std::string ErrorCategory::message (int ev) const BOOST_NOEXCEPT {
         ITEM(CANNOT_OPEN_DONGLE)
         ITEM(DONGLE_NOT_FOUND)
         ITEM(PORT_OUT_OF_RANGE)
-        ITEM(NO_ROBOT_ENDPOINT)
 
         ITEM(UNREGISTERED_SERIALID)
         ITEM(INVALID_SERIALID)

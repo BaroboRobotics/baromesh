@@ -10,7 +10,6 @@ enum class Status {
     CANNOT_OPEN_DONGLE      = barobo_Status_CANNOT_OPEN_DONGLE,
     DONGLE_NOT_FOUND        = barobo_Status_DONGLE_NOT_FOUND,
     PORT_OUT_OF_RANGE       = barobo_Status_PORT_OUT_OF_RANGE,
-    NO_ROBOT_ENDPOINT       = barobo_Status_NO_ROBOT_ENDPOINT,
 
     UNREGISTERED_SERIALID   = barobo_Status_UNREGISTERED_SERIALID,
     INVALID_SERIALID        = barobo_Status_INVALID_SERIALID,

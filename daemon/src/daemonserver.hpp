@@ -250,7 +250,6 @@ public:
                     sizeof(result.endpoint.address) - 1);
                 result.endpoint.address[sizeof(result.endpoint.address) - 1] = 0;
                 result.endpoint.port = endpoint.port();
-                result.has_endpoint = true;
                 result.status = decltype(result.status)(Status::OK);
             }
             else {
@@ -260,7 +259,6 @@ public:
         catch (boost::system::system_error& e) {
             BOOST_LOG(mLog) << "Error (re)starting proxy server for "
                             << std::string(serialId) << ": " << e.what();
-            result.has_endpoint = false;
             result.status = e.code().category() == errorCategory()
                             ? decltype(result.status)(e.code().value())
                             : decltype(result.status)(Status::OTHER_ERROR);

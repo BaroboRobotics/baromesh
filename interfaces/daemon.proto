@@ -17,7 +17,7 @@ message resolveSerialId {
     }
     message Result {
         required Status status = 1;
-        optional TcpEndpoint endpoint = 2;
+        required TcpEndpoint endpoint = 2;
     }
 }
 
