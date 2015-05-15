@@ -50,6 +50,7 @@ message dongleEvent {
 
 message robotEvent {
     required barobo.SerialId serialId = 1;
-    required Status status = 2;
-    required barobo.rpc.VersionTriplet firmwareVersion = 3;
+    required barobo.rpc.VersionTriplet firmwareVersion = 2;
+    required barobo.rpc.VersionTriplet rpcVersion = 3;
+    required barobo.rpc.VersionTriplet interfaceVersion = 4;
 }

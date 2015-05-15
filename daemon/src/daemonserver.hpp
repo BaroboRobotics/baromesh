@@ -448,7 +448,7 @@ private:
             ec = Status::STRANGE_DONGLE;
         }
         else if (rpc::Status::VERSION_MISMATCH == ec) {
-            ec = Status::RPC_VERSION_MISMATCH;
+            ec = Status::INCOMPATIBLE_FIRMWARE;
         }
         else if (ec && errorCategory() != ec.category()) {
             auto newEc = make_error_code(Status::CANNOT_OPEN_DONGLE);
@@ -491,16 +491,9 @@ private:
             auto robotEvent = Broadcast::robotEvent{};
             std::strncpy(robotEvent.serialId.value, serialId.c_str(), 4);
             robotEvent.serialId.value[4] = 0;
-            // Only check the RPC version--the daemon knows nothing of the interface version
-            if (rVer.major != rpc::Version<>::major
-                || rVer.minor != rpc::Version<>::minor
-                || rVer.patch != rpc::Version<>::patch) {
-                robotEvent.status = barobo_Status(Status::RPC_VERSION_MISMATCH);
-            }
-            else {
-                robotEvent.status = barobo_Status(Status::OK);
-            }
             robotEvent.firmwareVersion = fVer;
+            robotEvent.rpcVersion = rVer;
+            robotEvent.interfaceVersion = iVer;
 
             rpc::asio::asyncBroadcast(mServer, robotEvent,
             [] (boost::system::error_code ec2) {
