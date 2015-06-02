@@ -160,6 +160,7 @@ public:
         sigSet.async_wait([this] (boost::system::error_code ec, int sigNo) {
             if (!ec) {
                 BOOST_LOG(mLog) << "Closing DaemonServer after signal " << sigNo;
+                mTerminateSignalled = true;
                 close(ec);
             }
         });
@@ -324,6 +325,11 @@ private:
             mDongle.reset();
             dongleEvent(Status::DONGLE_NOT_FOUND);
         }
+
+        if (mTerminateSignalled) {
+            return;
+        }
+
         mDongleTimer.cancel();
         mDongleTimer.expires_from_now(std::forward<Duration>(timeout));
         mDongleTimer.async_wait(mStrand.wrap(
@@ -378,6 +384,7 @@ private:
                 sigSet->async_wait([this, dongle] (boost::system::error_code ec, int sigNo) {
                     if (!ec) {
                         BOOST_LOG(mLog) << "Closing nascent dongle after signal " << sigNo;
+                        mTerminateSignalled = true;
                         dongle->close(ec);
                     }
                 });
@@ -556,6 +563,8 @@ private:
 
     std::map<std::string, std::shared_ptr<ProxyData>> mRobotProxies;
     std::mutex mRobotProxiesMutex;
+
+    std::atomic<bool> mTerminateSignalled = {false};
 
     mutable boost::log::sources::logger mLog;
 };
