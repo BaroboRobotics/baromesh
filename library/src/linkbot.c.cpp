@@ -55,6 +55,9 @@ void linkbotDelete(Linkbot* l)
 #define LINKBOT_C_WRAPPER_FUNC_IMPL(cpp_name, ...) \
 do \
 { \
+    if (!l) { \
+        return -1; \
+    } \
     try { \
         l->impl. cpp_name (__VA_ARGS__); \
         return 0; \
@@ -113,6 +116,9 @@ int linkbotGetVersions (Linkbot* l, unsigned* major, unsigned* minor, unsigned* 
 
 int linkbotGetSerialId(Linkbot* l, char* serialId)
 {
+    if (!l) {
+        return -1;
+    }
     std::string id;
     try {
         l->impl.getSerialId(id);
@@ -240,6 +246,9 @@ int linkbotStop(Linkbot *l, int mask) {
 #define SET_EVENT_CALLBACK(cbname) \
 int linkbotSet##cbname(Linkbot* l, barobo::cbname cb, void* userData) \
 { \
+    if (!l) { \
+        return -1; \
+    } \
     try { \
         l->impl.set##cbname(cb, userData); \
         return 0; \
@@ -261,6 +270,9 @@ int linkbotSetEncoderEventCallback(Linkbot* l,
                                    float granularity,
                                    void* userData)
 {
+    if (!l) {
+        return -1;
+    }
     try { 
         l->impl.setEncoderEventCallback(cb, granularity, userData); 
         return 0; 
