@@ -282,6 +282,7 @@ message getFormFactor {
         I = 0;
         L = 1;
         T = 2;
+        DONGLE = 3;
     }
     message In {}
     message Result {
