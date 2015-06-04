@@ -83,6 +83,7 @@ int linkbotGetBatteryVoltage(Linkbot *l, double* voltage)
 
 int linkbotGetFormFactor(Linkbot *l, barobo::FormFactor::Type *form)
 {
+    *form = barobo::FormFactor::I;
     LINKBOT_C_WRAPPER_FUNC_IMPL(getFormFactor, *form);
 }
 
