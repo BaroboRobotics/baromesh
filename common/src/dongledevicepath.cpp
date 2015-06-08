@@ -13,7 +13,8 @@ struct usb_dongle_id {
 static const usb_dongle_id g_barobo_usb_dongle_ids[] = {
   { "Barobo, Inc.", "Mobot USB-Serial Adapter" },
   { "Barobo, Inc.", "Linkbot USB-Serial Adapter" },
-  { "Barobo, Inc.", "Barobo USB-Serial Adapter" }
+  { "Barobo, Inc.", "Barobo USB-Serial Adapter" },
+  { "Barobo, Inc.", "Barobo USB-Serial Adapter\u031aBarob" },
 };
 
 static int dongleDevicePathImpl(char *, size_t);

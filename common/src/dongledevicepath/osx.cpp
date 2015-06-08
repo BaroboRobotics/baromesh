@@ -49,8 +49,19 @@ int dongleDevicePathImpl (char *buf, size_t len) {
       = CFStringGetCStringPtr(static_cast<CFStringRef>(prod_cont), kCFStringEncodingMacRoman);
     if(!usb_product_name) continue;
 
+    char pn[64];
+    if (CFStringGetCString(static_cast<CFStringRef>(prod_cont), pn, sizeof(pn), kCFStringEncodingUTF8)) {
+      fprintf(stderr, "yo! %s\n", pn);
+    }
+
     int i;
     for (i = 0; i < NUM_BAROBO_USB_DONGLE_IDS; ++i) {
+      fprintf(stderr, "testing product string %s (", usb_product_name));
+      auto p = usb_product_name;
+      while (auto c = p++) {
+        fprintf(stderr, "%02x ", c);
+      }
+      fprintf(stderr, ")\n");
       if (!strcmp(usb_vendor_name, g_barobo_usb_dongle_ids[i].manufacturer) &&
           !strcmp(usb_product_name, g_barobo_usb_dongle_ids[i].product)) {
         /* Woohoo! */
