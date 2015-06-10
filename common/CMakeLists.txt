@@ -53,7 +53,11 @@ if(WIN32)
 elseif(APPLE)
     find_library(coreFoundationLib CoreFoundation)
     find_library(ioKitLib IOKit)
-    target_link_libraries(baromesh-common PRIVATE ${ioKitLib} ${coreFoundationLib})
+    target_link_libraries(baromesh-common
+      PRIVATE cfpp
+              ${ioKitLib}
+              ${coreFoundationLib}
+              )
 endif()
 
 set_target_properties(baromesh-common PROPERTIES
