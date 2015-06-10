@@ -52,6 +52,8 @@ public:
     /* SETTERS */
     void resetEncoderRevs();
     void setBuzzerFrequency (double);
+    void setJointAccelI(int mask, double, double, double);
+    void setJointAccelF(int mask, double, double, double);
     void setJointSpeeds (int mask, double, double, double);
     void setJointStates(
         int mask,
@@ -79,6 +81,8 @@ public:
     // a motor backward, +1 to move it forward.
     void moveContinuous (int mask, double, double, double);
     void moveTo (int mask, double, double, double);
+    void moveSmoothTo(int mask, double a0, double a1, double a2);
+    void moveSmooth(int mask, double a0, double a1, double a2);
     void motorPower(int mask, int m1, int m2, int m3);
     void stop (int mask = 0x07);
 

@@ -290,6 +290,19 @@ message getFormFactor {
     }
 }
 
+// For standard acceleration:
+// Controller: ACCEL
+// goal : initial velocity
+// AlphaI : Acceleration of motor
+// AlphaF : Ignored: Set to 0
+// timeout (optional) : When to stop the motor
+
+// For smooth motion:
+// Controller: SMOOTH
+// ABS(Omega) : VMax
+// AlphaI : Starting Acceleration
+// AlphaF : Ending Acceleration
+
 message Goal {
     enum Type {
         ABSOLUTE = 1; // move to an absolute angle value
@@ -301,6 +314,9 @@ message Goal {
         PID = 1;
         CONSTVEL = 2;
         SMOOTH = 3;
+        ACCEL = 4;
+        CYCLOIDAL = 5;
+        HARMONIC = 6;
     }
     required Type type = 1;
     required float goal = 2; // absolute, relative angles; or coefficient in infinite case

@@ -556,6 +556,49 @@ void Linkbot::setJointSafetyAngles(int mask, double t0, double t1, double t2) {
     }
 }
 
+void Linkbot::setJointAccelI(
+    int mask,
+    double a0, double a1, double a2)
+{
+    try {
+        MethodIn::setMotorControllerAlphaI arg;
+        arg.mask = mask;
+        arg.values_count = 0;
+        int jointFlag = 0x01;
+        for (auto& s : { a0, a1, a2 }) {
+            if (jointFlag & mask) {
+                arg.values[arg.values_count++] = float(baromesh::degToRad(s));
+            }
+            jointFlag <<= 1;
+        }
+        asyncFire(m->robot, arg, requestTimeout(), use_future).get();
+    }
+    catch (std::exception& e) {
+        throw Error(e.what());
+    }
+}
+
+void Linkbot::setJointAccelF(
+    int mask,
+    double a0, double a1, double a2)
+{
+    try {
+        MethodIn::setMotorControllerAlphaF arg;
+        arg.mask = mask;
+        arg.values_count = 0;
+        int jointFlag = 0x01;
+        for (auto& s : { a0, a1, a2 }) {
+            if (jointFlag & mask) {
+                arg.values[arg.values_count++] = float(baromesh::degToRad(s));
+            }
+            jointFlag <<= 1;
+        }
+        asyncFire(m->robot, arg, requestTimeout(), use_future).get();
+    }
+    catch (std::exception& e) {
+        throw Error(e.what());
+    }
+}
 /* MOVEMENT */
 
 void Linkbot::drive (int mask, double a0, double a1, double a2)
@@ -635,6 +678,64 @@ void Linkbot::moveContinuous (int mask, double c0, double c1, double c2) {
             bool(mask&0x01), { barobo_Robot_Goal_Type_INFINITE, float(c0), false },
             bool(mask&0x02), { barobo_Robot_Goal_Type_INFINITE, float(c1), false },
             bool(mask&0x04), { barobo_Robot_Goal_Type_INFINITE, float(c2), false }
+        }, requestTimeout(), use_future).get();
+    }
+    catch (std::exception& e) {
+        throw Error(e.what());
+    }
+}
+
+void Linkbot::moveSmooth(int mask, double a0, double a1, double a2)
+{
+    try {
+        asyncFire(m->robot, MethodIn::move {
+            bool(mask&0x01), { 
+                barobo_Robot_Goal_Type_RELATIVE, 
+                float(baromesh::degToRad(a0)),
+                true,
+                barobo_Robot_Goal_Controller_SMOOTH
+                },
+            bool(mask&0x02), { 
+                barobo_Robot_Goal_Type_RELATIVE, 
+                float(baromesh::degToRad(a1)),
+                true,
+                barobo_Robot_Goal_Controller_SMOOTH
+                },
+            bool(mask&0x04), { 
+                barobo_Robot_Goal_Type_RELATIVE, 
+                float(baromesh::degToRad(a2)),
+                true,
+                barobo_Robot_Goal_Controller_SMOOTH
+                }
+        }, requestTimeout(), use_future).get();
+    }
+    catch (std::exception& e) {
+        throw Error(e.what());
+    }
+}
+
+void Linkbot::moveSmoothTo(int mask, double a0, double a1, double a2)
+{
+    try {
+        asyncFire(m->robot, MethodIn::move {
+            bool(mask&0x01), { 
+                barobo_Robot_Goal_Type_ABSOLUTE, 
+                float(baromesh::degToRad(a0)),
+                true,
+                barobo_Robot_Goal_Controller_SMOOTH
+                },
+            bool(mask&0x02), { 
+                barobo_Robot_Goal_Type_ABSOLUTE, 
+                float(baromesh::degToRad(a1)),
+                true,
+                barobo_Robot_Goal_Controller_SMOOTH
+                },
+            bool(mask&0x04), { 
+                barobo_Robot_Goal_Type_ABSOLUTE, 
+                float(baromesh::degToRad(a2)),
+                true,
+                barobo_Robot_Goal_Controller_SMOOTH
+                }
         }, requestTimeout(), use_future).get();
     }
     catch (std::exception& e) {
