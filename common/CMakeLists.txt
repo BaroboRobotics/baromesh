@@ -21,6 +21,9 @@ find_package(Boost 1.54.0 REQUIRED COMPONENTS system chrono log thread program_o
 
 include(LinkbotLabs)
 ll_add_dependency(cxx-util cxx-util)
+if(APPLE)
+  ll_add_dependency(CFPP cfpp)
+endif()
 
 set(SOURCES
     src/dongledevicepath.cpp
