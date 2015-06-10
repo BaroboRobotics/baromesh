@@ -21,6 +21,9 @@ find_package(Boost 1.54.0 REQUIRED COMPONENTS system chrono log thread program_o
 
 include(LinkbotLabs)
 ll_add_dependency(cxx-util cxx-util)
+if(APPLE)
+  ll_add_dependency(CFPP cfpp)
+endif()
 
 set(SOURCES
     src/dongledevicepath.cpp
@@ -53,7 +56,11 @@ if(WIN32)
 elseif(APPLE)
     find_library(coreFoundationLib CoreFoundation)
     find_library(ioKitLib IOKit)
-    target_link_libraries(baromesh-common PRIVATE ${ioKitLib} ${coreFoundationLib})
+    target_link_libraries(baromesh-common
+      PRIVATE cfpp
+              ${ioKitLib}
+              ${coreFoundationLib}
+              )
 endif()
 
 set_target_properties(baromesh-common PROPERTIES
