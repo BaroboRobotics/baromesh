@@ -85,8 +85,7 @@ public:
         double a2, double timeout2, JointState::Type endstate2);
     void moveContinuous (int mask, double, double, double);
     void moveTo (int mask, double, double, double);
-    void moveSmoothTo(int mask, double a0, double a1, double a2);
-    void moveSmooth(int mask, double a0, double a1, double a2);
+    void moveSmooth(int mask, int relativeMask, double a0, double a1, double a2);
     void motorPower(int mask, int m1, int m2, int m3);
     void stop (int mask = 0x07);
 

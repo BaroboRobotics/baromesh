@@ -694,7 +694,7 @@ void Linkbot::moveAccel(int mask, int relativeMask,
     hasTimeouts[0] = (timeout0 != 0.0);
     hasTimeouts[1] = (timeout1 != 0.0);
     hasTimeouts[2] = (timeout2 != 0.0);
-    int motionType[3];
+    barobo_Robot_Goal_Type motionType[3];
     for(int i = 0; i < 3; i++) { 
         if(relativeMask & (1<<i)) {
             motionType[i] = barobo_Robot_Goal_Type_RELATIVE;
@@ -718,21 +718,21 @@ void Linkbot::moveAccel(int mask, int relativeMask,
 
         asyncFire(m->robot, MethodIn::move {
             bool(mask&0x01), { 
-                barobo_Robot_Goal_Type_RELATIVE, 
+                motionType[0], 
                 float(baromesh::degToRad(a0)),
                 true,
                 barobo_Robot_Goal_Controller_ACCEL,
                 hasTimeouts[0], float(timeout0), hasTimeouts[0], js_to_int(endstate0)
                 },
             bool(mask&0x02), { 
-                barobo_Robot_Goal_Type_RELATIVE, 
+                motionType[1], 
                 float(baromesh::degToRad(a1)),
                 true,
                 barobo_Robot_Goal_Controller_ACCEL,
                 hasTimeouts[1], float(timeout1), hasTimeouts[1], js_to_int(endstate1)
                 },
             bool(mask&0x04), { 
-                barobo_Robot_Goal_Type_RELATIVE, 
+                motionType[2], 
                 float(baromesh::degToRad(a2)),
                 true,
                 barobo_Robot_Goal_Controller_ACCEL,
@@ -745,53 +745,33 @@ void Linkbot::moveAccel(int mask, int relativeMask,
     }
 }
 
-void Linkbot::moveSmooth(int mask, double a0, double a1, double a2)
+void Linkbot::moveSmooth(int mask, int relativeMask, double a0, double a1, double a2)
 {
-    try {
-        asyncFire(m->robot, MethodIn::move {
-            bool(mask&0x01), { 
-                barobo_Robot_Goal_Type_RELATIVE, 
-                float(baromesh::degToRad(a0)),
-                true,
-                barobo_Robot_Goal_Controller_SMOOTH
-                },
-            bool(mask&0x02), { 
-                barobo_Robot_Goal_Type_RELATIVE, 
-                float(baromesh::degToRad(a1)),
-                true,
-                barobo_Robot_Goal_Controller_SMOOTH
-                },
-            bool(mask&0x04), { 
-                barobo_Robot_Goal_Type_RELATIVE, 
-                float(baromesh::degToRad(a2)),
-                true,
-                barobo_Robot_Goal_Controller_SMOOTH
-                }
-        }, requestTimeout(), use_future).get();
+    barobo_Robot_Goal_Type motionType[3];
+    for(int i = 0; i < 3; i++) { 
+        if(relativeMask & (1<<i)) {
+            motionType[i] = barobo_Robot_Goal_Type_RELATIVE;
+        } else {
+            motionType[i] = barobo_Robot_Goal_Type_ABSOLUTE;
+        }
     }
-    catch (std::exception& e) {
-        throw Error(e.what());
-    }
-}
 
-void Linkbot::moveSmoothTo(int mask, double a0, double a1, double a2)
-{
     try {
         asyncFire(m->robot, MethodIn::move {
             bool(mask&0x01), { 
-                barobo_Robot_Goal_Type_ABSOLUTE, 
+                motionType[0], 
                 float(baromesh::degToRad(a0)),
                 true,
                 barobo_Robot_Goal_Controller_SMOOTH
                 },
             bool(mask&0x02), { 
-                barobo_Robot_Goal_Type_ABSOLUTE, 
+                motionType[1], 
                 float(baromesh::degToRad(a1)),
                 true,
                 barobo_Robot_Goal_Controller_SMOOTH
                 },
             bool(mask&0x04), { 
-                barobo_Robot_Goal_Type_ABSOLUTE, 
+                motionType[2], 
                 float(baromesh::degToRad(a2)),
                 true,
                 barobo_Robot_Goal_Controller_SMOOTH
