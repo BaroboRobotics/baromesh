@@ -99,6 +99,12 @@ int linkbotSetJointSafetyThresholds(baromesh::Linkbot *l, int mask, int t1, int 
 int linkbotSetJointSafetyAngles(baromesh::Linkbot *l, int mask, double t1, double t2, double t3);
 
 /* MOVEMENT */
+int linkbotMoveAccel(baromesh::Linkbot *l, int mask, int relativeMask,
+    double a0, double timeout0, barobo::JointState::Type endstate0,
+    double a1, double timeout1, barobo::JointState::Type endstate1,
+    double a2, double timeout2, barobo::JointState::Type endstate2);
+int linkbotMoveSmooth(baromesh::Linkbot *l, 
+    int mask, int relativeMask, double a0, double a1, double a2);
 int linkbotMoveContinuous(baromesh::Linkbot *l, int mask, 
                           double d1, 
                           double d2, 

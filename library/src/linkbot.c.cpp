@@ -201,6 +201,23 @@ int linkbotSetJointSafetyAngles(baromesh::Linkbot *l, int mask, double t1, doubl
 
 /* MOVEMENT */
 
+int linkbotMoveAccel(Linkbot *l, int mask, int relativeMask,
+    double a0, double timeout0, barobo::JointState::Type endstate0,
+    double a1, double timeout1, barobo::JointState::Type endstate1,
+    double a2, double timeout2, barobo::JointState::Type endstate2)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(moveAccel, mask, relativeMask, 
+            a0, timeout0, endstate0,
+            a1, timeout1, endstate1,
+            a2, timeout2, endstate2);
+}
+
+int linkbotMoveSmooth(Linkbot *l, int mask, int relativeMask, 
+    double a0, double a1, double a2)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(moveSmooth, mask, relativeMask, a0, a1, a2);
+}
+
 int linkbotMoveContinuous(Linkbot *l, int mask, 
                           double d1,
                           double d2,
