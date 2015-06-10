@@ -79,6 +79,10 @@ public:
     void move (int mask, double, double, double);
     // moveContinuous takes three angular speed coefficients. Use -1 to move
     // a motor backward, +1 to move it forward.
+    void moveAccel(int mask, 
+        double a0, double timeout0, JointState::Type endstate0,
+        double a1, double timeout1, JointState::Type endstate1,
+        double a2, double timeout2, JointState::Type endstate2);
     void moveContinuous (int mask, double, double, double);
     void moveTo (int mask, double, double, double);
     void moveSmoothTo(int mask, double a0, double a1, double a2);
