@@ -144,6 +144,16 @@ int linkbotGetJointSafetyAngles(Linkbot* l, double* t1, double* t2, double* t3)
 
 /* SETTERS */
 
+int linkbotSetAlphaI(baromesh::Linkbot *l, int mask, double a1, double a2, double a3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(setJointAccelI, mask, a1, a2, a3);
+}
+
+int linkbotSetAlphaF(baromesh::Linkbot *l, int mask, double a1, double a2, double a3)
+{
+    LINKBOT_C_WRAPPER_FUNC_IMPL(setJointAccelF, mask, a1, a2, a3);
+}
+
 int linkbotResetEncoderRevs(Linkbot *l)
 {
     LINKBOT_C_WRAPPER_FUNC_IMPL(resetEncoderRevs);

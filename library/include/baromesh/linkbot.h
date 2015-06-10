@@ -82,6 +82,10 @@ int linkbotGetJointSafetyThresholds(baromesh::Linkbot* l, int*, int*, int*);
 int linkbotGetJointSafetyAngles(baromesh::Linkbot* l, double*, double*, double*);
 
 /* SETTERS */
+int linkbotSetAlphaI(baromesh::Linkbot *l, int mask, 
+    double a1, double a2, double a3);
+int linkbotSetAlphaF(baromesh::Linkbot *l, int mask, 
+    double a1, double a2, double a3);
 int linkbotResetEncoderRevs(baromesh::Linkbot *l);
 int linkbotSetBuzzerFrequency(baromesh::Linkbot *l, float freq);
 int linkbotSetJointSpeeds(baromesh::Linkbot *l, int mask, double j1, double j2, 

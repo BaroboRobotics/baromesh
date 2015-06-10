@@ -296,6 +296,7 @@ message getFormFactor {
 // AlphaI : Acceleration of motor
 // AlphaF : Ignored: Set to 0
 // timeout (optional) : When to stop the motor
+// Omega : VMax
 
 // For smooth motion:
 // Controller: SMOOTH
