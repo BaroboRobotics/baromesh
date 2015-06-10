@@ -685,7 +685,7 @@ void Linkbot::moveContinuous (int mask, double c0, double c1, double c2) {
     }
 }
 
-void Linkbot::moveAccel(int mask, 
+void Linkbot::moveAccel(int mask, int relativeMask,
     double a0, double timeout0, JointState::Type endstate0,
     double a1, double timeout1, JointState::Type endstate1,
     double a2, double timeout2, JointState::Type endstate2)
@@ -694,6 +694,14 @@ void Linkbot::moveAccel(int mask,
     hasTimeouts[0] = (timeout0 != 0.0);
     hasTimeouts[1] = (timeout1 != 0.0);
     hasTimeouts[2] = (timeout2 != 0.0);
+    int motionType[3];
+    for(int i = 0; i < 3; i++) { 
+        if(relativeMask & (1<<i)) {
+            motionType[i] = barobo_Robot_Goal_Type_RELATIVE;
+        } else {
+            motionType[i] = barobo_Robot_Goal_Type_ABSOLUTE;
+        }
+    }
     try {
         auto js_to_int = [] (JointState::Type js) {
             switch(js) {
@@ -714,21 +722,21 @@ void Linkbot::moveAccel(int mask,
                 float(baromesh::degToRad(a0)),
                 true,
                 barobo_Robot_Goal_Controller_ACCEL,
-                hasTimeouts[0], timeout0, hasTimeouts[0], js_to_int(endstate0)
+                hasTimeouts[0], float(timeout0), hasTimeouts[0], js_to_int(endstate0)
                 },
             bool(mask&0x02), { 
                 barobo_Robot_Goal_Type_RELATIVE, 
                 float(baromesh::degToRad(a1)),
                 true,
                 barobo_Robot_Goal_Controller_ACCEL,
-                hasTimeouts[1], timeout1, hasTimeouts[1], js_to_int(endstate1)
+                hasTimeouts[1], float(timeout1), hasTimeouts[1], js_to_int(endstate1)
                 },
             bool(mask&0x04), { 
                 barobo_Robot_Goal_Type_RELATIVE, 
                 float(baromesh::degToRad(a2)),
                 true,
                 barobo_Robot_Goal_Controller_ACCEL,
-                hasTimeouts[2], timeout2, hasTimeouts[2], js_to_int(endstate2)
+                hasTimeouts[2], float(timeout2), hasTimeouts[2], js_to_int(endstate2)
                 }
         }, requestTimeout(), use_future).get();
     }
@@ -736,7 +744,6 @@ void Linkbot::moveAccel(int mask,
         throw Error(e.what());
     }
 }
-
 
 void Linkbot::moveSmooth(int mask, double a0, double a1, double a2)
 {
