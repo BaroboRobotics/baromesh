@@ -1,139 +1,74 @@
-#include "logging.h"
+#include "osx_uniqueiobject.hpp"
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <boost/log/sources/logger.hpp>
+#include <boost/log/sources/record_ostream.hpp>
 
-#include <unistd.h>
+#include "CF++.h"
 
-#include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
 #include <IOKit/IOBSD.h>
 #include <IOKit/usb/IOUSBLib.h>
 #include <IOKit/IOReturn.h>
 
-static CFTypeRef get_string_prop (io_object_t device, const char *prop);
-static CFTypeRef get_string_prop_r (io_object_t device, const char *prop);
+#include <string.h>
+#include <unistd.h>
+
+static CF::String getStringProperty (io_object_t device, CF::String key, bool recursive=false) {
+    auto valueRef = IORegistryEntrySearchCFProperty(device,
+        kIOServicePlane, key, 
+        kCFAllocatorDefault, recursive
+                             ? kIORegistryIterateRecursively
+                             : kNilOptions);
+    auto value = CF::String{valueRef};
+    if (valueRef) {
+        CFRelease(valueRef);
+    }
+    return value;
+}
+
+static UniqueIoObject getUsbDeviceIterator () {
+    io_iterator_t iter;
+    auto kr = IOServiceGetMatchingServices(kIOMasterPortDefault,
+        IOServiceMatching(kIOUSBDeviceClassName), &iter);
+    if (kIOReturnSuccess != kr) {
+        throw std::runtime_error("Could not get USB devices from the IORegistry.");
+    }
+    return UniqueIoObject{iter};
+}
 
 int dongleDevicePathImpl (char *buf, size_t len) {
-  kern_return_t result;
-  io_iterator_t it;
+    auto iter = getUsbDeviceIterator();
+    while (auto device = UniqueIoObject{IOIteratorNext(iter)}) {
+        for (auto i = 0; i < NUM_BAROBO_USB_DONGLE_IDS; ++i) {
+            auto expectedManufacturer = g_barobo_usb_dongle_ids[i].manufacturer;
+            auto expectedProduct = g_barobo_usb_dongle_ids[i].product;
 
-  result = IOServiceGetMatchingServices(kIOMasterPortDefault,
-      IOServiceMatching(kIOUSBDeviceClassName), &it);
+            auto manufacturerValue = std::string(getStringProperty(device, "USB Vendor Name"));
+            auto productValue = std::string(getStringProperty(device, "USB Product Name"));
 
-  if (kIOReturnSuccess != result) {
-    fprintf(stderr, "(barobo) ERROR: IOServiceGetMatchingServices\n");
-    abort();
-  }
-
-  /* Iterate through the serial ports */
-  io_object_t device;
-  CFTypeRef prod_cont, vend_cont;
-  bool found_dongle = false;
-  while (!found_dongle && (device = IOIteratorNext(it))) {
-    vend_cont = get_string_prop(device, "USB Vendor Name");
-    if (!vend_cont) {
-      fprintf(stderr, "(barobo) ERROR: USB device has no vendor name\n");
-      continue;
+            if (manufacturerValue == expectedManufacturer
+                && productValue == expectedProduct) {
+                auto path = std::string(getStringProperty(device, "IOCalloutDevice", true));
+                if (!access(path.c_str(), R_OK | W_OK)) {
+                    // Success!
+                    strncpy(buf, path.c_str(), len);
+                    buf[len-1] = 0;
+                    return 0;
+                }
+                else if (EACCES == errno) {
+                    boost::log::sources::logger lg;
+                    BOOST_LOG(lg) << "Dongle found at " << path << ", but user does not have "
+                        << "sufficient read/write permissions.";
+                    
+                }
+                else {
+                    char errbuf[256];
+                    strerror_r(errno, errbuf, sizeof(errbuf));
+                    boost::log::sources::logger lg;
+                    BOOST_LOG(lg) << "access(\"" << path << "\", R_OK|W_OK) failed: " << errbuf;
+                }
+            }
+        }
     }
-    const char *usb_vendor_name
-      = CFStringGetCStringPtr(static_cast<CFStringRef>(vend_cont), kCFStringEncodingMacRoman);
-    if(!usb_vendor_name) continue;
-
-    prod_cont = get_string_prop(device, "USB Product Name");
-    if (!prod_cont) {
-      fprintf(stderr, "(barobo) ERROR: USB device has no product name\n");
-      continue;
-    }
-    const char *usb_product_name
-      = CFStringGetCStringPtr(static_cast<CFStringRef>(prod_cont), kCFStringEncodingMacRoman);
-    if(!usb_product_name) continue;
-
-    char pn[64];
-    if (CFStringGetCString(static_cast<CFStringRef>(prod_cont), pn, sizeof(pn), kCFStringEncodingUTF8)) {
-      fprintf(stderr, "yo! %s\n", pn);
-    }
-
-    int i;
-    for (i = 0; i < NUM_BAROBO_USB_DONGLE_IDS; ++i) {
-      fprintf(stderr, "testing product string %s (", usb_product_name));
-      auto p = usb_product_name;
-      while (auto c = p++) {
-        fprintf(stderr, "%02x ", c);
-      }
-      fprintf(stderr, ")\n");
-      if (!strcmp(usb_vendor_name, g_barobo_usb_dongle_ids[i].manufacturer) &&
-          !strcmp(usb_product_name, g_barobo_usb_dongle_ids[i].product)) {
-        /* Woohoo! */
-        found_dongle = true;
-        break;
-      }
-    }
-
-    CFRelease(prod_cont);
-    CFRelease(vend_cont);
-  }
-
-  IOObjectRelease(it);
-
-  if (!found_dongle) {
     return -1;
-  }
-
-  /* Get the tty file path for this device */
-  CFTypeRef tty_cont = get_string_prop_r(device, "IOCalloutDevice");
-  if (!tty_cont) {
-    fprintf(stderr, "(barobo) ERROR: dongle has no IOCalloutDevice\n");
-    return -1;
-  }
-
-  /* Put the device path into buf */
-  /* TODO figure out if CFStringGetLength() includes a null-terminator or not */
-  CFIndex ttylen = CFStringGetLength(static_cast<CFStringRef>(tty_cont));
-  if (ttylen >= len) {
-    fprintf(stderr, "(barobo) ERROR: buffer overflow in Mobot_dongleGetTTY()\n");
-    return -1;
-  }
-  CFStringGetBytes(static_cast<CFStringRef>(tty_cont), CFRangeMake(0, ttylen),
-      kCFStringEncodingMacRoman, 0, false, (UInt8*)buf, len, NULL);
-  buf[ttylen] = 0;
-  CFRelease(tty_cont);
-
-  /* FIXME code duplication here with linux_dongle_get_tty.c */
-  if (!access(buf, R_OK | W_OK)) {
-    bInfo(stderr, "(barobo) INFO: dongle found at %s\n", buf);
-    return 0;
-  }
-
-  /* access() must have failed */
-
-  if (EACCES == errno) {
-    fprintf(stderr, "(barobo) WARNING: dongle found at %s, but user does not have "
-        "sufficient read/write permissions.\n", buf);
-  }
-  else {
-    char errbuf[256];
-    strerror_r(errno, errbuf, sizeof(errbuf));
-    fprintf(stderr, "(barobo) WARNING: attempted to access %s: %s\n", buf, errbuf);
-  }
-
-  return -1;
-}
-
-static CFTypeRef get_string_prop (io_object_t device, const char *prop) {
-  CFStringRef key = CFStringCreateWithCString(kCFAllocatorDefault,
-      prop, kCFStringEncodingMacRoman);
-  CFTypeRef ret = IORegistryEntryCreateCFProperty(device,
-      key, kCFAllocatorDefault, 0);
-  CFRelease(key);
-  return ret;
-}
-
-static CFTypeRef get_string_prop_r (io_object_t device, const char *prop) {
-  CFStringRef key = CFStringCreateWithCString(kCFAllocatorDefault,
-      prop, kCFStringEncodingMacRoman);
-  CFTypeRef ret = IORegistryEntrySearchCFProperty(device, kIOServicePlane,
-      key, kCFAllocatorDefault, kIORegistryIterateRecursively);
-  CFRelease(key);
-  return ret;
 }
