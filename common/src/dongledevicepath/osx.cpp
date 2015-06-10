@@ -1,4 +1,4 @@
-#include "osx_uniqueiobject.hpp"
+#include "osx_uniqueioobject.hpp"
 
 #include <boost/log/sources/logger.hpp>
 #include <boost/log/sources/record_ostream.hpp>
