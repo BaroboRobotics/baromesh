@@ -1,3 +1,6 @@
+#ifndef BAROMESH_LOG_HPP
+#define BAROMESH_LOG_HPP
+
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
 
@@ -13,3 +16,5 @@ void initialize (std::string appName, const boost::program_options::variables_ma
 
 } // namespace log
 } // namespace baromesh
+
+#endif
