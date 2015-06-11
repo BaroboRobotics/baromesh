@@ -19,10 +19,8 @@ endif()
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.54.0 REQUIRED COMPONENTS system chrono log thread program_options)
 
-include(LinkbotLabs)
-ll_add_dependency(cxx-util cxx-util)
 if(APPLE)
-  ll_add_dependency(CFPP cfpp)
+  add_subdirectory(CFPP)
 endif()
 
 set(SOURCES
