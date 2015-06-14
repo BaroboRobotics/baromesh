@@ -56,7 +56,7 @@ int dongleDevicePathImpl (char *buf, size_t len) {
             // test to be true if the expected product string is a prefix of the
             // device's product string.
             if (manufacturerValue == expectedManufacturer
-                && expectedProduct.size <= productValue.size()
+                && expectedProduct.size() <= productValue.size()
                 && expectedProduct.end() == std::mismatch(
                     expectedProduct.begin(),
                     expectedProduct.end(),
