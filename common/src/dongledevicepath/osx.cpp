@@ -42,8 +42,8 @@ int dongleDevicePathImpl (char *buf, size_t len) {
     auto iter = getUsbDeviceIterator();
     while (auto device = UniqueIoObject{IOIteratorNext(iter)}) {
         for (auto i = 0; i < NUM_BAROBO_USB_DONGLE_IDS; ++i) {
-            auto expectedManufacturer = g_barobo_usb_dongle_ids[i].manufacturer;
-            auto expectedProduct = g_barobo_usb_dongle_ids[i].product;
+            auto expectedManufacturer = std::string(g_barobo_usb_dongle_ids[i].manufacturer);
+            auto expectedProduct = std::string(g_barobo_usb_dongle_ids[i].product);
 
             auto manufacturerValue = std::string(getStringProperty(device, "USB Vendor Name"));
             auto productValue = std::string(getStringProperty(device, "USB Product Name"));
