@@ -14,10 +14,6 @@ static const usb_dongle_id g_barobo_usb_dongle_ids[] = {
     { "Barobo, Inc.", "Mobot USB-Serial Adapter" },
     { "Barobo, Inc.", "Linkbot USB-Serial Adapter" },
     { "Barobo, Inc.", "Barobo USB-Serial Adapter" },
-    // Some old dongles were shipped with a product string that Mac reads
-    // as the following garbage. Separate literals are required because
-    // \x9aBa is a valid hex escape sequence.
-    { "Barobo, Inc.", "Barobo USB-Serial Adapter \xcc\x9a" "Barob" },
 };
 
 static int dongleDevicePathImpl(char *, size_t);
