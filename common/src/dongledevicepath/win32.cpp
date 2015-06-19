@@ -26,24 +26,6 @@
 #define snprintf _snprintf
 #endif
 
-static void printPropUnicodeStringList (PBYTE buf, DWORD bufsize) {
-    assert(!(bufsize & 1));
-
-    wchar_t *s = (wchar_t *)buf;
-    size_t len = bufsize / 2;
-
-    wprintf(L"{");
-    wprintf(L" %s", s);
-    s += wcslen(s) + 1;
-    len -= wcslen(s) + 1;
-    while (len) {
-        wprintf(L", %s", s);
-        s += wcslen(s) + 1;
-        len -= wcslen(s) + 1;
-    }
-    wprintf(L" }");
-}
-
 static void printPropStringList (PTCHAR s) {
     _tprintf(_T("%s"), s);
     s += _tcslen(s) + 1;
@@ -83,56 +65,6 @@ static PBYTE getPropertyBuf (HDEVINFO devices, PSP_DEVINFO_DATA dev,
     }
 
     return buf;
-}
-
-static void dumpProperty (HDEVINFO devices, PSP_DEVINFO_DATA dev, DWORD key,
-        PTCHAR keyname) {
-    DWORD size = 0;
-    DWORD type = 0;
-    char *buf = (char*)getPropertyBuf(devices, dev, key, &size, &type);
-    if (!buf) {
-        exit(1);
-    }
-
-    _tprintf(_T("%s: "), keyname);
-
-    switch (type) {
-        case REG_BINARY:
-            _tprintf(_T("(binary data)\n"));
-            break;
-        case REG_DWORD: /* little-endian */
-            _tprintf(_T("%d\n"), (PDWORD)buf);
-            break;
-        case REG_QWORD: /* little-endian */
-            _tprintf(_T("%ld\n"), (uint64_t *)buf);
-            break;
-        case REG_DWORD_BIG_ENDIAN:
-            _tprintf(_T("(dword big endian)\n"));
-            break;
-        case REG_EXPAND_SZ:
-            _tprintf(_T("%s\n"), (PTCHAR)buf);
-            break;
-        case REG_LINK:
-            _tprintf(_T("(link)\n"));
-            break;
-        case REG_MULTI_SZ:
-            printPropStringList((PTCHAR)buf);
-            break;
-        case REG_NONE:
-            _tprintf(_T("(none)\n"));
-            break;
-        case REG_RESOURCE_LIST:
-            _tprintf(_T("(resource list)\n"));
-            break;
-        case REG_SZ:
-            _tprintf(_T("%s\n"), (PTCHAR)buf);
-            break;
-        default:
-            _tprintf(_T("(unrecognized registry type %d)\n"), type);
-            break;
-    }
-
-    free(buf);
 }
 
 #if 0
