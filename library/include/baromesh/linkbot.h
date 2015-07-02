@@ -34,12 +34,13 @@ namespace FormFactor {
     };
 }
 
+// Keep in sync with enumeration in robot.proto
 namespace JointState {
     enum Type {
         COAST,
         HOLD,
         MOVING,
-        FAILURE
+        FAILURE = 4
     };
 }
 
