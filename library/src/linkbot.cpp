@@ -414,6 +414,7 @@ void Linkbot::setJointStates(
                 goalType[i] = barobo_Robot_Goal_Type_RELATIVE;
                 controllerType[i] = barobo_Robot_Goal_Controller_PID;
                 coefficients[i] = 0;
+                break;
             case JointState::MOVING:
                 goalType[i] = barobo_Robot_Goal_Type_INFINITE;
                 controllerType[i] = barobo_Robot_Goal_Controller_CONSTVEL;
