@@ -4,6 +4,7 @@
 #include "baromesh/linkbot.h"
 
 #include <string>
+#include <vector>
 #include <stdint.h>
 
 namespace barobo {
@@ -35,6 +36,7 @@ public:
     // All functions are non-blocking. Use moveWait() to wait for non-blocking
     // movement functions.
     void getAccelerometer (int& timestamp, double&, double&, double&);
+    std::vector<int> getAdcRaw();
     void getBatteryVoltage(double& voltage);
     void getFormFactor(FormFactor::Type & form);
     void getJointAngles (int& timestamp, double&, double&, double&);

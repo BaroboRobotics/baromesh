@@ -216,6 +216,24 @@ void Linkbot::getAccelerometer (int& timestamp, double&x, double&y, double&z)
     }
 }
 
+std::vector<int> Linkbot::getAdcRaw()
+{
+    try {
+        std::vector<int> rvalues;
+        auto value = asyncFire( m->robot,
+                                MethodIn::getAdcRaw{},
+                                requestTimeout(),
+                                use_future).get();
+        for(auto i = 0; i < value.values_count; i++) {
+            rvalues.push_back(value.values[i]);
+        }
+        return rvalues;
+    }
+    catch (std::exception& e) {
+        throw Error(e.what());
+    }
+}
+
 void Linkbot::getBatteryVoltage(double &volts)
 {
     try {
