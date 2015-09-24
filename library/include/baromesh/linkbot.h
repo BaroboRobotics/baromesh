@@ -1,6 +1,12 @@
 #ifndef BAROMESH_LINKBOT_H_
 #define BAROMESH_LINKBOT_H_
 
+#ifdef _WIN32
+#define LIBLINKBOT_EXPORT __declspec ( dllexport ) 
+#else
+#define LIBLINKBOT_EXPORT 
+#endif
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -66,60 +72,60 @@ void linkbotDelete(baromesh::Linkbot* l);
 int linkbotWriteEeprom(baromesh::Linkbot *l, unsigned int address, const char *data, unsigned int size);
 
 /* GETTERS */
-int linkbotGetAccelerometer(baromesh::Linkbot *l, int *timestamp, double *x, double *y, 
+LIBLINKBOT_EXPORT int linkbotGetAccelerometer(baromesh::Linkbot *l, int *timestamp, double *x, double *y, 
                             double *z);
-int linkbotGetBatteryVoltage(baromesh::Linkbot *l, double*);
-int linkbotGetFormFactor(baromesh::Linkbot *l, barobo::FormFactor::Type *form);
-int linkbotGetJointAngles(baromesh::Linkbot *l, int* timestamp, double *j1, double *j2, 
+LIBLINKBOT_EXPORT int linkbotGetBatteryVoltage(baromesh::Linkbot *l, double*);
+LIBLINKBOT_EXPORT int linkbotGetFormFactor(baromesh::Linkbot *l, barobo::FormFactor::Type *form);
+LIBLINKBOT_EXPORT int linkbotGetJointAngles(baromesh::Linkbot *l, int* timestamp, double *j1, double *j2, 
                           double *j3);
-int linkbotGetJointSpeeds(baromesh::Linkbot *l, double *s1, double *s2, double *s3);
-int linkbotGetJointStates(baromesh::Linkbot*, int *timestamp, barobo::JointState::Type *j1, 
+LIBLINKBOT_EXPORT int linkbotGetJointSpeeds(baromesh::Linkbot *l, double *s1, double *s2, double *s3);
+LIBLINKBOT_EXPORT int linkbotGetJointStates(baromesh::Linkbot*, int *timestamp, barobo::JointState::Type *j1, 
                           barobo::JointState::Type *j2, 
                           barobo::JointState::Type *j3);
-int linkbotGetLedColor(baromesh::Linkbot *l, int *r, int *g, int *b);
-int linkbotGetVersions (baromesh::Linkbot *l, unsigned*, unsigned*, unsigned*);
-int linkbotGetSerialId(baromesh::Linkbot* l, char* serialId);
-int linkbotGetJointSafetyThresholds(baromesh::Linkbot* l, int*, int*, int*);
-int linkbotGetJointSafetyAngles(baromesh::Linkbot* l, double*, double*, double*);
+LIBLINKBOT_EXPORT int linkbotGetLedColor(baromesh::Linkbot *l, int *r, int *g, int *b);
+LIBLINKBOT_EXPORT int linkbotGetVersions (baromesh::Linkbot *l, unsigned*, unsigned*, unsigned*);
+LIBLINKBOT_EXPORT int linkbotGetSerialId(baromesh::Linkbot* l, char* serialId);
+LIBLINKBOT_EXPORT int linkbotGetJointSafetyThresholds(baromesh::Linkbot* l, int*, int*, int*);
+LIBLINKBOT_EXPORT int linkbotGetJointSafetyAngles(baromesh::Linkbot* l, double*, double*, double*);
 
 /* SETTERS */
-int linkbotSetAlphaI(baromesh::Linkbot *l, int mask, 
+LIBLINKBOT_EXPORT int linkbotSetAlphaI(baromesh::Linkbot *l, int mask, 
     double a1, double a2, double a3);
-int linkbotSetAlphaF(baromesh::Linkbot *l, int mask, 
+LIBLINKBOT_EXPORT int linkbotSetAlphaF(baromesh::Linkbot *l, int mask, 
     double a1, double a2, double a3);
-int linkbotResetEncoderRevs(baromesh::Linkbot *l);
-int linkbotSetBuzzerFrequency(baromesh::Linkbot *l, float freq);
-int linkbotSetJointSpeeds(baromesh::Linkbot *l, int mask, double j1, double j2, 
+LIBLINKBOT_EXPORT int linkbotResetEncoderRevs(baromesh::Linkbot *l);
+LIBLINKBOT_EXPORT int linkbotSetBuzzerFrequency(baromesh::Linkbot *l, float freq);
+LIBLINKBOT_EXPORT int linkbotSetJointSpeeds(baromesh::Linkbot *l, int mask, double j1, double j2, 
                           double j3);
-int linkbotSetJointStates(baromesh::Linkbot *l, int mask,
+LIBLINKBOT_EXPORT int linkbotSetJointStates(baromesh::Linkbot *l, int mask,
         barobo::JointState::Type s1, double d1,
         barobo::JointState::Type s2, double d2,
         barobo::JointState::Type s3, double d3);
-int linkbotSetJointStatesTimed(baromesh::Linkbot *l, int mask,
+LIBLINKBOT_EXPORT int linkbotSetJointStatesTimed(baromesh::Linkbot *l, int mask,
         barobo::JointState::Type s1, double d1, double timeout1, barobo::JointState::Type end1,
         barobo::JointState::Type s2, double d2, double timeout2, barobo::JointState::Type end2,
         barobo::JointState::Type s3, double d3, double timeout3, barobo::JointState::Type end3);
-int linkbotSetLedColor(baromesh::Linkbot *l, int r, int g, int b);
-int linkbotSetJointSafetyThresholds(baromesh::Linkbot *l, int mask, int t1, int t2, int t3);
-int linkbotSetJointSafetyAngles(baromesh::Linkbot *l, int mask, double t1, double t2, double t3);
+LIBLINKBOT_EXPORT int linkbotSetLedColor(baromesh::Linkbot *l, int r, int g, int b);
+LIBLINKBOT_EXPORT int linkbotSetJointSafetyThresholds(baromesh::Linkbot *l, int mask, int t1, int t2, int t3);
+LIBLINKBOT_EXPORT int linkbotSetJointSafetyAngles(baromesh::Linkbot *l, int mask, double t1, double t2, double t3);
 
 /* MOVEMENT */
-int linkbotMoveAccel(baromesh::Linkbot *l, int mask, int relativeMask,
+LIBLINKBOT_EXPORT int linkbotMoveAccel(baromesh::Linkbot *l, int mask, int relativeMask,
     double a0, double timeout0, barobo::JointState::Type endstate0,
     double a1, double timeout1, barobo::JointState::Type endstate1,
     double a2, double timeout2, barobo::JointState::Type endstate2);
-int linkbotMoveSmooth(baromesh::Linkbot *l, 
+LIBLINKBOT_EXPORT int linkbotMoveSmooth(baromesh::Linkbot *l, 
     int mask, int relativeMask, double a0, double a1, double a2);
-int linkbotMoveContinuous(baromesh::Linkbot *l, int mask, 
+LIBLINKBOT_EXPORT int linkbotMoveContinuous(baromesh::Linkbot *l, int mask, 
                           double d1, 
                           double d2, 
                           double d3);
-int linkbotDrive(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
-int linkbotDriveTo(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
-int linkbotMotorPower(baromesh::Linkbot*, int mask, int m1, int m2, int m3);
-int linkbotMove(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
-int linkbotMoveTo(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
-int linkbotStop(baromesh::Linkbot*, int mask);
+LIBLINKBOT_EXPORT int linkbotDrive(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
+LIBLINKBOT_EXPORT int linkbotDriveTo(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
+LIBLINKBOT_EXPORT int linkbotMotorPower(baromesh::Linkbot*, int mask, int m1, int m2, int m3);
+LIBLINKBOT_EXPORT int linkbotMove(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
+LIBLINKBOT_EXPORT int linkbotMoveTo(baromesh::Linkbot*, int mask, double j1, double j2, double j3);
+LIBLINKBOT_EXPORT int linkbotStop(baromesh::Linkbot*, int mask);
 
 /* CALLBACKS */
 #define SET_EVENT_CALLBACK(cbname) \
@@ -139,5 +145,7 @@ int linkbotSetEncoderEventCallback(baromesh::Linkbot* l,
 #ifdef __cplusplus
 } // extern "C"
 #endif
+
+#undef LINKBOT_EXPORT
 
 #endif
