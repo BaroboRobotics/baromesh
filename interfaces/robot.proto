@@ -180,6 +180,14 @@ message getBatteryVoltage {
     }
 }
 
+message getAdcRaw {
+    message In {
+    }
+    message Result {
+        repeated uint32 values = 1[packed=true, (nanopb).max_count=32];
+    }
+}
+
 message getMotorControllerSafetyThreshold {
     message In {
     }

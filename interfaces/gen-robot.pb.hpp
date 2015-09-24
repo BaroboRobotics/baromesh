@@ -9,6 +9,7 @@ RPCDEF_HPP(
         (barobo, Robot), (0, 2, 2),
         // all methods
         (getAccelerometerData)
+        (getAdcRaw)
         (getLedColor)
         (setLedColor)
         (getBuzzerFrequency)

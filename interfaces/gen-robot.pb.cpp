@@ -4,6 +4,7 @@
 RPCDEF_CPP((barobo, Robot),
         // all methods
         (getAccelerometerData)
+        (getAdcRaw)
         (getLedColor)
         (setLedColor)
         (getBuzzerFrequency)
