@@ -29,9 +29,15 @@ static CF::String getStringProperty (io_object_t device, CF::String key, bool re
 }
 
 static UniqueIoObject getUsbDeviceIterator () {
+    // OS X 10.11 overhauled the USB system, introducing the IOUSBHostDevice
+    // class name.
+    auto classes = IOServiceMatching("IOUSBHostDevice");
+    if (!classes) {
+        // Fall back to the IOUSBDevice class name--we are on 10.10 or less.
+        classes = IOServiceMatching(kIOUSBDeviceClassName);
+    }
     io_iterator_t iter;
-    auto kr = IOServiceGetMatchingServices(kIOMasterPortDefault,
-        IOServiceMatching(kIOUSBDeviceClassName), &iter);
+    auto kr = IOServiceGetMatchingServices(kIOMasterPortDefault, classes, &iter);
     if (kIOReturnSuccess != kr) {
         throw std::runtime_error("Could not get USB devices from the IORegistry.");
     }
@@ -39,6 +45,7 @@ static UniqueIoObject getUsbDeviceIterator () {
 }
 
 int dongleDevicePathImpl (char *buf, size_t len) {
+    boost::log::sources::logger lg;
     auto iter = getUsbDeviceIterator();
     while (auto device = UniqueIoObject{IOIteratorNext(iter)}) {
         for (auto i = 0; i < NUM_BAROBO_USB_DONGLE_IDS; ++i) {
@@ -46,21 +53,20 @@ int dongleDevicePathImpl (char *buf, size_t len) {
             auto expectedProduct = std::string(g_barobo_usb_dongle_ids[i].product);
 
             auto manufacturerValue = std::string(getStringProperty(device, "USB Vendor Name"));
-            auto productValue = std::string(getStringProperty(device, "USB Product Name"));
+            // The device also has a "USB Product Name" property which we ought to
+            // be able to use, but on 10.11, OS X mangles '-' to '_', and on 10.10
+            // and earlier, the string returned is not null-terminated. The USB
+            // product name is available unmangled as the device's registry entry
+            // name instead.
+            io_name_t buffer;
+            auto kr = IORegistryEntryGetNameInPlane(device, kIOServicePlane, buffer);
+            if (kIOReturnSuccess != kr) {
+                continue;
+            }
+            auto productValue = std::string(buffer);
 
-            // Some old dongles were shipped with a product string that Mac reads
-            // as the following garbage, written using C literal syntax. Separate
-            // literals are required because \x9aBa is a valid hex escape sequence.
-            //     "Barobo USB-Serial Adapter \xcc\x9a" "Barob"
-            // Rather than test for that exact string, modify the product string
-            // test to be true if the expected product string is a prefix of the
-            // device's product string.
             if (manufacturerValue == expectedManufacturer
-                && expectedProduct.size() <= productValue.size()
-                && expectedProduct.end() == std::mismatch(
-                    expectedProduct.begin(),
-                    expectedProduct.end(),
-                    productValue.begin()).first) {
+                && productValue == expectedProduct) {
                 auto path = std::string(getStringProperty(device, "IOCalloutDevice", true));
                 if (!access(path.c_str(), R_OK | W_OK)) {
                     // Success!
@@ -69,15 +75,12 @@ int dongleDevicePathImpl (char *buf, size_t len) {
                     return 0;
                 }
                 else if (EACCES == errno) {
-                    boost::log::sources::logger lg;
                     BOOST_LOG(lg) << "Dongle found at " << path << ", but user does not have "
                         << "sufficient read/write permissions.";
-                    
                 }
                 else {
                     char errbuf[256];
                     strerror_r(errno, errbuf, sizeof(errbuf));
-                    boost::log::sources::logger lg;
                     BOOST_LOG(lg) << "access(\"" << path << "\", R_OK|W_OK) failed: " << errbuf;
                 }
             }
