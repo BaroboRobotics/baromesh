@@ -65,8 +65,16 @@ int dongleDevicePathImpl (char *buf, size_t len) {
             }
             auto productValue = std::string(buffer);
 
+            // TODO: test if productValue is truly null-terminated properly on
+            // OS X 10.10. Until this is tested, we'll keep the old method of
+            // comparing product strings: true if the expected product string
+            // is a prefix of the device's product string.
             if (manufacturerValue == expectedManufacturer
-                && productValue == expectedProduct) {
+                && expectedProduct.size() <= productValue.size()
+                && expectedProduct.end() == std::mismatch(
+                    expectedProduct.begin(),
+                    expectedProduct.end(),
+                    productValue.begin()).first) {
                 auto path = std::string(getStringProperty(device, "IOCalloutDevice", true));
                 if (!access(path.c_str(), R_OK | W_OK)) {
                     // Success!
