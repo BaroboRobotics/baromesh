@@ -36,16 +36,6 @@ enum RadioPort {
     ROBOT_BUMPCONNECT = 4;
 }
 
-enum BumpConnectMessageType {
-    SYNC_SHOCK = 0; // Payload is BumpConnect_ArbitrateMaster
-    SET_SLAVE = 1; // Payload is BumpConnect_GroupInfo
-    SET_MASTER = 2; // Payload is BumpConnect_GroupInfo
-    SET_POWER = 3;
-    SET_POS = 4;
-    NEW_SLAVE = 5; // No Payload
-    UNPAIR = 6;
-}
-
 // Radio broadcast from the daemon to multiple robots.
 message RobotPing {
     repeated SerialId destinations = 1 [(nanopb).max_count = 8];
@@ -65,6 +55,20 @@ message RobotEvent {
 message SessionMessage {
     optional uint32 computerId = 1;
     required Payload payload = 2;
+}
+
+enum BumpConnectMessageType {
+    SYNC_SHOCK = 0; // Payload is BumpConnect_ArbitrateMaster
+    SET_SLAVE = 1; // Payload is BumpConnect_GroupInfo
+    SET_MASTER = 2; // Payload is BumpConnect_GroupInfo
+    SET_POWER = 3;
+    SET_POS = 4;
+    NEW_SLAVE = 5; // No Payload
+    UNPAIR = 6;
+    RECORD_POSE = 7;
+    GOTO_POSE = 8;
+    POSE_REACHED = 9;
+    PLAY_POSES = 10;
 }
 
 message BumpConnectMessage {
@@ -95,4 +99,12 @@ message BumpConnect_GroupInfo{
     required uint32 groupId = 1;
     required uint32 rgb = 2;
     optional SerialId masterId = 3;
+}
+
+message BumpConnect_RecordPose {
+    optional uint32 index = 1;
+}
+
+message BumpConnect_GoToPose {
+    required uint32 index = 1;
 }
