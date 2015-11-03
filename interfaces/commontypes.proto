@@ -69,6 +69,7 @@ enum BumpConnectMessageType {
     GOTO_POSE = 8;
     POSE_REACHED = 9;
     PLAY_POSES = 10;
+    CLEAR_POSES = 11;
 }
 
 message BumpConnectMessage {
