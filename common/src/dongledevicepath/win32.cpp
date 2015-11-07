@@ -26,16 +26,6 @@
 #define snprintf _snprintf
 #endif
 
-static void printPropStringList (PTCHAR s) {
-    _tprintf(_T("%s"), s);
-    s += _tcslen(s) + 1;
-    while (_tcslen(s)) {
-        _tprintf(_T("\n\t%s"), s);
-        s += _tcslen(s) + 1;
-    }
-    _tprintf(_T("\n"));
-}
-
 /* Allocate and return a buffer with property data in it. The size of the
  * buffer is returned in the output parameter size, the type of the property
  * is returned in the output parameter type. The caller must free the buffer
@@ -47,6 +37,7 @@ static PBYTE getPropertyBuf (HDEVINFO devices, PSP_DEVINFO_DATA dev,
     *size = 0;
     BOOL b = SetupDiGetDeviceRegistryProperty(devices, dev, key, NULL, NULL, 0, size);
     assert(!b);
+    (void)b;
 
     DWORD err = GetLastError();
     if (ERROR_INSUFFICIENT_BUFFER != err) {
