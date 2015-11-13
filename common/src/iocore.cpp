@@ -1,5 +1,7 @@
 #include "baromesh/iocore.hpp"
 
+#include <boost/utility/in_place_factory.hpp>
+
 #include <boost/log/sources/record_ostream.hpp>
 
 #include <exception>
