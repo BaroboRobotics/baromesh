@@ -72,10 +72,8 @@ int dongleDevicePathImpl (char *buf, size_t len) {
     auto iter = getUsbDeviceIterator();
     while (auto device = UniqueIoObject{IOIteratorNext(iter)}) {
         for (auto i = 0; i < NUM_BAROBO_USB_DONGLE_IDS; ++i) {
-            auto expectedManufacturer = std::string(g_barobo_usb_dongle_ids[i].manufacturer);
             auto expectedProduct = std::string(g_barobo_usb_dongle_ids[i].product);
 
-            auto manufacturerValue = std::string(getStringProperty(device, "USB Vendor Name"));
             // The device also has a "USB Product Name" property which we ought to
             // be able to use, but on 10.11, OS X mangles '-' to '_', and on 10.10
             // and earlier, the string returned is not null-terminated. The USB
@@ -92,8 +90,7 @@ int dongleDevicePathImpl (char *buf, size_t len) {
             // OS X 10.10. Until this is tested, we'll keep the old method of
             // comparing product strings: true if the expected product string
             // is a prefix of the device's product string.
-            if (manufacturerValue == expectedManufacturer
-                && expectedProduct.size() <= productValue.size()
+            if (expectedProduct.size() <= productValue.size()
                 && expectedProduct.end() == std::mismatch(
                     expectedProduct.begin(),
                     expectedProduct.end(),

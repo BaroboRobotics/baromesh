@@ -3,17 +3,16 @@
 #include "baromesh/system_error.hpp"
 
 struct usb_dongle_id {
-  const char *manufacturer;
   const char *product;
 };
 
-/* List of valid Barobo dongle manufacturer and product strings. The platform-
- * specific Mobot_dongleGetTTY() functions should depend on this data for
- * finding the dongle. Update this list as necessary. */
+/* List of valid Barobo dongle product strings. The platform-specific
+ * dongleDevicePath() functions should depend on this data for finding the
+ * dongle. Update this list as necessary. */
 static const usb_dongle_id g_barobo_usb_dongle_ids[] = {
-    { "Barobo, Inc.", "Mobot USB-Serial Adapter" },
-    { "Barobo, Inc.", "Linkbot USB-Serial Adapter" },
-    { "Barobo, Inc.", "Barobo USB-Serial Adapter" },
+    { "Mobot USB-Serial Adapter" },
+    { "Linkbot USB-Serial Adapter" },
+    { "Barobo USB-Serial Adapter" },
 };
 
 static int dongleDevicePathImpl(char *, size_t);

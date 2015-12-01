@@ -23,7 +23,6 @@
 namespace fs = boost::filesystem;
 
 bool findTtyPath (std::string& output,
-        std::string expectedManufacturer,
         std::string expectedProduct) {
     using namespace std::placeholders;
 
@@ -59,21 +58,16 @@ bool findTtyPath (std::string& output,
 
         // For each USB device on the system ...
         for (fs::path usbSs : subsystems("usb", sysDevices)) {
-            auto manufacturerPath = usbSs.parent_path() / "manufacturer";
             auto productPath = usbSs.parent_path() / "product";
 
-            // that has manufacturer and product entries ...
-            if (fs::exists(manufacturerPath) && fs::exists(productPath)) {
-                std::string manufacturer;
-                fs::ifstream manufacturerStream{manufacturerPath};
-                std::getline(manufacturerStream, manufacturer);
-
+            // that has a product entry ...
+            if (fs::exists(productPath)) {
                 std::string product;
                 fs::ifstream productStream{productPath};
                 std::getline(productStream, product);
 
-                // which matches the dongle's expected strings ...
-                if (manufacturer == expectedManufacturer && product == expectedProduct) {
+                // which matches the dongle's expected string ...
+                if (product == expectedProduct) {
                     // find its associated TTY device path.
                     for (fs::path ttySs : subsystems("tty", usbSs.parent_path())) {
                         auto uePath = ttySs.parent_path() / "uevent";
@@ -100,7 +94,6 @@ int dongleDevicePathImpl (char *buf, size_t len) {
     std::string path;
     for (auto i = 0; i < NUM_BAROBO_USB_DONGLE_IDS; ++i) {
         if (findTtyPath(path,
-                g_barobo_usb_dongle_ids[i].manufacturer,
                 g_barobo_usb_dongle_ids[i].product)) {
             if (!access(path.c_str(), R_OK | W_OK)) {
                 auto nWritten = snprintf(buf, len, "%s", path.c_str());

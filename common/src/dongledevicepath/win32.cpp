@@ -97,17 +97,10 @@ static void dumpProperties (HDEVINFO devices, PSP_DEVINFO_DATA dev) {
 #endif
 
 static int isDongle (HDEVINFO devices, PSP_DEVINFO_DATA dev) {
-  char manufacturer[64];
   char product[64];
 
   DWORD size = 0;
   DWORD type = 0;
-
-  TCHAR *m = (TCHAR *)getPropertyBuf(devices, dev, SPDRP_MFG, &size, &type);
-  if (!m) {
-    return 0;
-  }
-  assert(REG_SZ == type);
 
   TCHAR *p= (TCHAR *)getPropertyBuf(devices, dev, SPDRP_DEVICEDESC, &size, &type);
   if (!p) {
@@ -116,26 +109,21 @@ static int isDongle (HDEVINFO devices, PSP_DEVINFO_DATA dev) {
   assert(REG_SZ == type);
 
 #if defined(UNICODE) || defined(_UNICODE)
-  size_t retm = wcstombs(manufacturer, m, sizeof(manufacturer));
   size_t retp = wcstombs(product, p, sizeof(product));
 #else
-  strncpy(manufacturer, m, sizeof(manufacturer));
   strncpy(product, p, sizeof(product));
 #endif
 
-  free(m);
   free(p);
-  m = NULL;
   p = NULL;
 
 #if defined(UNICODE) || defined(_UNICODE)
-  if (sizeof(manufacturer) <= retm || sizeof(product) <= retp) {
+  if (sizeof(product) <= retp) {
     fprintf(stderr, "(barobo) WARNING: buffer overflow or failed Unicode conversion in isDongle()\n");
     return 0;
   }
 #else
-  if (sizeof(manufacturer) == strlen(manufacturer)
-      || sizeof(product) == strlen(product)) {
+  if (sizeof(product) == strlen(product)) {
     fprintf(stderr, "(barobo) WARNING: buffer overflow in isDongle()\n");
     return 0;
   }
@@ -143,8 +131,7 @@ static int isDongle (HDEVINFO devices, PSP_DEVINFO_DATA dev) {
 
   size_t i;
   for (i = 0; i < NUM_BAROBO_USB_DONGLE_IDS; ++i) {
-    if (!strcmp(manufacturer, g_barobo_usb_dongle_ids[i].manufacturer)
-        || !strcmp(product, g_barobo_usb_dongle_ids[i].product)) {
+    if (!strcmp(product, g_barobo_usb_dongle_ids[i].product)) {
       return 1;
     }
   }
