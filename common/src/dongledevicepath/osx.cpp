@@ -1,5 +1,7 @@
 #include "osx_uniqueioobject.hpp"
 
+#include "baromesh/system_error.hpp"
+
 #include <boost/log/sources/logger.hpp>
 #include <boost/log/sources/record_ostream.hpp>
 
@@ -66,57 +68,56 @@ static UniqueIoObject getUsbDeviceIterator () {
     return UniqueIoObject{iter};
 }
 
-int dongleDevicePathImpl (char *buf, size_t len) {
+std::string dongleDevicePathImpl (boost::system::error_code& ec) {
     boost::log::sources::logger lg;
-
-    auto iter = getUsbDeviceIterator();
-    while (auto device = UniqueIoObject{IOIteratorNext(iter)}) {
-        for (auto i = 0; i < NUM_BAROBO_USB_DONGLE_IDS; ++i) {
-            auto expectedProduct = std::string(g_barobo_usb_dongle_ids[i].product);
-
-            // The device also has a "USB Product Name" property which we ought to
-            // be able to use, but on 10.11, OS X mangles '-' to '_', and on 10.10
-            // and earlier, the string returned is not null-terminated. The USB
-            // product name is available unmangled as the device's registry entry
-            // name instead.
-            io_name_t buffer;
-            auto kr = IORegistryEntryGetNameInPlane(device, kIOServicePlane, buffer);
-            if (kIOReturnSuccess != kr) {
-                continue;
-            }
-            auto productValue = std::string(buffer);
-
-            // TODO: test if productValue is truly null-terminated properly on
-            // OS X 10.10. Until this is tested, we'll keep the old method of
-            // comparing product strings: true if the expected product string
-            // is a prefix of the device's product string.
-            if (expectedProduct.size() <= productValue.size()
-                && expectedProduct.end() == std::mismatch(
-                    expectedProduct.begin(),
-                    expectedProduct.end(),
-                    productValue.begin()).first) {
-                auto path = std::string(getStringProperty(device, "IOCalloutDevice", true));
-                if (!path.length()) {
-                    BOOST_LOG(lg) << "Found dongle in IORegistry, but no IOCalloutDevice";
+    ec = baromesh::Status::DONGLE_NOT_FOUND;
+    try {
+        auto iter = getUsbDeviceIterator();
+        while (auto device = UniqueIoObject{IOIteratorNext(iter)}) {
+            for (auto& expectedProduct : usbDongleProductStrings()) {
+                // The device also has a "USB Product Name" property which we ought to
+                // be able to use, but on 10.11, OS X mangles '-' to '_', and on 10.10
+                // and earlier, the string returned is not null-terminated. The USB
+                // product name is available unmangled as the device's registry entry
+                // name instead.
+                io_name_t buffer;
+                auto kr = IORegistryEntryGetNameInPlane(device, kIOServicePlane, buffer);
+                if (kIOReturnSuccess != kr) {
                     continue;
                 }
-                if (!access(path.c_str(), R_OK | W_OK)) {
-                    // Success!
-                    strncpy(buf, path.c_str(), len);
-                    buf[len-1] = 0;
-                    return 0;
-                }
-                else if (EACCES == errno) {
-                    BOOST_LOG(lg) << "Dongle found at " << path << ", but user does not have "
-                        << "sufficient read/write permissions.";
-                }
-                else {
-                    char errbuf[256];
-                    strerror_r(errno, errbuf, sizeof(errbuf));
-                    BOOST_LOG(lg) << "access(\"" << path << "\", R_OK|W_OK) failed: " << errbuf;
+                auto productValue = std::string(buffer);
+
+                // TODO: test if productValue is truly null-terminated properly on
+                // OS X 10.10. Until this is tested, we'll keep the old method of
+                // comparing product strings: true if the expected product string
+                // is a prefix of the device's product string.
+                if (expectedProduct.size() <= productValue.size()
+                    && expectedProduct.end() == std::mismatch(
+                        expectedProduct.begin(),
+                        expectedProduct.end(),
+                        productValue.begin()).first) {
+                    auto path = std::string(getStringProperty(device, "IOCalloutDevice", true));
+                    if (!path.length()) {
+                        BOOST_LOG(lg) << "Found dongle in IORegistry, but no IOCalloutDevice";
+                        continue;
+                    }
+                    if (!access(path.c_str(), R_OK | W_OK)) {
+                        ec = baromesh::Status::OK;
+                    }
+                    else {
+                        ec = boost::system::error_code{errno, boost::system::generic_category()};
+                        BOOST_LOG(lg) << "Error accessing dongle at " << path << ": " << ec.message();
+                    }
+                    return path;
                 }
             }
         }
     }
-    return -1;
+    catch (boost::system::system_error& e) {
+        ec = e.code();
+    }
+    catch (std::exception& e) {
+        BOOST_LOG(lg) << "Exception getting dongle device path: " << e.what();
+    }
+    return "";
 }

@@ -1,3 +1,5 @@
+#include "baromesh/system_error.hpp"
+
 #include <boost/algorithm/string/predicate.hpp>
 
 #include <boost/filesystem.hpp>
@@ -89,29 +91,30 @@ bool findTtyPath (std::string& output,
     return false;
 }
 
-int dongleDevicePathImpl (char *buf, size_t len) {
-    boost::log::sources::logger log;
-    std::string path;
-    for (auto i = 0; i < NUM_BAROBO_USB_DONGLE_IDS; ++i) {
-        if (findTtyPath(path,
-                g_barobo_usb_dongle_ids[i].product)) {
-            if (!access(path.c_str(), R_OK | W_OK)) {
-                auto nWritten = snprintf(buf, len, "%s", path.c_str());
-                if (nWritten >= len) {
-                    BOOST_LOG(log) << "Buffer overflow copying device path: "
-                                   << buf << " (... and "
-                                   << path.length() - len + 1
-                                   << " more characters)";
+std::string dongleDevicePathImpl (boost::system::error_code& ec) {
+    boost::log::sources::logger lg;
+    ec = baromesh::Status::DONGLE_NOT_FOUND;
+    try {
+        std::string path;
+        for (auto& expectedProduct : usbDongleProductStrings()) {
+            if (findTtyPath(path,
+                    expectedProduct)) {
+                if (!access(path.c_str(), R_OK | W_OK)) {
+                    ec = baromesh::Status::OK;
                 }
                 else {
-                    return 0;
+                    ec = boost::system::error_code{errno, boost::system::generic_category()};
+                    BOOST_LOG(lg) << "Error accessing dongle at " << path << ": " << ec.message();
                 }
-            }
-            else {
-                auto ec = boost::system::error_code{errno, boost::system::generic_category()};
-                BOOST_LOG(log) << "Error accessing dongle at " << path << ": " << ec.message();
+                return path;
             }
         }
     }
-    return -1;
+    catch (boost::system::system_error& e) {
+        ec = e.code();
+    }
+    catch (std::exception& e) {
+        BOOST_LOG(lg) << "Exception getting dongle device path: " << e.what();
+    }
+    return "";
 }

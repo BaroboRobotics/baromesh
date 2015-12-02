@@ -7,10 +7,10 @@ set(VERSION_PATCH 0)
 set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
 
 if(WIN32 AND NOT CMAKE_COMPILER_IS_GNUCXX)
-  add_definitions("-D_ALLOW_KEYWORD_MACROS")
-  #set_target_properties(${target} PROPERTIES
-  #  COMPILE_FLAGS "-D_ALLOW_KEYWORD_MACROS"
-  #)
+    add_definitions("-D_ALLOW_KEYWORD_MACROS")
+    #set_target_properties(${target} PROPERTIES
+    #  COMPILE_FLAGS "-D_ALLOW_KEYWORD_MACROS"
+    #)
 endif()
 
 # Linking statically to Boost is easier for prototyping. For multi-module
@@ -20,7 +20,7 @@ set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.54.0 REQUIRED COMPONENTS system chrono log thread program_options)
 
 if(APPLE)
-  add_subdirectory(CFPP)
+    add_subdirectory(CFPP)
 endif()
 
 set(SOURCES
@@ -48,9 +48,7 @@ target_link_libraries(baromesh-common
     )
 
 if(WIN32)
-    target_link_libraries(baromesh-common
-        PRIVATE setupapi 
-        )
+    target_link_libraries(baromesh-common PRIVATE setupapi)
 elseif(APPLE)
     find_library(coreFoundationLib CoreFoundation)
     find_library(ioKitLib IOKit)
