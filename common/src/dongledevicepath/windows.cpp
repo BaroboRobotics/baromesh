@@ -6,10 +6,12 @@
 #include <boost/log/sources/logger.hpp>
 #include <boost/log/sources/record_ostream.hpp>
 
+#include <iomanip>
 #include <memory>
 
-#include "windowsguids.hpp"
-#include "windowserror.hpp"
+#include "windows_guids.hpp"
+#include "windows_error.hpp"
+#include "windows_utf.hpp"
 
 #include <windows.h>
 #include <setupapi.h>
@@ -39,25 +41,62 @@ static bool isWin7OrGreater () {
     return !!fn_SetupDiGetDevicePropertyW();
 }
 
+static std::shared_ptr<void> makeDeviceList (const GUID* classGuid, const char* enumerator) {
+    auto diList = SetupDiGetClassDevs(classGuid, enumerator, nullptr, DIGCF_PRESENT);
+    if (INVALID_HANDLE_VALUE == diList) {
+        auto err = GetLastError();
+        throw WindowsError{"SetupDiGetClassDevs", err};
+    }
+    return std::shared_ptr<void>(diList, SetupDiDestroyDeviceInfoList);
+}
+
 class Device : public SP_DEVINFO_DATA {
 public:
+    std::string productString () {
+        // The Windows 10 in-box usbser.sys driver reports the product
+        // string the DEVPKEY way.
+        return isWin7OrGreater()
+            ? getProperty(&DEVPKEY_Device_BusReportedDeviceDesc)
+            : getRegistryProperty(SPDRP_DEVICEDESC);
+    }
+
+    std::string path () {
+        boost::log::sources::logger lg;
+        // The friendly name will be something like "Some Device (COM17)",
+        // in which case we would want to return "\\.\COM17".
+        // \\.\ is the Windows equivalent of /dev in Linux.
+        auto friendly = getRegistryProperty(SPDRP_FRIENDLYNAME);
+        friendly.erase(friendly.find_last_of(')'));
+        auto first = friendly.find_last_of('(');
+        if (std::string::npos != first) {
+            friendly.replace(0, first + 1, "\\\\.\\");
+            return friendly;
+        }
+        throw "USB serial device has no path";
+        return {};
+    }
+
+private:
     Device (std::shared_ptr<void> handle) : mHandle(handle) {}
 
-    std::string registryProperty (DWORD key) {
+    std::string getRegistryProperty (DWORD key) {
         DWORD type;
         DWORD size = 0;
-        if (!SetupDiGetDeviceRegistryPropertyA(mHandle.get(), this, key,
-                                               &type, nullptr, 0, &size)) {
+        if (!SetupDiGetDeviceRegistryPropertyA(mHandle.get(), this,
+                                               key, &type,
+                                               nullptr, 0,
+                                               &size)) {
             auto err = GetLastError();
             if (ERROR_INSUFFICIENT_BUFFER != err) {
                 throw WindowsError{"SetupDiGetDeviceRegistryProperty", err};
             }
         }
 
-        auto buf = std::string(size, 0);
-
-        if (!SetupDiGetDeviceRegistryPropertyA(mHandle.get(), this, key,
-                                               &type, PBYTE(buf.data()), size, nullptr)) {
+        auto result = std::vector<char>(size);
+        if (!SetupDiGetDeviceRegistryPropertyA(mHandle.get(), this,
+                                               key, &type,
+                                               PBYTE(result.data()), size,
+                                               nullptr)) {
             throw WindowsError{"SetupDiGetDeviceRegistryProperty", GetLastError()};
         }
 
@@ -65,25 +104,32 @@ public:
             throw std::runtime_error{"Registry property is not a string"};
         }
 
-        return buf;
+        return result.data();
     }
 
-    std::string property (const DEVPROPKEY* key) {
+    std::string getProperty (const DEVPROPKEY* key) {
         DEVPROPTYPE type;
         DWORD size = 0;
         assert(isWin7OrGreater());
-        if (!fn_SetupDiGetDevicePropertyW()(mHandle.get(), this, key,
-                                       &type, nullptr, 0, &size, 0)) {
+        if (!fn_SetupDiGetDevicePropertyW()(mHandle.get(), this,
+                                            key, &type,
+                                            nullptr, 0,
+                                            &size, 0)) {
             auto err = GetLastError();
             if (ERROR_INSUFFICIENT_BUFFER != err) {
                 throw WindowsError{"SetupDiGetDeviceProperty", err};
             }
         }
 
-        auto buf = std::string(size, 0);
-
-        if (!fn_SetupDiGetDevicePropertyW()(mHandle.get(), this, key,
-                                       &type, PBYTE(buf.data()), size, nullptr, 0)) {
+        // If the requested size is not a multiple of wstring's element type,
+        // bump it to the next multiple.
+        const auto wcSize = sizeof(std::wstring::value_type);
+        size = (size - 1) + wcSize - (size - 1) % wcSize;
+        auto result = std::vector<std::wstring::value_type>(size / wcSize);
+        if (!fn_SetupDiGetDevicePropertyW()(mHandle.get(), this,
+                                            key, &type,
+                                            PBYTE(result.data()), size,
+                                            nullptr, 0)) {
             throw WindowsError{"SetupDiGetDeviceProperty", GetLastError()};
         }
 
@@ -91,10 +137,9 @@ public:
             throw std::runtime_error{"Registry property is not a string"};
         }
 
-        return buf;
+        return toUtf8(result.data());
     }
 
-private:
     // Intrusive iterator, to save on copying HDEVINFO shared_ptrs around.
     friend class DeviceIterator;
     std::shared_ptr<void> mHandle;
@@ -106,16 +151,26 @@ class DeviceIterator
     > {
 public:
     DeviceIterator ()
-        : mIndex(kEnd), mDevice(nullptr) {}
+        : mIndex(kEnd), mDevice(nullptr)
+    {}
 
+    friend DeviceIterator begin (const DeviceIterator&) {
+        return DeviceIterator{makeDeviceList(&GUID_DEVCLASS_PORTS, "USB")};
+    }
+
+    friend DeviceIterator end (const DeviceIterator&) {
+        return DeviceIterator{};
+    }
+
+private:
+    friend class boost::iterator_core_access;
+
+    // Create a new begin iterator
     DeviceIterator (std::shared_ptr<void> handle)
         : mIndex(kBegin), mDevice(handle)
     {
         increment();
     }
-
-private:
-    friend class boost::iterator_core_access;
 
     void increment () {
         if (kEnd != mIndex) {
@@ -149,59 +204,18 @@ private:
     Device mDevice;
 };
 
-class DeviceList {
-public:
-    DeviceList (const GUID* classGuid, const char* enumerator)
-        : mHandle(makeDiList(classGuid, enumerator), SetupDiDestroyDeviceInfoList)
-    {}
-
-    DeviceIterator begin () { return { mHandle }; }
-    DeviceIterator end () { return {}; }
-
-private:
-    static HDEVINFO makeDiList (const GUID* classGuid, const char* enumerator) {
-        auto diList = SetupDiGetClassDevs(classGuid, enumerator, nullptr, DIGCF_PRESENT);
-        if (INVALID_HANDLE_VALUE == diList) {
-            auto err = GetLastError();
-            throw WindowsError{"SetupDiGetClassDevs", err};
-        }
-        return diList;
-    }
-
-    std::shared_ptr<void> mHandle;
-};
-
 /* Find an attached dongle device and return the COM port name via the output
  * parameter tty. tty is a user-supplied buffer of size len. Return the COM
  * port number, if anyone cares. On error, return -1. */
 std::string dongleDevicePathImpl (boost::system::error_code& ec) {
     boost::log::sources::logger lg;
-    BOOST_LOG(lg) << "Windows 7? " << isWin7OrGreater();
     ec = baromesh::Status::DONGLE_NOT_FOUND;
     try {
-        /* Get all USB devices that provide a serial or parallel port interface. */
-        auto usbSerialDevices = DeviceList{&GUID_DEVCLASS_PORTS, "USB"};
-        /* Now iterate over each device in the COM port interface class. */
-        for (auto& device : usbSerialDevices) {
-            // The Windows 10 in-box usbser.sys driver reports the product
-            // string the DEVPKEY way.
-            auto productValue = isWin7OrGreater()
-                ? device.property(&DEVPKEY_Device_BusReportedDeviceDesc)
-                : device.registryProperty(SPDRP_DEVICEDESC);
-            BOOST_LOG(lg) << "productValue: " << productValue;
-            if (usbDongleProductStrings().count(productValue)) {
-                auto path = device.registryProperty(SPDRP_FRIENDLYNAME);
-                BOOST_LOG(lg) << "friendly name: " << path;
-                auto first = path.find_last_of('(');
-                auto last = path.find_last_of(')');
-                if (first >= last || std::string::npos == first || std::string::npos == last) {
-                    throw std::runtime_error("Dongle found but it has no device path");
-                }
-                path.replace(0, first + 1, "\\\\.\\");
-                path.erase(last);
+        // Iterate through USB CDC devices
+        for (auto& device : DeviceIterator{}) {
+            if (usbDongleProductStrings().count(device.productString())) {
                 ec = baromesh::Status::OK;
-                BOOST_LOG(lg) << "path: " << path;
-                return path;
+                return device.path();
             }
         }
     }

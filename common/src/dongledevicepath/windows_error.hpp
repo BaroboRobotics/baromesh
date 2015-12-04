@@ -1,5 +1,5 @@
-#ifndef _WIN32_ERROR_H_
-#define _WIN32_ERROR_H_
+#ifndef DONGLEDEVICEPATH_WINDOWS_ERROR_HPP
+#define DONGLEDEVICEPATH_WINDOWS_ERROR_HPP
 
 #ifndef _WIN32
 #error win32_error.h is a Windows-specific header file.
