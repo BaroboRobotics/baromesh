@@ -5,12 +5,13 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 
-#include <boost/iterator/filter_iterator.hpp>
-
 #include <boost/log/sources/logger.hpp>
 #include <boost/log/sources/record_ostream.hpp>
 
+#include <boost/range/adaptor/filtered.hpp>
+#include <boost/range/adaptor/transformed.hpp>
 #include <boost/range/iterator_range.hpp>
+#include <boost/range.hpp>
 
 #include <boost/system/error_code.hpp>
 
@@ -23,90 +24,126 @@
 #include <unistd.h>
 
 namespace fs = boost::filesystem;
+using namespace boost::adaptors;
 
-bool findTtyPath (std::string& output,
-        std::string expectedProduct) {
-    using namespace std::placeholders;
+class Device {
+public:
+    Device () = default;
+    Device (std::string path, std::string productString, fs::path sysfsUsbPath, fs::path sysfsTtyPath)
+        : mPath(path), mProductString(productString), mSysfsUsbPath(sysfsUsbPath), mSysfsTtyPath(sysfsTtyPath)
+    {}
 
-    std::string sysfs{"/sys"};
-    auto sysfsPtr = std::getenv("SYSFS_PATH");
-    if (sysfsPtr) {
-        sysfs = sysfsPtr;
+    const std::string& path () const {
+        return mPath;
     }
 
-    auto sysDevices = fs::path{sysfs + "/devices"};
+    const std::string& productString () const {
+        return mProductString;
+    }
 
-    if (fs::exists(sysDevices) && fs::is_directory(sysDevices)) {
-        // True if a path is a subsystem symlink matching ss.
-        auto isSubsystemSymlink = [] (const fs::path& ss, const fs::path& p) {
-            return p.filename() == "subsystem" &&
-                   fs::read_symlink(p).filename() == ss;
-        };
+    const fs::path& sysfsUsbPath () const { return mSysfsUsbPath; }
+    const fs::path& sysfsTtyPath () const { return mSysfsTtyPath; }
 
-        // Make an iterator which filters directory entries by isSubsystemSymlink.
-        auto makeSubsystemFilter = [=] (fs::path ss, fs::recursive_directory_iterator iter) {
-            return boost::make_filter_iterator(
-                std::bind(isSubsystemSymlink, ss, _1),
-                iter,
-                fs::recursive_directory_iterator{});
-        };
+private:
+    std::string mPath;
+    std::string mProductString;
+    fs::path mSysfsUsbPath;
+    fs::path mSysfsTtyPath;
+};
 
-        // Make an object we can for (x : y) over.
-        auto subsystems = [=] (const fs::path& ss, const fs::path& root) {
-            return boost::make_iterator_range(
-                makeSubsystemFilter(ss, fs::recursive_directory_iterator{root}),
-                makeSubsystemFilter(ss, fs::recursive_directory_iterator{}));
-        };
+static fs::path sysDevices () {
+    auto sysEnv = std::getenv("SYSFS_PATH");
+    auto sd = fs::path{sysEnv ? sysEnv : "/sys"} / "devices";
+    if (!fs::exists(sd) || !fs::is_directory(sd)) {
+        throw std::runtime_error("No sysfs");
+    }
+    return sd;
+}
 
-        // For each USB device on the system ...
-        for (fs::path usbSs : subsystems("usb", sysDevices)) {
-            auto productPath = usbSs.parent_path() / "product";
+static boost::iterator_range<fs::recursive_directory_iterator>
+traverseDir (const fs::path& root) {
+    return boost::make_iterator_range(
+        fs::recursive_directory_iterator{root},
+        fs::recursive_directory_iterator{});
+};
 
-            // that has a product entry ...
-            if (fs::exists(productPath)) {
-                std::string product;
-                fs::ifstream productStream{productPath};
-                std::getline(productStream, product);
+// For use with Boost.Range's filtered adaptor
+struct BySubsystem {
+    std::string mTarget;
+    BySubsystem () = default;
+    explicit BySubsystem (const std::string& target) : mTarget(target) {}
+    // True if p has a child subsystem symlink matching target.
+    bool operator() (const fs::path& p) const {
+        auto ec = boost::system::error_code{};
+        auto subsystem = fs::read_symlink(p / "subsystem", ec);
+        return !ec && subsystem.filename() == mTarget;
+    };
+};
 
-                // which matches the dongle's expected string ...
-                if (product == expectedProduct) {
-                    // find its associated TTY device path.
-                    for (fs::path ttySs : subsystems("tty", usbSs.parent_path())) {
-                        auto uePath = ttySs.parent_path() / "uevent";
-                        if (fs::exists(uePath)) {
-                            fs::ifstream ueStream{uePath};
-                            while (std::getline(ueStream, output)) {
-                                auto key = std::string{"DEVNAME="};
-                                if (boost::algorithm::starts_with(output, key)) {
-                                    output.replace(0, key.length(), "/dev/");
-                                    return true;
-                                }
-                            }
-                        }
+// For use with Boost.Range transformed adaptor
+static Device toDevice (const fs::path& p) {
+    auto productPath = p / "product";
+    if (fs::exists(productPath)) {
+        std::string productString;
+        fs::ifstream productStream{productPath};
+        std::getline(productStream, productString);
+        for (const auto& tty : traverseDir(p)
+                               | filtered(BySubsystem{"tty"})) {
+            auto uePath = tty / "uevent";
+            if (fs::exists(uePath)) {
+                std::string path;
+                fs::ifstream ueStream{uePath};
+                const auto key = std::string("DEVNAME=");
+                while (std::getline(ueStream, path)) {
+                    if (boost::algorithm::starts_with(path, key)) {
+                        path.replace(0, key.length(), "/dev/");
+                        return Device{path, productString, p, tty};
                     }
                 }
             }
         }
     }
-    return false;
+    return Device{};
+}
+
+static bool deviceIsValid (const Device& d) {
+    return d.path().size() && d.productString().size();
+}
+
+// TODO get rid of this when we switch to C++14 and use "auto devices () { }"
+// instead.
+using DeviceRange
+    = boost::filtered_range<
+        decltype(&deviceIsValid),
+        const boost::transformed_range<
+            decltype(&toDevice),
+            const boost::filtered_range<
+                BySubsystem,
+                const decltype(traverseDir(sysDevices()))
+            >
+        >
+    >;
+
+static DeviceRange devices () {
+    return traverseDir(sysDevices())
+        | filtered(BySubsystem{"usb"})
+        | transformed(toDevice)
+        | filtered(deviceIsValid)
+        ;
 }
 
 std::string dongleDevicePathImpl (boost::system::error_code& ec) {
     boost::log::sources::logger lg;
     ec = baromesh::Status::DONGLE_NOT_FOUND;
     try {
-        std::string path;
-        for (auto& expectedProduct : usbDongleProductStrings()) {
-            if (findTtyPath(path,
-                    expectedProduct)) {
-                if (!access(path.c_str(), R_OK | W_OK)) {
-                    ec = baromesh::Status::OK;
-                }
-                else {
-                    ec = boost::system::error_code{errno, boost::system::generic_category()};
-                    BOOST_LOG(lg) << "Error accessing dongle at " << path << ": " << ec.message();
-                }
-                return path;
+        for (auto d : devices()) {
+            BOOST_LOG(lg) << "Detected " << d.productString() << " at " << d.path()
+                          << "(" << d.sysfsUsbPath() << " ; " << d.sysfsTtyPath() << ")";
+        }
+        for (auto device : devices()) {
+            if (usbDongleProductStrings().count(device.productString())) {
+                ec = baromesh::Status::OK;
+                return device.path();
             }
         }
     }
@@ -116,5 +153,5 @@ std::string dongleDevicePathImpl (boost::system::error_code& ec) {
     catch (std::exception& e) {
         BOOST_LOG(lg) << "Exception getting dongle device path: " << e.what();
     }
-    return "";
+    return {};
 }

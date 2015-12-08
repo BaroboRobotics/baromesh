@@ -52,18 +52,10 @@ static std::shared_ptr<void> makeDeviceList (const GUID* classGuid, const char* 
 
 class Device : public SP_DEVINFO_DATA {
 public:
-    std::string productString () {
-        // The Windows 10 in-box usbser.sys driver reports the product
-        // string the DEVPKEY way.
-        return isWin7OrGreater()
-            ? getProperty(&DEVPKEY_Device_BusReportedDeviceDesc)
-            : getRegistryProperty(SPDRP_DEVICEDESC);
-    }
-
     std::string path () {
         boost::log::sources::logger lg;
-        // The friendly name will be something like "Some Device (COM17)",
-        // in which case we would want to return "\\.\COM17".
+        // The friendly name will be something like "Some Device (COM3)",
+        // in which case we would want to return "\\.\COM3".
         // \\.\ is the Windows equivalent of /dev in Linux.
         auto friendly = getRegistryProperty(SPDRP_FRIENDLYNAME);
         friendly.erase(friendly.find_last_of(')'));
@@ -74,6 +66,14 @@ public:
         }
         throw "USB serial device has no path";
         return {};
+    }
+
+    std::string productString () {
+        // The Windows 10 in-box usbser.sys driver reports the product
+        // string the DEVPKEY way.
+        return isWin7OrGreater()
+            ? getProperty(&DEVPKEY_Device_BusReportedDeviceDesc)
+            : getRegistryProperty(SPDRP_DEVICEDESC);
     }
 
 private:
@@ -225,5 +225,5 @@ std::string dongleDevicePathImpl (boost::system::error_code& ec) {
     catch (std::exception& e) {
         BOOST_LOG(lg) << "Exception getting dongle device path: " << e.what();
     }
-    return "";
+    return {};
 }

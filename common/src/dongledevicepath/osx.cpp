@@ -22,6 +22,28 @@
 #include <string.h>
 #include <unistd.h>
 
+static unsigned darwinVersionMajor () {
+    static auto v = [] {
+        char osRelease[256];
+        size_t osReleaseSize = sizeof(osRelease);
+        auto rc = sysctlbyname("kern.osrelease", osRelease, &osReleaseSize, nullptr, 0);
+        if (rc) {
+            throw std::runtime_error("Error getting Darwin version string with sysctlbyname");
+        }
+        assert(osReleaseSize <= sizeof(osRelease));
+        auto darwinVersionString = std::string(osRelease, osReleaseSize);
+
+        std::vector<decltype(darwinVersionString)> splitResult;
+        using CharT = decltype(darwinVersionString)::value_type;
+        boost::split(splitResult, darwinVersionString, [] (CharT c) { return c == '.'; });
+        if (splitResult.size() < 3) {
+            throw std::runtime_error("Error parsing Darwin version string");
+        }
+        return boost::lexical_cast<unsigned>(splitResult[0]);
+    }();
+    return v;
+}
+
 static CF::String getStringProperty (io_object_t device, CF::String key, bool recursive=false) {
     auto valueRef = IORegistryEntrySearchCFProperty(device,
         kIOServicePlane, key, 
@@ -33,25 +55,6 @@ static CF::String getStringProperty (io_object_t device, CF::String key, bool re
         CFRelease(valueRef);
     }
     return value;
-}
-
-static unsigned darwinVersionMajor () {
-    char osRelease[256];
-    size_t osReleaseSize = sizeof(osRelease);
-    auto rc = sysctlbyname("kern.osrelease", osRelease, &osReleaseSize, nullptr, 0);
-    if (rc) {
-        throw std::runtime_error("Error getting Darwin version string with sysctlbyname");
-    }
-    assert(osReleaseSize <= sizeof(osRelease));
-    auto darwinVersionString = std::string(osRelease, osReleaseSize);
-
-    std::vector<decltype(darwinVersionString)> splitResult;
-    using CharT = decltype(darwinVersionString)::value_type;
-    boost::split(splitResult, darwinVersionString, [] (CharT c) { return c == '.'; });
-    if (splitResult.size() < 3) {
-        throw std::runtime_error("Error parsing Darwin version string");
-    }
-    return boost::lexical_cast<unsigned>(splitResult[0]);
 }
 
 static UniqueIoObject getUsbDeviceIterator () {
@@ -68,25 +71,96 @@ static UniqueIoObject getUsbDeviceIterator () {
     return UniqueIoObject{iter};
 }
 
+class Device {
+public:
+    Device (std::string path, std::string productString)
+        : mPath(path), mProductString(productString)
+    {}
+
+    std::string path () {
+        return mPath;
+    }
+
+    std::string productString () {
+        return mProductString;
+    }
+
+private:
+    std::string mPath;
+    std::string mProductString;
+};
+
+class DeviceIterator
+    : public boost::iterator_facade<
+        DeviceIterator, Device, boost::single_pass_traversal_tag
+public:
+    DeviceIterator ()
+        : mIter(0)
+    {}
+
+    friend DeviceIterator begin (const DeviceIterator&) {
+        return DeviceIterator{getUsbDeviceIterator()};
+    }
+
+    friend DeviceIterator end (const DeviceIterator&) {
+        return DeviceIterator{};
+    }
+
+private:
+    DeviceIterator (UniqueIoObject iter)
+        : mIter(iter)
+    {
+        increment();
+    }
+
+    friend class boost::iterator_core_access;
+
+    void increment () {
+        std::string path;
+        std::string productString;
+        while (auto device = UniqueIoObject{IOIteratorNext(mIter)}) {
+            // The device also has a "USB Product Name" property which we ought to
+            // be able to use, but on 10.11, OS X mangles '-' to '_', and on 10.10
+            // and earlier, the string returned is not null-terminated. The USB
+            // product name is available unmangled as the device's registry entry
+            // name instead.
+            io_name_t name;
+            auto kr = IORegistryEntryGetNameInPlane(device, kIOServicePlane, name);
+            if (kIOReturnSuccess != kr) {
+                continue;
+            }
+            productString = std::string(name);
+
+            path = std::string(getStringProperty(device, "IOCalloutDevice", true));
+            if (!path.length()) {
+                continue;
+            }
+            mDevice = {path, productString};
+            return;
+        }
+    }
+
+    bool equal (const DeviceIterator& other) const {
+        // IOKit iterators are only equal if they're invalid.
+        return !IOIteratorIsValid(mIter) && !IOIteratorIsValid(other.mIter);
+    }
+
+    Device& dereference () const {
+        return const_cast<Device&>(mDevice);
+    }
+
+    UniqueIoObject mIter;
+    Device mDevice;
+};
+
+
 std::string dongleDevicePathImpl (boost::system::error_code& ec) {
     boost::log::sources::logger lg;
     ec = baromesh::Status::DONGLE_NOT_FOUND;
     try {
-        auto iter = getUsbDeviceIterator();
-        while (auto device = UniqueIoObject{IOIteratorNext(iter)}) {
+        for (auto& device : DeviceIterator{}) {
+            auto productValue = device.productString();
             for (auto& expectedProduct : usbDongleProductStrings()) {
-                // The device also has a "USB Product Name" property which we ought to
-                // be able to use, but on 10.11, OS X mangles '-' to '_', and on 10.10
-                // and earlier, the string returned is not null-terminated. The USB
-                // product name is available unmangled as the device's registry entry
-                // name instead.
-                io_name_t buffer;
-                auto kr = IORegistryEntryGetNameInPlane(device, kIOServicePlane, buffer);
-                if (kIOReturnSuccess != kr) {
-                    continue;
-                }
-                auto productValue = std::string(buffer);
-
                 // TODO: test if productValue is truly null-terminated properly on
                 // OS X 10.10. Until this is tested, we'll keep the old method of
                 // comparing product strings: true if the expected product string
@@ -96,19 +170,7 @@ std::string dongleDevicePathImpl (boost::system::error_code& ec) {
                         expectedProduct.begin(),
                         expectedProduct.end(),
                         productValue.begin()).first) {
-                    auto path = std::string(getStringProperty(device, "IOCalloutDevice", true));
-                    if (!path.length()) {
-                        BOOST_LOG(lg) << "Found dongle in IORegistry, but no IOCalloutDevice";
-                        continue;
-                    }
-                    if (!access(path.c_str(), R_OK | W_OK)) {
-                        ec = baromesh::Status::OK;
-                    }
-                    else {
-                        ec = boost::system::error_code{errno, boost::system::generic_category()};
-                        BOOST_LOG(lg) << "Error accessing dongle at " << path << ": " << ec.message();
-                    }
-                    return path;
+                    return device.path();
                 }
             }
         }
@@ -119,5 +181,5 @@ std::string dongleDevicePathImpl (boost::system::error_code& ec) {
     catch (std::exception& e) {
         BOOST_LOG(lg) << "Exception getting dongle device path: " << e.what();
     }
-    return "";
+    return {};
 }
