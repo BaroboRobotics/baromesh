@@ -159,7 +159,10 @@ std::string dongleDevicePathImpl (boost::system::error_code& ec) {
     boost::log::sources::logger lg;
     ec = baromesh::Status::DONGLE_NOT_FOUND;
     try {
-        for (auto& device : DeviceIterator{}) {
+        for (auto d : DeviceIterator{}) {
+            BOOST_LOG(lg) << "Detected " << d.productString() << " at " << d.path();
+        }
+        for (auto device : DeviceIterator{}) {
             auto productValue = device.productString();
             for (auto& expectedProduct : usbDongleProductStrings()) {
                 // TODO: test if productValue is truly null-terminated properly on
