@@ -108,7 +108,7 @@ public:
     }
 
 private:
-    DeviceIterator (UniqueIoObject iter)
+    DeviceIterator (UniqueIoObject&& iter)
         : mIter(iter)
     {
         increment();
