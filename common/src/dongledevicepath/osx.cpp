@@ -92,7 +92,7 @@ private:
 
 class DeviceIterator
     : public boost::iterator_facade<
-        DeviceIterator, Device, boost::single_pass_traversal_tag
+        DeviceIterator, Device, boost::single_pass_traversal_tag> {
 public:
     DeviceIterator ()
         : mIter(0)
