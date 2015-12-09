@@ -109,7 +109,7 @@ public:
 
 private:
     DeviceIterator (UniqueIoObject&& iter)
-        : mIter(iter)
+        : mIter(std::move(iter))
     {
         increment();
     }
