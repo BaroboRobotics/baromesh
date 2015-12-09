@@ -73,6 +73,7 @@ static UniqueIoObject getUsbDeviceIterator () {
 
 class Device {
 public:
+    Device () = default;
     Device (std::string path, std::string productString)
         : mPath(path), mProductString(productString)
     {}
