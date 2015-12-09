@@ -50,7 +50,7 @@ void tenaciousSetOption (boost::asio::serial_port& sp, Option value, const int m
     }
 }
 
-void setSerialPortOptions (boost::asio::serial_port& sp, int baud) {
+inline void setSerialPortOptions (boost::asio::serial_port& sp, int baud) {
     using Option = boost::asio::serial_port_base;
     const auto max = kMaxSerialSetOptionAttempts;
     tenaciousSetOption(sp, Option::baud_rate(baud), max);
@@ -62,62 +62,6 @@ void setSerialPortOptions (boost::asio::serial_port& sp, int baud) {
     auto handle = sp.native_handle();
     ::write(handle, nullptr, 0);
 #endif
-}
-
-
-template <class Handler>
-class RobustOpenOperation : public std::enable_shared_from_this<RobustOpenOperation<Handler>> {
-public:
-    RobustOpenOperation (boost::asio::serial_port& sp, std::string path, int baud)
-        : mSp(sp)
-        , mTimer(sp.get_io_service())
-        , mStrand(sp.get_io_service())
-        , mPath(path)
-        , mBaud(baud)
-    {}
-
-    void start (Handler handler) {
-        try {
-            mSp.open(mPath);
-            mTimer.expires_from_now(kDongleSettleTimeAfterOpen);
-            mTimer.async_wait(mStrand.wrap(
-                std::bind(&RobustOpenOperation::stepOne,
-                    this->shared_from_this(), handler, _1)));
-        }
-        catch (boost::system::system_error& e) {
-            mSp.get_io_service().post(std::bind(handler, e.code()));
-        }
-    }
-
-private:
-    void stepOne (Handler handler, boost::system::error_code ec) {
-        if (!ec) {
-            setSerialPortOptions(mSp, mBaud);
-        }
-        mSp.get_io_service().post(std::bind(handler, ec));
-    }
-
-    boost::asio::serial_port& mSp;
-    boost::asio::steady_timer mTimer;
-    boost::asio::io_service::strand mStrand;
-
-    std::string mPath;
-    int mBaud;
-};
-
-typedef void RobustOpenHandlerSignature(boost::system::error_code);
-
-template <class Handler>
-BOOST_ASIO_INITFN_RESULT_TYPE(Handler, RobustOpenHandlerSignature)
-asyncRobustOpen (boost::asio::serial_port& sp, std::string path, int baud, Handler&& handler) {
-    boost::asio::detail::async_result_init<
-        Handler, RobustOpenHandlerSignature
-    > init { std::forward<Handler>(handler) };
-
-    using Op = RobustOpenOperation<decltype(init.handler)>;
-    std::make_shared<Op>(sp, path, baud)->start(init.handler);
-
-    return init.result.get();
 }
 
 } // namespace baromesh
