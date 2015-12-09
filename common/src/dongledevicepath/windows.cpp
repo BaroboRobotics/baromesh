@@ -212,6 +212,9 @@ std::string dongleDevicePathImpl (boost::system::error_code& ec) {
     ec = baromesh::Status::DONGLE_NOT_FOUND;
     try {
         // Iterate through USB CDC devices
+        for (auto& d : DeviceIterator{}) {
+            BOOST_LOG(lg) << "Detected " << d.productString() << " at " << d.path();
+        }
         for (auto& device : DeviceIterator{}) {
             if (usbDongleProductStrings().count(device.productString())) {
                 ec = baromesh::Status::OK;
