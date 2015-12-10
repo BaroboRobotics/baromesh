@@ -139,12 +139,12 @@ private:
             mDevice = {path, productString};
             return;
         }
+        mIter = 0;
     }
 
     bool equal (const DeviceIterator& other) const {
         // Only equal if they're both end iterators.
-        return !(mIter && IOIteratorIsValid(mIter))
-            && !(other.mIter && IOIteratorIsValid(other.mIter));
+        return !mIter && !other.mIter;
     }
 
     Device& dereference () const {
