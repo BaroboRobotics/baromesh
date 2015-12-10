@@ -139,7 +139,7 @@ private:
             mDevice = {path, productString};
             return;
         }
-        mIter = 0;
+        mIter = UniqueIoObject{0};
     }
 
     bool equal (const DeviceIterator& other) const {
