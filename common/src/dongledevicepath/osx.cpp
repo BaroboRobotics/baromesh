@@ -142,8 +142,9 @@ private:
     }
 
     bool equal (const DeviceIterator& other) const {
-        // IOKit iterators are only equal if they're invalid.
-        return !IOIteratorIsValid(mIter) && !IOIteratorIsValid(other.mIter);
+        // Only equal if they're both end iterators.
+        return !(mIter && IOIteratorIsValid(mIter))
+            && !(other.mIter && IOIteratorIsValid(other.mIter));
     }
 
     Device& dereference () const {
