@@ -29,8 +29,8 @@ using namespace boost::adaptors;
 class Device {
 public:
     Device () = default;
-    Device (std::string path, std::string productString, fs::path sysfsUsbPath, fs::path sysfsTtyPath)
-        : mPath(path), mProductString(productString), mSysfsUsbPath(sysfsUsbPath), mSysfsTtyPath(sysfsTtyPath)
+    Device (std::string path, std::string productString)
+        : mPath(path), mProductString(productString)
     {}
 
     const std::string& path () const {
@@ -41,14 +41,9 @@ public:
         return mProductString;
     }
 
-    const fs::path& sysfsUsbPath () const { return mSysfsUsbPath; }
-    const fs::path& sysfsTtyPath () const { return mSysfsTtyPath; }
-
 private:
     std::string mPath;
     std::string mProductString;
-    fs::path mSysfsUsbPath;
-    fs::path mSysfsTtyPath;
 };
 
 static fs::path sysDevices () {
@@ -69,35 +64,65 @@ traverseDir (const fs::path& root) {
 
 // For use with Boost.Range's filtered adaptor
 struct BySubsystem {
-    std::string mTarget;
+    const std::string mTarget;
     BySubsystem () = default;
     explicit BySubsystem (const std::string& target) : mTarget(target) {}
     // True if p has a child subsystem symlink matching target.
     bool operator() (const fs::path& p) const {
-        auto ec = boost::system::error_code{};
-        auto subsystem = fs::read_symlink(p / "subsystem", ec);
-        return !ec && subsystem.filename() == mTarget;
+        if (fs::is_directory(p) && !fs::is_symlink(p)) {
+            auto ec = boost::system::error_code{};
+            auto subsystem = fs::read_symlink(p / "subsystem", ec);
+            return !ec && mTarget == subsystem.filename();
+        }
+        return false;
     };
+};
+
+// http://www.usb.org/developers/defined_class
+enum class UsbClass : uint8_t {
+    cdc = 0x02
+};
+
+struct ByUsbInterfaceClass {
+    const UsbClass mTarget;
+    ByUsbInterfaceClass () = default;
+    explicit ByUsbInterfaceClass (UsbClass target) : mTarget(target) {}
+    bool operator() (const fs::path& p) const {
+        if (fs::is_directory(p) && !fs::is_symlink(p)) {
+            auto icPath = p / "bInterfaceClass";
+            if (fs::exists(icPath)) {
+                std::string icString;
+                fs::ifstream icStream{icPath};
+                if (std::getline(icStream, icString)) {
+                    size_t p = 0;
+                    auto ic = UsbClass(std::stoul(icString, &p, 16));
+                    return p && mTarget == ic;
+                }
+            }
+        }
+        return false;
+    }
 };
 
 // For use with Boost.Range transformed adaptor
 static Device toDevice (const fs::path& p) {
-    auto productPath = p / "product";
+    auto productPath = p.parent_path() / "product";
     if (fs::exists(productPath)) {
         std::string productString;
         fs::ifstream productStream{productPath};
-        std::getline(productStream, productString);
-        for (const auto& tty : traverseDir(p)
-                               | filtered(BySubsystem{"tty"})) {
-            auto uePath = tty / "uevent";
-            if (fs::exists(uePath)) {
-                std::string path;
-                fs::ifstream ueStream{uePath};
-                const auto key = std::string("DEVNAME=");
-                while (std::getline(ueStream, path)) {
-                    if (boost::algorithm::starts_with(path, key)) {
-                        path.replace(0, key.length(), "/dev/");
-                        return Device{path, productString, p, tty};
+        if (std::getline(productStream, productString)) {
+            for (const auto& tty : traverseDir(p / "tty")
+                                   | filtered(BySubsystem{"tty"})) {
+                auto uePath = tty / "uevent";
+                if (fs::exists(uePath)) {
+                    std::string path;
+                    fs::ifstream ueStream{uePath};
+                    const auto key = std::string("DEVNAME=");
+                    while (std::getline(ueStream, path)) {
+                        if (boost::algorithm::starts_with(path, key)) {
+                            path.replace(0, key.length(), "/dev/");
+                            return Device{path, productString, p, tty};
+                        }
                     }
                 }
             }
@@ -118,8 +143,11 @@ using DeviceRange
         const boost::transformed_range<
             decltype(&toDevice),
             const boost::filtered_range<
-                BySubsystem,
-                const decltype(traverseDir(sysDevices()))
+                ByUsbInterfaceClass,
+                const boost::filtered_range<
+                    BySubsystem,
+                    const decltype(traverseDir(sysDevices()))
+                >
             >
         >
     >;
@@ -127,6 +155,7 @@ using DeviceRange
 static DeviceRange devices () {
     return traverseDir(sysDevices())
         | filtered(BySubsystem{"usb"})
+        | filtered(ByUsbInterfaceClass{UsbClass::cdc})
         | transformed(toDevice)
         | filtered(deviceIsValid)
         ;
@@ -137,8 +166,7 @@ std::string dongleDevicePathImpl (boost::system::error_code& ec) {
     ec = baromesh::Status::DONGLE_NOT_FOUND;
     try {
         for (auto d : devices()) {
-            BOOST_LOG(lg) << "Detected " << d.productString() << " at " << d.path()
-                          << "(" << d.sysfsUsbPath() << " ; " << d.sysfsTtyPath() << ")";
+            BOOST_LOG(lg) << "Detected " << d.productString() << " at " << d.path();
         }
         for (auto device : devices()) {
             if (usbDongleProductStrings().count(device.productString())) {
