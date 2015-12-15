@@ -1,12 +1,9 @@
-#include "baromesh/system_error.hpp"
+#include "devices.hpp"
 
 #include <boost/algorithm/string/predicate.hpp>
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
-
-#include <boost/log/sources/logger.hpp>
-#include <boost/log/sources/record_ostream.hpp>
 
 #include <boost/range/adaptor/filtered.hpp>
 #include <boost/range/adaptor/transformed.hpp>
@@ -26,25 +23,7 @@
 namespace fs = boost::filesystem;
 using namespace boost::adaptors;
 
-class Device {
-public:
-    Device () = default;
-    Device (std::string path, std::string productString)
-        : mPath(path), mProductString(productString)
-    {}
-
-    const std::string& path () const {
-        return mPath;
-    }
-
-    const std::string& productString () const {
-        return mProductString;
-    }
-
-private:
-    std::string mPath;
-    std::string mProductString;
-};
+namespace usbcdc {
 
 static fs::path sysDevices () {
     auto sysEnv = std::getenv("SYSFS_PATH");
@@ -121,7 +100,7 @@ static Device toDevice (const fs::path& p) {
                     while (std::getline(ueStream, path)) {
                         if (boost::algorithm::starts_with(path, key)) {
                             path.replace(0, key.length(), "/dev/");
-                            return Device{path, productString, p, tty};
+                            return Device{path, productString};
                         }
                     }
                 }
@@ -135,24 +114,7 @@ static bool deviceIsValid (const Device& d) {
     return d.path().size() && d.productString().size();
 }
 
-// TODO get rid of this when we switch to C++14 and use "auto devices () { }"
-// instead.
-using DeviceRange
-    = boost::filtered_range<
-        decltype(&deviceIsValid),
-        const boost::transformed_range<
-            decltype(&toDevice),
-            const boost::filtered_range<
-                ByUsbInterfaceClass,
-                const boost::filtered_range<
-                    BySubsystem,
-                    const decltype(traverseDir(sysDevices()))
-                >
-            >
-        >
-    >;
-
-static DeviceRange devices () {
+DeviceRange devices () {
     return traverseDir(sysDevices())
         | filtered(BySubsystem{"usb"})
         | filtered(ByUsbInterfaceClass{UsbClass::cdc})
@@ -161,25 +123,4 @@ static DeviceRange devices () {
         ;
 }
 
-std::string dongleDevicePathImpl (boost::system::error_code& ec) {
-    boost::log::sources::logger lg;
-    ec = baromesh::Status::DONGLE_NOT_FOUND;
-    try {
-        for (auto d : devices()) {
-            BOOST_LOG(lg) << "Detected " << d.productString() << " at " << d.path();
-        }
-        for (auto device : devices()) {
-            if (usbDongleProductStrings().count(device.productString())) {
-                ec = baromesh::Status::OK;
-                return device.path();
-            }
-        }
-    }
-    catch (boost::system::system_error& e) {
-        ec = e.code();
-    }
-    catch (std::exception& e) {
-        BOOST_LOG(lg) << "Exception getting dongle device path: " << e.what();
-    }
-    return {};
-}
+} // namespace usbcdc

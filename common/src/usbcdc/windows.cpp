@@ -1,10 +1,8 @@
-#include "baromesh/system_error.hpp"
+#include "devices.hpp"
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/range/iterator_range.hpp>
-
-#include <boost/log/sources/logger.hpp>
-#include <boost/log/sources/record_ostream.hpp>
+#include <boost/range/adaptor/transformed.hpp>
 
 #include <iomanip>
 #include <memory>
@@ -17,6 +15,8 @@
 #include <setupapi.h>
 
 #include <devpkey.h>
+
+namespace usbcdc {
 
 // Stackoverflow Oleg
 typedef BOOL (WINAPI *FN_SetupDiGetDevicePropertyW)(
@@ -41,7 +41,7 @@ static bool isWin7OrGreater () {
     return !!fn_SetupDiGetDevicePropertyW();
 }
 
-static std::shared_ptr<void> makeDeviceList (const GUID* classGuid, const char* enumerator) {
+static std::shared_ptr<void> makeDevInfoList (const GUID* classGuid, const char* enumerator) {
     auto diList = SetupDiGetClassDevs(classGuid, enumerator, nullptr, DIGCF_PRESENT);
     if (INVALID_HANDLE_VALUE == diList) {
         auto err = GetLastError();
@@ -50,10 +50,9 @@ static std::shared_ptr<void> makeDeviceList (const GUID* classGuid, const char* 
     return std::shared_ptr<void>(diList, SetupDiDestroyDeviceInfoList);
 }
 
-class Device : public SP_DEVINFO_DATA {
+class DevInfo : public SP_DEVINFO_DATA {
 public:
     std::string path () {
-        boost::log::sources::logger lg;
         // The friendly name will be something like "Some Device (COM3)",
         // in which case we would want to return "\\.\COM3".
         // \\.\ is the Windows equivalent of /dev in Linux.
@@ -77,7 +76,7 @@ public:
     }
 
 private:
-    Device (std::shared_ptr<void> handle) : mHandle(handle) {}
+    DevInfo (std::shared_ptr<void> handle) : mHandle(handle) {}
 
     std::string getRegistryProperty (DWORD key) {
         DWORD type;
@@ -141,41 +140,41 @@ private:
     }
 
     // Intrusive iterator, to save on copying HDEVINFO shared_ptrs around.
-    friend class DeviceIterator;
+    friend class DevInfoIterator;
     std::shared_ptr<void> mHandle;
 };
 
-class DeviceIterator
+class DevInfoIterator
     : public boost::iterator_facade<
-        DeviceIterator, Device, boost::single_pass_traversal_tag
+        DevInfoIterator, DevInfo, boost::single_pass_traversal_tag
     > {
 public:
-    DeviceIterator ()
-        : mIndex(kEnd), mDevice(nullptr)
+    DevInfoIterator ()
+        : mIndex(kEnd), mDevInfo(nullptr)
     {}
 
-    friend DeviceIterator begin (const DeviceIterator&) {
-        return DeviceIterator{makeDeviceList(&GUID_DEVCLASS_PORTS, "USB")};
+    friend DevInfoIterator begin (const DevInfoIterator&) {
+        return DevInfoIterator{makeDevInfoList(&GUID_DEVCLASS_PORTS, "USB")};
     }
 
-    friend DeviceIterator end (const DeviceIterator&) {
-        return DeviceIterator{};
+    friend DevInfoIterator end (const DevInfoIterator&) {
+        return DevInfoIterator{};
     }
 
 private:
     friend class boost::iterator_core_access;
 
     // Create a new begin iterator
-    DeviceIterator (std::shared_ptr<void> handle)
-        : mIndex(kBegin), mDevice(handle)
+    DevInfoIterator (std::shared_ptr<void> handle)
+        : mIndex(kBegin), mDevInfo(handle)
     {
         increment();
     }
 
     void increment () {
         if (kEnd != mIndex) {
-            mDevice.cbSize = sizeof(SP_DEVINFO_DATA);
-            if (!SetupDiEnumDeviceInfo(mDevice.mHandle.get(), mIndex++, &mDevice)) {
+            mDevInfo.cbSize = sizeof(SP_DEVINFO_DATA);
+            if (!SetupDiEnumDeviceInfo(mDevInfo.mHandle.get(), mIndex++, &mDevInfo)) {
                 auto err = GetLastError();
                 if (ERROR_NO_MORE_ITEMS == err) {
                     mIndex = kEnd;
@@ -187,46 +186,33 @@ private:
         }
     }
 
-    bool equal (const DeviceIterator& other) const {
+    bool equal (const DevInfoIterator& other) const {
         // To be equal, either our indices are the same and we're both end
         // iterators, or our indices are the same and we use the same handle.
         return mIndex == other.mIndex
-            && (kEnd == mIndex || mDevice.mHandle == other.mDevice.mHandle);
+            && (kEnd == mIndex || mDevInfo.mHandle == other.mDevInfo.mHandle);
     }
 
-    Device& dereference () const {
-        return const_cast<Device&>(mDevice);
+    DevInfo dereference () const {
+        return mDevInfo;//const_cast<DevInfo&>(mDevInfo);
     }
 
     static const DWORD kBegin = 0;
     static const DWORD kEnd = DWORD(-1);
     DWORD mIndex;
-    Device mDevice;
+    DevInfo mDevInfo;
 };
 
-/* Find an attached dongle device and return the COM port name via the output
- * parameter tty. tty is a user-supplied buffer of size len. Return the COM
- * port number, if anyone cares. On error, return -1. */
-std::string dongleDevicePathImpl (boost::system::error_code& ec) {
-    boost::log::sources::logger lg;
-    ec = baromesh::Status::DONGLE_NOT_FOUND;
-    try {
-        // Iterate through USB CDC devices
-        for (auto& d : DeviceIterator{}) {
-            BOOST_LOG(lg) << "Detected " << d.productString() << " at " << d.path();
-        }
-        for (auto& device : DeviceIterator{}) {
-            if (usbDongleProductStrings().count(device.productString())) {
-                ec = baromesh::Status::OK;
-                return device.path();
-            }
-        }
-    }
-    catch (boost::system::system_error& e) {
-        ec = e.code();
-    }
-    catch (std::exception& e) {
-        BOOST_LOG(lg) << "Exception getting dongle device path: " << e.what();
-    }
-    return {};
+static Device toDevice (DevInfo di) {
+    return Device{di.path(), di.productString()};
 }
+
+using namespace boost::adaptors;
+
+DeviceRange devices () {
+    auto diIter = DevInfoIterator{};
+    return boost::make_iterator_range(begin(diIter), end(diIter))
+        | transformed(toDevice);
+}
+
+} // namespace usbcdc

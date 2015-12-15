@@ -17,7 +17,7 @@ endif()
 # projects we'll want to use shared libraries and defined -DBOOST_ALL_DYN_LINK
 # or the like.
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.54.0 REQUIRED COMPONENTS system chrono log thread program_options)
+find_package(Boost 1.59.0 REQUIRED COMPONENTS system chrono log thread program_options)
 
 if(APPLE)
     add_subdirectory(CFPP)
@@ -29,6 +29,14 @@ set(SOURCES
     src/log.cpp
     src/system_error.cpp
     )
+
+if(WIN32)
+    list(APPEND SOURCES src/usbcdc/windows.cpp)
+elseif(APPLE)
+    list(APPEND SOURCES src/usbcdc/osx.cpp)
+else()
+    list(APPEND SOURCES src/usbcdc/linux.cpp)
+endif()
 
 add_library(baromesh-common STATIC ${SOURCES})
 

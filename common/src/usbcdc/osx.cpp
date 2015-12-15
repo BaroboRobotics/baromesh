@@ -1,9 +1,6 @@
+#include "devices.hpp"
+
 #include "osx_uniqueioobject.hpp"
-
-#include "baromesh/system_error.hpp"
-
-#include <boost/log/sources/logger.hpp>
-#include <boost/log/sources/record_ostream.hpp>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -21,6 +18,8 @@
 
 #include <string.h>
 #include <unistd.h>
+
+namespace usbcdc {
 
 static unsigned darwinVersionMajor () {
     static auto v = [] {
@@ -70,26 +69,6 @@ static UniqueIoObject getUsbDeviceIterator () {
     }
     return UniqueIoObject{iter};
 }
-
-class Device {
-public:
-    Device () = default;
-    Device (std::string path, std::string productString)
-        : mPath(path), mProductString(productString)
-    {}
-
-    std::string path () {
-        return mPath;
-    }
-
-    std::string productString () {
-        return mProductString;
-    }
-
-private:
-    std::string mPath;
-    std::string mProductString;
-};
 
 class DeviceIterator
     : public boost::iterator_facade<
@@ -155,36 +134,8 @@ private:
     Device mDevice;
 };
 
-
-std::string dongleDevicePathImpl (boost::system::error_code& ec) {
-    boost::log::sources::logger lg;
-    ec = baromesh::Status::DONGLE_NOT_FOUND;
-    try {
-        for (auto d : DeviceIterator{}) {
-            BOOST_LOG(lg) << "Detected " << d.productString() << " at " << d.path();
-        }
-        for (auto device : DeviceIterator{}) {
-            auto productValue = device.productString();
-            for (auto& expectedProduct : usbDongleProductStrings()) {
-                // TODO: test if productValue is truly null-terminated properly on
-                // OS X 10.10. Until this is tested, we'll keep the old method of
-                // comparing product strings: true if the expected product string
-                // is a prefix of the device's product string.
-                if (expectedProduct.size() <= productValue.size()
-                    && expectedProduct.end() == std::mismatch(
-                        expectedProduct.begin(),
-                        expectedProduct.end(),
-                        productValue.begin()).first) {
-                    return device.path();
-                }
-            }
-        }
-    }
-    catch (boost::system::system_error& e) {
-        ec = e.code();
-    }
-    catch (std::exception& e) {
-        BOOST_LOG(lg) << "Exception getting dongle device path: " << e.what();
-    }
-    return {};
+DeviceRange devices () {
+    return DeviceIterator{};
 }
+
+} // namespace usbcdc

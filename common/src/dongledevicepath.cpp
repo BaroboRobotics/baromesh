@@ -1,20 +1,16 @@
 #include "baromesh/dongledevicepath.hpp"
-
 #include "baromesh/system_error.hpp"
+
+#include "usbcdc/devices.hpp"
+
+#include <boost/log/sources/logger.hpp>
+#include <boost/log/sources/record_ostream.hpp>
 
 #include <set>
 #include <string>
 
-//struct usb_dongle_id {
-//    const char *product;
-//};
-
-/* List of valid Barobo dongle product strings. The platform-specific
- * dongleDevicePath() functions should depend on this data for finding the
- * dongle. Update this list as necessary. */
-//static const usb_dongle_id g_barobo_usb_dongle_ids[] = {
-//};
-
+// List of valid Barobo dongle product strings.
+// Update this list as necessary.
 static const std::set<std::string>& usbDongleProductStrings () {
     static const std::set<std::string> s {
         "Mobot USB-Serial Adapter",
@@ -24,7 +20,27 @@ static const std::set<std::string>& usbDongleProductStrings () {
     return s;
 }
 
-static std::string dongleDevicePathImpl(boost::system::error_code&);
+static bool isBaroboDongle (const usbcdc::Device& d) {
+#ifdef __MACH__
+    for (auto& expectedProduct : usbDongleProductStrings()) {
+        // TODO: test if productString is truly null-terminated properly on
+        // OS X 10.10. Until this is tested, we'll keep the old method of
+        // comparing product strings: true if the expected product string
+        // is a prefix of the device's product string.
+        if (expectedProduct.size() <= d.productString().size()
+            && expectedProduct.end() == std::mismatch(
+                expectedProduct.begin(),
+                expectedProduct.end(),
+                d.productString().begin()).first) {
+            return true;
+        }
+    }
+    return false;
+#else
+    return usbDongleProductStrings().count(d.productString());
+#endif
+}
+
 
 namespace baromesh {
 
@@ -38,23 +54,23 @@ std::string dongleDevicePath () {
 }
 
 std::string dongleDevicePath (boost::system::error_code& ec) {
-    // Get the dongle device path, i.e.: /dev/ttyACM0, \\.\COM3, etc.
-    return dongleDevicePathImpl(ec);
+    boost::log::sources::logger lg;
+    ec = baromesh::Status::DONGLE_NOT_FOUND;
+    try {
+        for (auto d : usbcdc::devices()) {
+            if (isBaroboDongle(d)) {
+                ec = baromesh::Status::OK;
+                return d.path();
+            }
+        }
+    }
+    catch (boost::system::system_error& e) {
+        ec = e.code();
+    }
+    catch (std::exception& e) {
+        BOOST_LOG(lg) << "Exception getting dongle device path: " << e.what();
+    }
+    return {};
 }
 
 } // namespace baromesh
-
-
-/* For convenience. */
-//#define NUM_BAROBO_USB_DONGLE_IDS \
-//  (sizeof(g_barobo_usb_dongle_ids) / sizeof(g_barobo_usb_dongle_ids[0]))
-
-#ifdef _WIN32
-#include "dongledevicepath/windows.cpp"
-#elif defined(__linux__)
-#include "dongledevicepath/linux.cpp"
-#elif defined(__APPLE__) && defined(__MACH__)
-#include "dongledevicepath/osx.cpp"
-#else
-#error No dongledevicepath.cpp available for this platform.
-#endif
