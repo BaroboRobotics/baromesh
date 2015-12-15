@@ -16,8 +16,8 @@ public:
     const std::string& path () const { return mPath; }
     const std::string& productString () const { return mProductString; }
 private:
-    const std::string mPath;
-    const std::string mProductString;
+    std::string mPath;
+    std::string mProductString;
 };
 
 // The third parameter to any_range (Reference) must be const to work around a
