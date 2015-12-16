@@ -2,8 +2,9 @@
 
 #include "osx_uniqueioobject.hpp"
 
-#include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/range/iterator_range.hpp>
 
 #include "CF++.h"
 
@@ -135,7 +136,8 @@ private:
 };
 
 DeviceRange devices () {
-    return DeviceIterator{};
+    auto it = DeviceIterator{};
+    return boost::make_iterator_range(begin(it), end(it));
 }
 
 } // namespace usbcdc
