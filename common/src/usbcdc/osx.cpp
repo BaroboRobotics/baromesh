@@ -57,7 +57,7 @@ static CF::String getStringProperty (io_object_t device, CF::String key, bool re
     return value;
 }
 
-static UniqueIoObject getUsbDeviceIterator () {
+static SharedIoObject getUsbDeviceIterator () {
     // OS X 10.11 (Darwin 15) overhauled the USB system, introducing the
     // IOUSBHostDevice class name.
     auto classes = IOServiceMatching(darwinVersionMajor() < 15
@@ -68,16 +68,14 @@ static UniqueIoObject getUsbDeviceIterator () {
     if (kIOReturnSuccess != kr) {
         throw std::runtime_error("Could not get USB devices from the IORegistry.");
     }
-    return UniqueIoObject{iter};
+    return SharedIoObject{iter};
 }
 
 class DeviceIterator
     : public boost::iterator_facade<
         DeviceIterator, Device, boost::single_pass_traversal_tag> {
 public:
-    DeviceIterator ()
-        : mIter(0)
-    {}
+    DeviceIterator () = default;
 
     friend DeviceIterator begin (const DeviceIterator&) {
         return DeviceIterator{getUsbDeviceIterator()};
@@ -88,8 +86,8 @@ public:
     }
 
 private:
-    DeviceIterator (UniqueIoObject&& iter)
-        : mIter(std::move(iter))
+    DeviceIterator (SharedIoObject iter)
+        : mIter(iter)
     {
         increment();
     }
@@ -99,27 +97,31 @@ private:
     void increment () {
         std::string path;
         std::string productString;
-        while (auto device = UniqueIoObject{IOIteratorNext(mIter)}) {
+        SharedIoObject devObj;
+        while (IOIteratorIsValid(mIter)
+            && (device = SharedIoObject{IOIteratorNext(mIter)})) {
             // The device also has a "USB Product Name" property which we ought to
             // be able to use, but on 10.11, OS X mangles '-' to '_', and on 10.10
             // and earlier, the string returned is not null-terminated. The USB
             // product name is available unmangled as the device's registry entry
             // name instead.
             io_name_t name;
-            auto kr = IORegistryEntryGetNameInPlane(device, kIOServicePlane, name);
+            auto kr = IORegistryEntryGetNameInPlane(devObj, kIOServicePlane, name);
             if (kIOReturnSuccess != kr) {
                 continue;
             }
             productString = std::string(name);
 
-            path = std::string(getStringProperty(device, "IOCalloutDevice", true));
+            path = std::string(getStringProperty(devObj, "IOCalloutDevice", true));
             if (!path.length()) {
                 continue;
             }
             mDevice = {path, productString};
             return;
         }
-        mIter = UniqueIoObject{0};
+        // If we completed the loop, either the iterator was invalidated, or
+        // there are no more devices to enumerate.
+        mIter = {};
     }
 
     bool equal (const DeviceIterator& other) const {
@@ -131,7 +133,7 @@ private:
         return const_cast<Device&>(mDevice);
     }
 
-    UniqueIoObject mIter;
+    SharedIoObject mIter;
     Device mDevice;
 };
 
