@@ -1,5 +1,5 @@
-#ifndef DONGLEDEVICEPATH_WINDOWS_UTF_HPP
-#define DONGLEDEVICEPATH_WINDOWS_UTF_HPP
+#ifndef USBCDC_WINDOWS_UTF_HPP
+#define USBCDC_WINDOWS_UTF_HPP
 
 #include <exception>
 #include <string>

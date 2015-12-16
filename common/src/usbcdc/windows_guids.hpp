@@ -1,5 +1,5 @@
-#ifndef DONGLEDEVICEPATH_WINDOWS_GUIDS_HPP
-#define DONGLEDEVICEPATH_WINDOWS_GUIDS_HPP
+#ifndef USBCDC_WINDOWS_GUIDS_HPP
+#define USBCDC_WINDOWS_GUIDS_HPP
 
 #ifndef _WIN32
 #error guid_devclass_ports.h is a Windows-specific header file.
