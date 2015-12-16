@@ -8,7 +8,6 @@
 #include <boost/range/adaptor/filtered.hpp>
 #include <boost/range/adaptor/transformed.hpp>
 #include <boost/range/iterator_range.hpp>
-#include <boost/range.hpp>
 
 #include <boost/system/error_code.hpp>
 
