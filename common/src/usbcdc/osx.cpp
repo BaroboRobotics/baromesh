@@ -99,7 +99,7 @@ private:
         std::string productString;
         SharedIoObject devObj;
         while (IOIteratorIsValid(mIter)
-            && (device = SharedIoObject{IOIteratorNext(mIter)})) {
+            && (devObj = SharedIoObject{IOIteratorNext(mIter)})) {
             // The device also has a "USB Product Name" property which we ought to
             // be able to use, but on 10.11, OS X mangles '-' to '_', and on 10.10
             // and earlier, the string returned is not null-terminated. The USB
