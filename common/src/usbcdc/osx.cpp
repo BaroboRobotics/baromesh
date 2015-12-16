@@ -1,6 +1,6 @@
 #include "devices.hpp"
 
-#include "osx_uniqueioobject.hpp"
+#include "osx_sharedioobject.hpp"
 
 #include <boost/algorithm/string/split.hpp>
 #include <boost/lexical_cast.hpp>
