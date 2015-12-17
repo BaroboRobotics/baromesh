@@ -1,6 +1,8 @@
 #ifndef USBCDC_OSX_SHAREDIOOBJECT_HPP
 #define USBCDC_OSX_SHAREDIOOBJECT_HPP
 
+#include <memory>
+
 #include <IOKit/IOKitLib.h>
 
 // io_object_t is typically an unsigned int, so the usual shared_ptr<void>
