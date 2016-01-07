@@ -1,10 +1,5 @@
 cmake_minimum_required(VERSION 3.2.1)
-project(baromesh-common CXX C)
-
-set(VERSION_MAJOR 0)
-set(VERSION_MINOR 2)
-set(VERSION_PATCH 0)
-set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
+project(baromesh-common VERSION 0.2.0)
 
 if(WIN32 AND NOT CMAKE_COMPILER_IS_GNUCXX)
     add_definitions("-D_ALLOW_KEYWORD_MACROS")
@@ -25,18 +20,9 @@ endif()
 
 set(SOURCES
     src/dongledevicepath.cpp
-    src/iocore.cpp
     src/log.cpp
     src/system_error.cpp
     )
-
-if(WIN32)
-    list(APPEND SOURCES src/usbcdc/windows.cpp)
-elseif(APPLE)
-    list(APPEND SOURCES src/usbcdc/osx.cpp)
-else()
-    list(APPEND SOURCES src/usbcdc/linux.cpp)
-endif()
 
 add_library(baromesh-common STATIC ${SOURCES})
 
@@ -52,23 +38,12 @@ target_include_directories(baromesh-common
 target_link_libraries(baromesh-common
     PUBLIC daemon-interface
            cxx-util
+           usbcdc
            ${Boost_LIBRARIES}
     )
 
-if(WIN32)
-    target_link_libraries(baromesh-common PRIVATE setupapi)
-elseif(APPLE)
-    find_library(coreFoundationLib CoreFoundation)
-    find_library(ioKitLib IOKit)
-    target_link_libraries(baromesh-common
-      PRIVATE cfpp
-              ${ioKitLib}
-              ${coreFoundationLib}
-              )
-endif()
-
 set_target_properties(baromesh-common PROPERTIES
-    VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
-    SOVERSION ${VERSION_MAJOR}
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
     MACOSX_RPATH ON
 )
