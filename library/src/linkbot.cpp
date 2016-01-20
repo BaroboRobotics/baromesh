@@ -1,11 +1,12 @@
 #include "baromesh/linkbot.hpp"
 #include "baromesh/error.hpp"
-#include "baromesh/iocore.hpp"
 #include "baromesh/log.hpp"
 
 #include "baromesh/daemon.hpp"
 
 #include "gen-robot.pb.hpp"
+
+#include <util/iothread.hpp>
 
 #include <boost/asio/use_future.hpp>
 
@@ -43,9 +44,9 @@ using boost::asio::use_future;
 struct Linkbot::Impl {
 private:
     Impl (const std::string& host, const std::string& service)
-        : ioCore(baromesh::IoCore::get())
-        , resolver(ioCore->ios())
-        , robot(ioCore->ios(), log)
+        : io(util::IoThread::getGlobal())
+        , resolver(io->context())
+        , robot(io->context(), log)
     {
         BOOST_LOG(log) << "Connecting to Linkbot proxy at "
                        << host << ":" << service;
@@ -91,10 +92,10 @@ public:
     // ownership of the returned pointer.
     static Impl* fromSerialId (const std::string& serialId) {
         initializeLoggingCore();
-        auto ioCore = baromesh::IoCore::get();
+        auto io = util::IoThread::getGlobal();
         boost::log::sources::logger log;
-        boost::asio::ip::tcp::resolver resolver {ioCore->ios()};
-        rpc::asio::TcpClient daemon {ioCore->ios(), log};
+        boost::asio::ip::tcp::resolver resolver {io->context()};
+        rpc::asio::TcpClient daemon {io->context(), log};
 
         auto daemonQuery = decltype(resolver)::query {
             baromesh::daemonHostName(), baromesh::daemonServiceName()
@@ -168,7 +169,7 @@ public:
     }
     mutable boost::log::sources::logger log;
 
-    std::shared_ptr<baromesh::IoCore> ioCore;
+    std::shared_ptr<util::IoThread> io;
     boost::asio::ip::tcp::resolver resolver;
 
     rpc::asio::TcpClient robot;
