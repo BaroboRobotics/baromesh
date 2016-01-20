@@ -706,9 +706,9 @@ void Linkbot::moveContinuous (int mask, double c0, double c1, double c2) {
 }
 
 void Linkbot::moveAccel(int mask, int relativeMask,
-    double a0, double timeout0, JointState::Type endstate0,
-    double a1, double timeout1, JointState::Type endstate1,
-    double a2, double timeout2, JointState::Type endstate2)
+    double omega0_i, double timeout0, JointState::Type endstate0,
+    double omega1_i, double timeout1, JointState::Type endstate1,
+    double omega2_i, double timeout2, JointState::Type endstate2)
 {
     bool hasTimeouts[3];
     hasTimeouts[0] = (timeout0 != 0.0);
@@ -739,21 +739,21 @@ void Linkbot::moveAccel(int mask, int relativeMask,
         asyncFire(m->robot, MethodIn::move {
             bool(mask&0x01), { 
                 motionType[0], 
-                float(baromesh::degToRad(a0)),
+                float(baromesh::degToRad(omega0_i)),
                 true,
                 barobo_Robot_Goal_Controller_ACCEL,
                 hasTimeouts[0], float(timeout0), hasTimeouts[0], js_to_int(endstate0)
                 },
             bool(mask&0x02), { 
                 motionType[1], 
-                float(baromesh::degToRad(a1)),
+                float(baromesh::degToRad(omega1_i)),
                 true,
                 barobo_Robot_Goal_Controller_ACCEL,
                 hasTimeouts[1], float(timeout1), hasTimeouts[1], js_to_int(endstate1)
                 },
             bool(mask&0x04), { 
                 motionType[2], 
-                float(baromesh::degToRad(a2)),
+                float(baromesh::degToRad(omega2_i)),
                 true,
                 barobo_Robot_Goal_Controller_ACCEL,
                 hasTimeouts[2], float(timeout2), hasTimeouts[2], js_to_int(endstate2)
