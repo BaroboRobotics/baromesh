@@ -37,7 +37,7 @@ static bool isBaroboDongle (const usbcdc::Device& d) {
     }
     return false;
 #else
-    return usbDongleProductStrings().count(d.productString());
+    return !!usbDongleProductStrings().count(d.productString());
 #endif
 }
 
