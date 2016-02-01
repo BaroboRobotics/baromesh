@@ -57,7 +57,7 @@ std::string dongleDevicePath (boost::system::error_code& ec) {
     boost::log::sources::logger lg;
     ec = baromesh::Status::DONGLE_NOT_FOUND;
     try {
-        for (auto d : usbcdc::devices()) {
+        for (auto&& d : usbcdc::devices()) {
             if (isBaroboDongle(d)) {
                 ec = baromesh::Status::OK;
                 return d.path();
