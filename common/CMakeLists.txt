@@ -14,10 +14,6 @@ endif()
 set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.59.0 REQUIRED COMPONENTS system chrono log thread program_options)
 
-if(APPLE)
-    add_subdirectory(CFPP)
-endif()
-
 set(SOURCES
     src/dongledevicepath.cpp
     src/log.cpp
