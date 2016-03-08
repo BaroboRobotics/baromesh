@@ -23,6 +23,7 @@ message transmitUnicast {
     }
     message Result {
         required barobo.Status status = 1;
+        required int32 queuedMessages = 2;
     }
 }
 
@@ -34,6 +35,7 @@ message transmitRadioBroadcast {
     }
     message Result {
         required barobo.Status status = 1;
+        required int32 queuedMessages = 2;
     }
 }
 

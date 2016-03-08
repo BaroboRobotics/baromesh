@@ -27,8 +27,13 @@ set_target_properties(baromesh-common
                CXX_STANDARD_REQUIRED ON
                )
 
+target_compile_definitions(baromesh-common
+    PUBLIC _WEBSOCKETPP_NO_CPP11_SYSTEM_ERROR_ )
+
+message(INFO "WS Include is: ${WEBSOCKETPP_INCLUDE}")
 target_include_directories(baromesh-common
     PUBLIC ${Boost_INCLUDE_DIRS}
+    PUBLIC ../../websocketpp/
            include
     )
 target_link_libraries(baromesh-common
