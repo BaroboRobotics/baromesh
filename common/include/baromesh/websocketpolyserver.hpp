@@ -125,6 +125,7 @@ public:
 
 private:
     void handleMessage (websocketpp::connection_hdl, WebsocketAcceptor::connection_type::message_ptr msg) {
+        BOOST_LOG(mLog) << "Received " << msg->get_payload().size();
         mInbox.emplace(msg);
         postReceives();
     }
@@ -200,7 +201,9 @@ struct RunSubServerOp {
     template <class Op>
     void operator() (Op&& op, boost::system::error_code ec = {}, RequestPair rp = {}) {
         if (!ec) reenter(op) {
+            BOOST_LOG(log_) << "Waiting for connection.";
             yield asyncWaitForConnection(*subServer_, std::move(op));
+            BOOST_LOG(log_) << "Received connection.";
             while (1) {
                 if (barobo_rpc_Request_Type_DISCONNECT == rp.second.type) {
                     BOOST_LOG(log_) << "disconnecting";
@@ -358,6 +361,39 @@ private:
 
         mAcceptor.set_open_handler(std::bind(&WebsocketPolyServerImpl::handleAccept,
                 this->shared_from_this(), _1));
+
+        auto mkHandler = [this](std::string message) {
+            return [this, message](websocketpp::connection_hdl hdl) mutable {
+                boost::system::error_code ec;
+                auto con = mAcceptor.get_con_from_hdl(hdl);
+                if (!ec) {
+                    message += " from ";
+                    message += con->get_uri()->str();
+                }
+                BOOST_LOG(mLog) << "websocketpp server handler: " << message;
+            };
+        };
+
+        auto mkValidateHandler = [this](std::string message) {
+            return [this, message](websocketpp::connection_hdl hdl) mutable {
+                boost::system::error_code ec;
+                auto con = mAcceptor.get_con_from_hdl(hdl);
+                if (!ec) {
+                    message += " from ";
+                    message += con->get_uri()->str();
+                }
+                BOOST_LOG(mLog) << "websocketpp server handler: " << message;
+                return true;
+            };
+        };
+
+        mAcceptor.set_close_handler(mkHandler("close"));
+        mAcceptor.set_fail_handler(mkHandler("fail"));
+        mAcceptor.set_http_handler(mkHandler("http"));
+        mAcceptor.set_interrupt_handler(mkHandler("interrupt"));
+        mAcceptor.set_validate_handler(mkValidateHandler("validate"));
+
+
         mAcceptor.set_reuse_addr(true);
         mAcceptor.listen(mDesiredEndpoint);
         mAcceptor.start_accept();
