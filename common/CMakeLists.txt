@@ -33,7 +33,7 @@ target_compile_definitions(baromesh-common
 message(INFO "WS Include is: ${WEBSOCKETPP_INCLUDE}")
 target_include_directories(baromesh-common
     PUBLIC ${Boost_INCLUDE_DIRS}
-    PUBLIC ../../websocketpp/
+    PUBLIC websocketpp/
            include
     )
 target_link_libraries(baromesh-common
