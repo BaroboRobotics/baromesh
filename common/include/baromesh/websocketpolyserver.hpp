@@ -387,11 +387,13 @@ private:
             };
         };
 
+        /*
         mAcceptor.set_close_handler(mkHandler("close"));
         mAcceptor.set_fail_handler(mkHandler("fail"));
         mAcceptor.set_http_handler(mkHandler("http"));
         mAcceptor.set_interrupt_handler(mkHandler("interrupt"));
         mAcceptor.set_validate_handler(mkValidateHandler("validate"));
+        */
 
 
         mAcceptor.set_reuse_addr(true);
