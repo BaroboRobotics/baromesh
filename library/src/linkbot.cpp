@@ -6,6 +6,8 @@
 
 #include "gen-robot.pb.hpp"
 
+#include <baromesh/websocketmessagequeue.hpp>
+
 #include <util/iothread.hpp>
 
 #include <boost/asio/use_future.hpp>
@@ -19,6 +21,9 @@
 #include <boost/algorithm/string/case_conv.hpp>
 
 #include <boost/program_options/parsers.hpp>
+
+#include <websocketpp/config/asio_no_tls_client.hpp>
+#include <websocketpp/client.hpp>
 
 #include <iostream>
 #include <memory>
@@ -43,15 +48,28 @@ using boost::asio::use_future;
 
 struct Linkbot::Impl {
 private:
-    Impl (const std::string& host, const std::string& service)
+    explicit Impl (const std::string& host, const std::string& service)
         : io(util::IoThread::getGlobal())
-        , resolver(io->context())
         , robot(io->context(), log)
     {
-        BOOST_LOG(log) << "Connecting to Linkbot proxy at "
-                       << host << ":" << service;
-        auto robotIter = resolver.resolve(decltype(resolver)::query{host, service});
-        rpc::asio::asyncInitTcpClient(robot, robotIter, use_future).get();
+        auto uri = std::make_shared<websocketpp::uri>(false, host, service, "");
+        BOOST_LOG(log) << "Connecting to Linkbot proxy at " << uri->str();
+        connector.init_asio(&io->context());
+        auto ec = boost::system::error_code{};
+        auto con = connector.get_connection(uri, ec);
+        if (ec) { throw boost::system::system_error{ec}; }
+        auto openPromise = std::promise<void>{};
+        auto openFuture = openPromise.get_future();
+        con->set_open_handler([con, &openPromise](websocketpp::connection_hdl) {
+            openPromise.set_value();
+        });
+        con->set_fail_handler([con, &openPromise](websocketpp::connection_hdl) {
+            auto e = boost::system::system_error{con->get_transport_ec()};
+            openPromise.set_exception(std::make_exception_ptr(e));
+        });
+        connector.connect(con);
+        openFuture.get();
+        robot.messageQueue().setConnection(con);
         rpc::asio::asyncConnect<barobo::Robot>(robot, requestTimeout(), use_future).get();
         robotRunDone = rpc::asio::asyncRunClient<barobo::Robot>(robot, *this, use_future);
     }
@@ -82,28 +100,41 @@ private:
     }
 
 public:
-    static Impl* fromTcpEndpoint (const std::string& host, const std::string& service) {
+    static Impl* fromWebSocketEndpoint (const std::string& host, const std::string& service) {
         initializeLoggingCore();
         return new Impl{host, service};
     }
 
-    // Use the daemon to resolve a serial ID to a TCP/IP host:service pair and
+    // Use the daemon to resolve a serial ID to WebSocket URI and
     // construct a Linkbot::Impl backed by this host:service. The caller has
     // ownership of the returned pointer.
     static Impl* fromSerialId (const std::string& serialId) {
         initializeLoggingCore();
         auto io = util::IoThread::getGlobal();
         boost::log::sources::logger log;
-        boost::asio::ip::tcp::resolver resolver {io->context()};
-        rpc::asio::TcpClient daemon {io->context(), log};
+        baromesh::WebSocketClient daemon {io->context(), log};
 
-        auto daemonQuery = decltype(resolver)::query {
-            baromesh::daemonHostName(), baromesh::daemonServiceName()
-        };
-        BOOST_LOG(log) << "Connecting to the daemon at "
-                       << daemonQuery.host_name() << ":" << daemonQuery.service_name();
-        auto daemonIter = resolver.resolve(daemonQuery);
-        rpc::asio::asyncInitTcpClient(daemon, daemonIter, use_future).get();
+        auto daemonUri = std::make_shared<websocketpp::uri>(
+            false, baromesh::daemonHostName(), baromesh::daemonServiceName(), "");
+        BOOST_LOG(log) << "Connecting to the daemon at " << daemonUri->str();
+        websocketpp::client<websocketpp::config::asio_client> dConnector;  // transport creator
+        dConnector.init_asio(&io->context());
+        auto ec = boost::system::error_code{};
+        auto con = dConnector.get_connection(daemonUri, ec);
+        if (ec) { throw boost::system::system_error{ec}; }
+        auto openPromise = std::promise<void>{};
+        auto openFuture = openPromise.get_future();
+        con->set_open_handler([con, &openPromise](websocketpp::connection_hdl) {
+            openPromise.set_value();
+        });
+        con->set_fail_handler([con, &openPromise](websocketpp::connection_hdl) {
+            auto e = boost::system::system_error{con->get_transport_ec()};
+            openPromise.set_exception(std::make_exception_ptr(e));
+        });
+        dConnector.connect(con);
+        openFuture.get();
+        daemon.messageQueue().setConnection(con);
+
         rpc::asio::asyncConnect<barobo::Daemon>(daemon, requestTimeout(), use_future).get();
 
         std::string host, service;
@@ -170,9 +201,9 @@ public:
     mutable boost::log::sources::logger log;
 
     std::shared_ptr<util::IoThread> io;
-    boost::asio::ip::tcp::resolver resolver;
+    websocketpp::client<websocketpp::config::asio_client> connector;  // transport creator
 
-    rpc::asio::TcpClient robot;
+    baromesh::WebSocketClient robot;  // RPC client
     std::future<void> robotRunDone;
 
     std::function<void(Button::Type, ButtonState::Type, int)> buttonEventCallback;
@@ -183,7 +214,7 @@ public:
 };
 
 Linkbot::Linkbot (const std::string& host, const std::string& service) try
-    : m(Linkbot::Impl::fromTcpEndpoint(host, service))
+    : m(Linkbot::Impl::fromWebSocketEndpoint(host, service))
 {}
 catch (std::exception& e) {
     throw Error(e.what());
@@ -211,7 +242,7 @@ void Linkbot::getAccelerometer (int& timestamp, double&x, double&y, double&z)
         x = value.x;
         y = value.y;
         z = value.z;
-    } 
+    }
     catch (std::exception& e) {
         throw Error(e.what());
     }
@@ -240,7 +271,7 @@ void Linkbot::getBatteryVoltage(double &volts)
     try {
         auto value = asyncFire(m->robot, MethodIn::getBatteryVoltage{}, requestTimeout(), use_future).get();
         volts = value.v;
-    } 
+    }
     catch (std::exception& e) {
         throw Error(e.what());
     }
@@ -251,7 +282,7 @@ void Linkbot::getFormFactor(FormFactor::Type& form)
     try {
         auto value = asyncFire(m->robot, MethodIn::getFormFactor{}, requestTimeout(), use_future).get();
         form = FormFactor::Type(value.value);
-    } 
+    }
     catch (std::exception& e) {
         throw Error(e.what());
     }
@@ -279,13 +310,13 @@ void Linkbot::getJointSpeeds(double&s1, double&s2, double&s3)
         s1 = baromesh::radToDeg(values.values[0]);
         s2 = baromesh::radToDeg(values.values[1]);
         s3 = baromesh::radToDeg(values.values[2]);
-    } 
+    }
     catch (std::exception& e) {
         throw Error(e.what());
     }
 }
 
-void Linkbot::getJointStates(int& timestamp, 
+void Linkbot::getJointStates(int& timestamp,
                              JointState::Type& s1,
                              JointState::Type& s2,
                              JointState::Type& s3)
@@ -296,7 +327,7 @@ void Linkbot::getJointStates(int& timestamp,
         s1 = static_cast<JointState::Type>(values.values[0]);
         s2 = static_cast<JointState::Type>(values.values[1]);
         s3 = static_cast<JointState::Type>(values.values[2]);
-    } 
+    }
     catch (std::exception& e) {
         throw Error(e.what());
     }
@@ -625,17 +656,17 @@ void Linkbot::drive (int mask, double a0, double a1, double a2)
 {
     try {
         asyncFire(m->robot, MethodIn::move {
-            bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE, 
+            bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE,
                                float(baromesh::degToRad(a0)),
-                               true, 
+                               true,
                                barobo_Robot_Goal_Controller_PID
                              },
-            bool(mask&0x02), { barobo_Robot_Goal_Type_RELATIVE, 
+            bool(mask&0x02), { barobo_Robot_Goal_Type_RELATIVE,
                                float(baromesh::degToRad(a1)),
                                true,
                                barobo_Robot_Goal_Controller_PID
                              },
-            bool(mask&0x04), { barobo_Robot_Goal_Type_RELATIVE, 
+            bool(mask&0x04), { barobo_Robot_Goal_Type_RELATIVE,
                                float(baromesh::degToRad(a2)),
                                true,
                                barobo_Robot_Goal_Controller_PID
@@ -651,17 +682,17 @@ void Linkbot::driveTo (int mask, double a0, double a1, double a2)
 {
     try {
         asyncFire(m->robot, MethodIn::move {
-            bool(mask&0x01), { barobo_Robot_Goal_Type_ABSOLUTE, 
+            bool(mask&0x01), { barobo_Robot_Goal_Type_ABSOLUTE,
                                float(baromesh::degToRad(a0)),
-                               true, 
+                               true,
                                barobo_Robot_Goal_Controller_PID
                              },
-            bool(mask&0x02), { barobo_Robot_Goal_Type_ABSOLUTE, 
+            bool(mask&0x02), { barobo_Robot_Goal_Type_ABSOLUTE,
                                float(baromesh::degToRad(a1)),
                                true,
                                barobo_Robot_Goal_Controller_PID
                              },
-            bool(mask&0x04), { barobo_Robot_Goal_Type_ABSOLUTE, 
+            bool(mask&0x04), { barobo_Robot_Goal_Type_ABSOLUTE,
                                float(baromesh::degToRad(a2)),
                                true,
                                barobo_Robot_Goal_Controller_PID
@@ -676,13 +707,13 @@ void Linkbot::driveTo (int mask, double a0, double a1, double a2)
 void Linkbot::move (int mask, double a0, double a1, double a2) {
     try {
         asyncFire(m->robot, MethodIn::move {
-            bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE, 
+            bool(mask&0x01), { barobo_Robot_Goal_Type_RELATIVE,
                                float(baromesh::degToRad(a0)),
                                false},
-            bool(mask&0x02), { barobo_Robot_Goal_Type_RELATIVE, 
+            bool(mask&0x02), { barobo_Robot_Goal_Type_RELATIVE,
                                float(baromesh::degToRad(a1)),
                                false},
-            bool(mask&0x04), { barobo_Robot_Goal_Type_RELATIVE, 
+            bool(mask&0x04), { barobo_Robot_Goal_Type_RELATIVE,
                                float(baromesh::degToRad(a2)),
                                false}
         }, requestTimeout(), use_future).get();
@@ -715,7 +746,7 @@ void Linkbot::moveAccel(int mask, int relativeMask,
     hasTimeouts[1] = (timeout1 != 0.0);
     hasTimeouts[2] = (timeout2 != 0.0);
     barobo_Robot_Goal_Type motionType[3];
-    for(int i = 0; i < 3; i++) { 
+    for(int i = 0; i < 3; i++) {
         if(relativeMask & (1<<i)) {
             motionType[i] = barobo_Robot_Goal_Type_RELATIVE;
         } else {
@@ -737,22 +768,22 @@ void Linkbot::moveAccel(int mask, int relativeMask,
         };
 
         asyncFire(m->robot, MethodIn::move {
-            bool(mask&0x01), { 
-                motionType[0], 
+            bool(mask&0x01), {
+                motionType[0],
                 float(baromesh::degToRad(omega0_i)),
                 true,
                 barobo_Robot_Goal_Controller_ACCEL,
                 hasTimeouts[0], float(timeout0), hasTimeouts[0], js_to_int(endstate0)
                 },
-            bool(mask&0x02), { 
-                motionType[1], 
+            bool(mask&0x02), {
+                motionType[1],
                 float(baromesh::degToRad(omega1_i)),
                 true,
                 barobo_Robot_Goal_Controller_ACCEL,
                 hasTimeouts[1], float(timeout1), hasTimeouts[1], js_to_int(endstate1)
                 },
-            bool(mask&0x04), { 
-                motionType[2], 
+            bool(mask&0x04), {
+                motionType[2],
                 float(baromesh::degToRad(omega2_i)),
                 true,
                 barobo_Robot_Goal_Controller_ACCEL,
@@ -768,7 +799,7 @@ void Linkbot::moveAccel(int mask, int relativeMask,
 void Linkbot::moveSmooth(int mask, int relativeMask, double a0, double a1, double a2)
 {
     barobo_Robot_Goal_Type motionType[3];
-    for(int i = 0; i < 3; i++) { 
+    for(int i = 0; i < 3; i++) {
         if(relativeMask & (1<<i)) {
             motionType[i] = barobo_Robot_Goal_Type_RELATIVE;
         } else {
@@ -778,20 +809,20 @@ void Linkbot::moveSmooth(int mask, int relativeMask, double a0, double a1, doubl
 
     try {
         asyncFire(m->robot, MethodIn::move {
-            bool(mask&0x01), { 
-                motionType[0], 
+            bool(mask&0x01), {
+                motionType[0],
                 float(baromesh::degToRad(a0)),
                 true,
                 barobo_Robot_Goal_Controller_SMOOTH
                 },
-            bool(mask&0x02), { 
-                motionType[1], 
+            bool(mask&0x02), {
+                motionType[1],
                 float(baromesh::degToRad(a1)),
                 true,
                 barobo_Robot_Goal_Controller_SMOOTH
                 },
-            bool(mask&0x04), { 
-                motionType[2], 
+            bool(mask&0x04), {
+                motionType[2],
                 float(baromesh::degToRad(a2)),
                 true,
                 barobo_Robot_Goal_Controller_SMOOTH
@@ -820,17 +851,17 @@ void Linkbot::motorPower(int mask, int m1, int m2, int m3)
 {
     try {
         asyncFire(m->robot, MethodIn::move {
-            bool(mask&0x01), { barobo_Robot_Goal_Type_INFINITE, 
+            bool(mask&0x01), { barobo_Robot_Goal_Type_INFINITE,
                                float(m1),
-                               true, 
+                               true,
                                barobo_Robot_Goal_Controller_PID
                              },
-            bool(mask&0x02), { barobo_Robot_Goal_Type_INFINITE, 
+            bool(mask&0x02), { barobo_Robot_Goal_Type_INFINITE,
                                float(m2),
                                true,
                                barobo_Robot_Goal_Controller_PID
                              },
-            bool(mask&0x04), { barobo_Robot_Goal_Type_INFINITE, 
+            bool(mask&0x04), { barobo_Robot_Goal_Type_INFINITE,
                                float(m3),
                                true,
                                barobo_Robot_Goal_Controller_PID
@@ -892,7 +923,7 @@ void Linkbot::setButtonEventCallback (ButtonEventCallback cb, void* userData) {
     }
 }
 
-void Linkbot::setEncoderEventCallback (EncoderEventCallback cb, 
+void Linkbot::setEncoderEventCallback (EncoderEventCallback cb,
                                        double granularity, void* userData)
 {
     const bool enable = !!cb;
@@ -1010,8 +1041,8 @@ void Linkbot::readTwi(uint32_t address, size_t recvsize, uint8_t *buffer)
 }
 
 void Linkbot::writeReadTwi(
-    uint32_t address, 
-    const uint8_t *sendbuf, 
+    uint32_t address,
+    const uint8_t *sendbuf,
     size_t sendsize,
     uint8_t* recvbuf,
     size_t recvsize)

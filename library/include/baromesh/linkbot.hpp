@@ -12,13 +12,13 @@ namespace barobo {
 /* A C++03-compatible Linkbot API. */
 class Linkbot {
 public:
-    // Construct a Linkbot backed by a given TCP/IP host and service. For
+    // Construct a Linkbot backed by a given WebSocket host and service. For
     // example, Linkbot{"127.0.0.1", "42010"} would attempt to start
-    // communicating with a robot interface at localhost:42010.
+    // communicating with a robot interface at ws://localhost:42010/.
     Linkbot (const std::string& host, const std::string& service);
 
-    // Ask the daemon to resolve the given serial ID to a TCP/IP host:service,
-    // and construct a Linkbot backed by this TCP endpoint.
+    // Ask the daemon to resolve the given serial ID to a WebSocket host:service,
+    // and construct a Linkbot backed by this WebSocket endpoint.
     explicit Linkbot (const std::string& serialId);
 
     ~Linkbot ();
@@ -41,7 +41,7 @@ public:
     void getFormFactor(FormFactor::Type & form);
     void getJointAngles (int& timestamp, double&, double&, double&);
     void getJointSpeeds(double&, double&, double&);
-    void getJointStates(int& timestamp, 
+    void getJointStates(int& timestamp,
                         JointState::Type & s1,
                         JointState::Type & s2,
                         JointState::Type & s3);
@@ -113,8 +113,8 @@ public:
     void writeTwi(uint32_t address, const uint8_t *data, size_t size);
     void readTwi(uint32_t address, size_t recvsize, uint8_t *buffer);
     void writeReadTwi(
-        uint32_t address, 
-        const uint8_t *sendbuf, 
+        uint32_t address,
+        const uint8_t *sendbuf,
         size_t sendsize,
         uint8_t* recvbuf,
         size_t recvsize);

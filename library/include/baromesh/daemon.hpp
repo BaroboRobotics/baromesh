@@ -1,10 +1,10 @@
 #ifndef BAROMESH_DAEMON_HPP
 #define BAROMESH_DAEMON_HPP
 
-#include "rpc/asio/tcpclient.hpp"
 #include "gen-daemon.pb.hpp"
 
 #include "baromesh/system_error.hpp"
+#include <baromesh/websocketclient.hpp>
 
 #include <boost/asio/async_result.hpp>
 #include <boost/asio/io_service.hpp>
@@ -46,7 +46,7 @@ using ResolveSerialIdHandler = std::function<ResolveSerialIdHandlerSignature>;
 
 template <class Duration, class Handler>
 BOOST_ASIO_INITFN_RESULT_TYPE(Handler, ResolveSerialIdHandlerSignature)
-asyncResolveSerialId (rpc::asio::TcpClient& daemon, std::string serialId, Duration&& timeout, Handler&& handler) {
+asyncResolveSerialId (WebSocketClient& daemon, std::string serialId, Duration&& timeout, Handler&& handler) {
     boost::asio::detail::async_result_init<
         Handler, ResolveSerialIdHandlerSignature
     > init { std::forward<Handler>(handler) };

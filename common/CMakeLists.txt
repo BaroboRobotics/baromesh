@@ -28,7 +28,7 @@ set_target_properties(baromesh-common
                )
 
 target_compile_definitions(baromesh-common
-    PUBLIC _WEBSOCKETPP_NO_CPP11_SYSTEM_ERROR_ )
+    PUBLIC _WEBSOCKETPP_NO_CPP11_SYSTEM_ERROR_ _WEBSOCKETPP_CPP11_RANDOM_DEVICE_)
 
 message(INFO "WS Include is: ${WEBSOCKETPP_INCLUDE}")
 target_include_directories(baromesh-common
