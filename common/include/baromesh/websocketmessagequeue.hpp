@@ -8,7 +8,10 @@
 #include <boost/log/sources/logger.hpp>
 #include <boost/log/sources/record_ostream.hpp>
 
+#include <functional>
 #include <queue>
+
+using namespace std::placeholders;
 
 namespace baromesh {
 
