@@ -1,6 +1,8 @@
 #ifndef BAROMESH_WEBSOCKETMESSAGEQUEUE_HPP
 #define BAROMESH_WEBSOCKETMESSAGEQUEUE_HPP
 
+#include <util/asynccompletion.hpp>
+
 #include <websocketpp/connection.hpp>
 
 #include <boost/asio/io_service.hpp>
@@ -71,7 +73,7 @@ public:
     template <class Handler>
     BOOST_ASIO_INITFN_RESULT_TYPE(Handler, WebSocketSendHandlerSignature)
     asyncSend (boost::asio::const_buffer buffer, Handler&& handler) {
-        boost::asio::detail::async_result_init<
+        util::AsyncCompletion<
             Handler, WebSocketSendHandlerSignature
         > init { std::forward<Handler>(handler) };
 
@@ -86,7 +88,7 @@ public:
     template <class Handler>
     BOOST_ASIO_INITFN_RESULT_TYPE(Handler, WebSocketReceiveHandlerSignature)
     asyncReceive (boost::asio::mutable_buffer buffer, Handler&& handler) {
-        boost::asio::detail::async_result_init<
+        util::AsyncCompletion<
             Handler, WebSocketReceiveHandlerSignature
         > init { std::forward<Handler>(handler) };
 
