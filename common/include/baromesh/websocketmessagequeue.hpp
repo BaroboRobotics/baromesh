@@ -1,9 +1,10 @@
 #ifndef BAROMESH_WEBSOCKETMESSAGEQUEUE_HPP
 #define BAROMESH_WEBSOCKETMESSAGEQUEUE_HPP
 
-#include <util/asynccompletion.hpp>
+#include <util/asio/asynccompletion.hpp>
 
 #include <websocketpp/connection.hpp>
+#include <websocketpp/close.hpp>
 
 #include <boost/asio/io_service.hpp>
 

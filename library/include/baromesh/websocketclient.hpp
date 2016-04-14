@@ -8,8 +8,6 @@
 #include <websocketpp/config/asio_no_tls_client.hpp>
 #include <websocketpp/client.hpp>
 
-#include <boost/asio/async_result.hpp>
-
 #include <utility>
 
 namespace baromesh {

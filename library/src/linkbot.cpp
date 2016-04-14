@@ -8,7 +8,7 @@
 
 #include <baromesh/websocketmessagequeue.hpp>
 
-#include <util/iothread.hpp>
+#include <util/asio/iothread.hpp>
 
 #include <boost/asio/use_future.hpp>
 
