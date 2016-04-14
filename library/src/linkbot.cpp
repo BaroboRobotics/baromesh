@@ -6,7 +6,8 @@
 
 #include "gen-robot.pb.hpp"
 
-#include <baromesh/websocketmessagequeue.hpp>
+#include <baromesh/websocketconnector.hpp>
+#include <baromesh/websocketclient.hpp>
 
 #include <util/asio/iothread.hpp>
 
@@ -21,9 +22,6 @@
 #include <boost/algorithm/string/case_conv.hpp>
 
 #include <boost/program_options/parsers.hpp>
-
-#include <websocketpp/config/asio_no_tls_client.hpp>
-#include <websocketpp/client.hpp>
 
 #include <iostream>
 #include <memory>
@@ -50,8 +48,10 @@ struct Linkbot::Impl {
 private:
     explicit Impl (const std::string& host, const std::string& service)
         : io(util::IoThread::getGlobal())
+        , wsConnector(io->context())
         , robot(io->context(), log)
     {
+#if 0
         auto uri = std::make_shared<websocketpp::uri>(false, host, service, "");
         BOOST_LOG(log) << "Connecting to Linkbot proxy at " << uri->str();
         connector.init_asio(&io->context());
@@ -70,6 +70,9 @@ private:
         connector.connect(con);
         openFuture.get();
         robot.messageQueue().setConnection(con);
+#endif
+        BOOST_LOG(log) << "Connecting to Linkbot proxy at " << host << ":" << service;
+        wsConnector.asyncConnect(robot.messageQueue(), host, service, use_future).get();
         rpc::asio::asyncConnect<barobo::Robot>(robot, requestTimeout(), use_future).get();
         robotRunDone = rpc::asio::asyncRunClient<barobo::Robot>(robot, *this, use_future);
     }
@@ -114,6 +117,7 @@ public:
         boost::log::sources::logger log;
         baromesh::WebSocketClient daemon {io->context(), log};
 
+#if 0
         auto daemonUri = std::make_shared<websocketpp::uri>(
             false, baromesh::daemonHostName(), baromesh::daemonServiceName(), "");
         BOOST_LOG(log) << "Connecting to the daemon at " << daemonUri->str();
@@ -134,7 +138,10 @@ public:
         dConnector.connect(con);
         openFuture.get();
         daemon.messageQueue().setConnection(con);
-
+#endif
+        baromesh::websocket::Connector dConnector{io->context()};
+        dConnector.asyncConnect(daemon.messageQueue(),
+            baromesh::daemonHostName(), baromesh::daemonServiceName(), use_future).get();
         rpc::asio::asyncConnect<barobo::Daemon>(daemon, requestTimeout(), use_future).get();
 
         std::string host, service;
@@ -201,7 +208,7 @@ public:
     mutable boost::log::sources::logger log;
 
     std::shared_ptr<util::IoThread> io;
-    websocketpp::client<websocketpp::config::asio_client> connector;  // transport creator
+    baromesh::websocket::Connector wsConnector;
 
     baromesh::WebSocketClient robot;  // RPC client
     std::future<void> robotRunDone;
