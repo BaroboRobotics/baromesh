@@ -16,26 +16,26 @@
 
 using namespace std::placeholders;
 
-namespace baromesh {
+namespace baromesh { namespace websocket {
 
-typedef void WebSocketReceiveHandlerSignature(boost::system::error_code, size_t);
-typedef void WebSocketSendHandlerSignature(boost::system::error_code);
+typedef void ReceiveHandlerSignature(boost::system::error_code, size_t);
+typedef void SendHandlerSignature(boost::system::error_code);
 
 template <class Config>
-struct WebSocketMessageQueue {
+struct MessageQueue {
 public:
     using Connection = websocketpp::connection<Config>;
     using ConnectionPtr = typename Connection::ptr;
     using MessagePtr = typename Connection::message_ptr;
 
-    WebSocketMessageQueue (boost::asio::io_service& ios, boost::log::sources::logger log)
+    MessageQueue (boost::asio::io_service& ios, boost::log::sources::logger log)
         : mIos(ios)
         , mLog(log)
     {
         mLog.add_attribute("Protocol", boost::log::attributes::constant<std::string>("WSQ"));
     }
 
-    ~WebSocketMessageQueue () {
+    ~MessageQueue () {
         if (mPtr) {
             mPtr->set_message_handler(nullptr);
             mPtr->set_close_handler(nullptr);
@@ -45,8 +45,8 @@ public:
     }
 
     // noncopyable
-    WebSocketMessageQueue (const WebSocketMessageQueue&) = delete;
-    WebSocketMessageQueue& operator= (const WebSocketMessageQueue&) = delete;
+    MessageQueue (const MessageQueue&) = delete;
+    MessageQueue& operator= (const MessageQueue&) = delete;
 
     void close () {
         boost::system::error_code ec;
@@ -59,11 +59,8 @@ public:
     void close (boost::system::error_code& ec) {
         voidReceives(boost::asio::error::operation_aborted);
 
-        enum CloseCode {
-            NORMAL_CLOSURE = 1000
-        };
         if (mPtr) {
-            mPtr->close(NORMAL_CLOSURE, "See ya bro", ec);
+            mPtr->close(websocketpp::close::status::normal, "See ya bro", ec);
         }
     }
 
@@ -72,10 +69,10 @@ public:
     }
 
     template <class Handler>
-    BOOST_ASIO_INITFN_RESULT_TYPE(Handler, WebSocketSendHandlerSignature)
+    BOOST_ASIO_INITFN_RESULT_TYPE(Handler, SendHandlerSignature)
     asyncSend (boost::asio::const_buffer buffer, Handler&& handler) {
         util::AsyncCompletion<
-            Handler, WebSocketSendHandlerSignature
+            Handler, SendHandlerSignature
         > init { std::forward<Handler>(handler) };
 
         assert(mPtr);
@@ -87,10 +84,10 @@ public:
     }
 
     template <class Handler>
-    BOOST_ASIO_INITFN_RESULT_TYPE(Handler, WebSocketReceiveHandlerSignature)
+    BOOST_ASIO_INITFN_RESULT_TYPE(Handler, ReceiveHandlerSignature)
     asyncReceive (boost::asio::mutable_buffer buffer, Handler&& handler) {
         util::AsyncCompletion<
-            Handler, WebSocketReceiveHandlerSignature
+            Handler, ReceiveHandlerSignature
         > init { std::forward<Handler>(handler) };
 
         auto ec = mPtr->get_transport_ec();
@@ -108,8 +105,8 @@ public:
 
     void setConnection (ConnectionPtr ptr) {
         mPtr = ptr;
-        mPtr->set_message_handler(std::bind(&WebSocketMessageQueue::handleMessage, this, _1, _2));
-        mPtr->set_close_handler(std::bind(&WebSocketMessageQueue::handleClose, this, _1));
+        mPtr->set_message_handler(std::bind(&MessageQueue::handleMessage, this, _1, _2));
+        mPtr->set_close_handler(std::bind(&MessageQueue::handleClose, this, _1));
     }
 
 private:
@@ -149,7 +146,7 @@ private:
 		}
 	}
 
-    using ReceiveHandler = std::function<WebSocketReceiveHandlerSignature>;
+    using ReceiveHandler = std::function<ReceiveHandlerSignature>;
     struct ReceiveData {
         boost::asio::io_service::work work;
         boost::asio::mutable_buffer buffer;
@@ -164,6 +161,6 @@ private:
     mutable boost::log::sources::logger mLog;
 };
 
-} // namespace baromesh
+}} // namespace baromesh::websocket
 
 #endif

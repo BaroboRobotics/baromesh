@@ -12,7 +12,7 @@
 
 namespace baromesh {
 
-using WebSocketClient = rpc::asio::Client<WebSocketMessageQueue<websocketpp::config::asio_client>>;
+using WebSocketClient = rpc::asio::Client<websocket::MessageQueue<websocketpp::config::asio_client>>;
 
 typedef void InitWebSocketClientHandlerSignature(boost::system::error_code);
 
