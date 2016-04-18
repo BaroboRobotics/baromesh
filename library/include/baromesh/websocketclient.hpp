@@ -3,17 +3,13 @@
 
 #include "rpc/asio/client.hpp"
 
-#include <baromesh/websocketmessagequeue.hpp>
-
-#include <websocketpp/config/asio_no_tls_client.hpp>
-#include <websocketpp/client.hpp>
+#include <baromesh/websocketconnector.hpp>
 
 #include <utility>
 
 namespace baromesh {
 
-using WebSocketClient
-    = rpc::asio::Client<websocket::MessageQueue<websocketpp::config::asio_client>>;
+using WebSocketClient = rpc::asio::Client<websocket::Connector::MessageQueue>;
 
 } // namespace baromesh
 

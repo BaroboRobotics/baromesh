@@ -6,12 +6,12 @@
 #include <util/asio/iothread.hpp>
 #include <util/asio/transparentservice.hpp>
 
+#include <baromesh/websocketconnectorconfig.hpp>
 #include <baromesh/websocketmessagequeue.hpp>
 
 #include <boost/log/sources/record_ostream.hpp>
 #include <boost/log/sources/logger.hpp>
 
-#include <websocketpp/config/asio_no_tls_client.hpp>
 #include <websocketpp/client.hpp>
 #include <websocketpp/close.hpp>
 
@@ -22,9 +22,10 @@ namespace baromesh { namespace websocket {
 
 class ConnectorImpl : public std::enable_shared_from_this<ConnectorImpl> {
 public:
-    using Config = ::websocketpp::config::asio_client;
+    using Config = ConnectorConfig;
     using Connection = ::websocketpp::connection<Config>;
     using ConnectionPtr = Connection::ptr;
+    using MessageQueue = MessageQueue<Config>;
 
     explicit ConnectorImpl (boost::asio::io_service& ios)
         : mContext(ios)
@@ -61,7 +62,7 @@ public:
 
     template <class CompletionToken>
     BOOST_ASIO_INITFN_RESULT_TYPE(CompletionToken, void(boost::system::error_code))
-    asyncConnect (MessageQueue<Config>& mq,
+    asyncConnect (MessageQueue& mq,
         const std::string& host, const std::string& service,
         CompletionToken&& token)
     {
@@ -131,7 +132,7 @@ private:
 
     struct NascentConnectionData {
         std::function<void(boost::system::error_code)> handler;
-        std::reference_wrapper<MessageQueue<Config>> mq;
+        std::reference_wrapper<MessageQueue> mq;
     };
     std::map<ConnectionPtr, NascentConnectionData> mNascentConnections;
 
@@ -192,6 +193,7 @@ private:
             this->get_service().transformCompletionToken(
                 std::get<std::tuple_size<typename std::decay<Tuple>::type>::value - 1>(t)));
     }
+    using MessageQueue = ConnectorImpl::MessageQueue;
 };
 
 }} // namespace baromesh::websocket
