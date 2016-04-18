@@ -145,55 +145,8 @@ public:
         : util::TransparentIoObject<ConnectorImpl>(ios)
     {}
 
-    Connector (const Connector&) = delete;
-    Connector& operator= (const Connector&) = delete;
-
-#if 0
-    Connector (Connector&&) = default;
-    Connector& operator= (Connector&&) = default;
-#endif
-
-    void close () {
-        boost::system::error_code ec;
-        close(ec);
-        if (ec) {
-            throw boost::system::system_error(ec);
-        }
-    }
-
-    void close (boost::system::error_code& ec) {
-        this->get_service().close(this->get_implementation(), ec);
-    }
-
-    template <class... Args, class Indices = util::make_index_sequence_t<sizeof...(Args) - 1>>
-    auto asyncConnect (Args&&... args)
-//#if !_MSC_VER
-        -> decltype(std::declval<Connector>().asyncConnectImpl(
-            std::forward_as_tuple(std::forward<Args>(args)...), Indices{}))
-//#endif
-    {
-        static_assert(sizeof...(Args) > 0, "Asynchronous operations need at least one argument");
-        // Indices is an index_sequence for every argument except the last argument, which is a
-        // completion token.
-        return asyncConnectImpl(std::forward_as_tuple(std::forward<Args>(args)...), Indices{});
-    }
-
-private:
-    template <class Tuple, size_t... NMinusOneIndices>
-    auto asyncConnectImpl (Tuple&& t, util::index_sequence<NMinusOneIndices...>&&)
-//#if !_MSC_VER
-        -> decltype(std::declval<Connector>().get_implementation()->asyncConnect(
-            std::get<NMinusOneIndices>(t)...,
-            std::declval<Connector>().get_service().transformCompletionToken(
-                std::get<std::tuple_size<typename std::decay<Tuple>::type>::value - 1>(t))))
-//#endif
-    {
-        return this->get_implementation()->asyncConnect(
-            std::get<NMinusOneIndices>(t)...,
-            this->get_service().transformCompletionToken(
-                std::get<std::tuple_size<typename std::decay<Tuple>::type>::value - 1>(t)));
-    }
     using MessageQueue = ConnectorImpl::MessageQueue;
+    UTIL_ASIO_DECL_ASYNC_METHOD(asyncConnect)
 };
 
 }} // namespace baromesh::websocket
