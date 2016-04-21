@@ -28,8 +28,9 @@ set(SOURCES
 
 add_library(baromesh ${SOURCES})
 
-if(CMAKE_CL_64)
+if(MSVC)
     # 64-bit VS compiles need /bigobj
+    # Update: 32-bit now needs it too!
     # specific template instantiation might fix this
     set_source_files_properties(src/linkbot.cpp
         PROPERTIES COMPILE_FLAGS "/bigobj")
