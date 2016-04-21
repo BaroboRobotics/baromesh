@@ -21,13 +21,13 @@ public:
     using channel_type_hint = ::websocketpp::log::channel_type_hint;
     using level = ::websocketpp::log::level;
 
-    Logger<Concurrency,Names> (channel_type_hint::value hint = channel_type_hint::access)
+    Logger (channel_type_hint::value hint = channel_type_hint::access)
         : base(hint)
     {
         initSource();
     }
 
-    Logger<Concurrency,Names>(level channels,
+    Logger (level channels,
         channel_type_hint::value hint = channel_type_hint::access)
         : base(channels, hint)
     {

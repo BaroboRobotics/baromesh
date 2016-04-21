@@ -1,12 +1,10 @@
 #ifndef BAROMESH_WEBSOCKETCONNECTOR_HPP
 #define BAROMESH_WEBSOCKETCONNECTOR_HPP
 
-#include <util/index_sequence.hpp>
 #include <util/asio/asynccompletion.hpp>
-#include <util/asio/iothread.hpp>
 #include <util/asio/transparentservice.hpp>
 
-#include <baromesh/websocketconnectorconfig.hpp>
+#include <baromesh/websocketlogger.hpp>
 #include <baromesh/websocketmessagequeue.hpp>
 
 #include <boost/log/sources/record_ostream.hpp>
@@ -14,6 +12,7 @@
 
 #include <websocketpp/client.hpp>
 #include <websocketpp/close.hpp>
+#include <websocketpp/config/asio_no_tls_client.hpp>
 
 #include <tuple>
 #include <utility>
@@ -22,7 +21,22 @@ namespace baromesh { namespace websocket {
 
 class ConnectorImpl : public std::enable_shared_from_this<ConnectorImpl> {
 public:
-    using Config = ConnectorConfig;
+    // Client config with asio transport, TLS disabled, and Boost.Log logging
+    struct Config : public ::websocketpp::config::asio_client {
+        typedef Config type;
+        typedef ::websocketpp::config::asio_client base;
+
+        typedef Logger<base::concurrency_type, ::websocketpp::log::elevel> elog_type;
+        typedef Logger<base::concurrency_type, ::websocketpp::log::alevel> alog_type;
+
+        struct transport_config : public base::transport_config {
+            typedef type::alog_type alog_type;
+            typedef type::elog_type elog_type;
+        };
+
+        typedef ::websocketpp::transport::asio::endpoint<transport_config> transport_type;
+    };
+
     using Connection = ::websocketpp::connection<Config>;
     using ConnectionPtr = Connection::ptr;
     using MessageQueue = MessageQueue<Config>;
@@ -33,6 +47,13 @@ public:
         mWsClient.init_asio(&mContext);
         // We can't set generic open/fail handlers here, because they would need a shared_ptr to
         // this to be safe, and shared_from_this() does not work in constructors.
+    }
+
+    void init () {
+        // Called immediately post-construction. AcceptorImpl now has access to shared_from_this().
+        auto self = this->shared_from_this();
+        mWsClient.set_open_handler(std::bind(&ConnectorImpl::handleOpen, self, _1));
+        mWsClient.set_fail_handler(std::bind(&ConnectorImpl::handleOpen, self, _1));
     }
 
     ~ConnectorImpl () {
@@ -66,18 +87,16 @@ public:
         const std::string& host, const std::string& service,
         CompletionToken&& token)
     {
-        util::AsyncCompletion<
+        util::asio::AsyncCompletion<
             CompletionToken, void(boost::system::error_code)
         > init { std::forward<CompletionToken>(token) };
 
         auto uri = std::make_shared<::websocketpp::uri>(false, host, service, "");
-        auto handler = init.handler;
+        auto& handler = init.handler;
         auto self = this->shared_from_this();
         mContext.post([&mq, uri, handler, self, this]() mutable {
             auto ec = boost::system::error_code{};
             auto con = mWsClient.get_connection(uri, ec);
-            con->set_open_handler(std::bind(&ConnectorImpl::openHandler, self, _1));
-            con->set_fail_handler(std::bind(&ConnectorImpl::openHandler, self, _1));
             if (ec) {
                 handler(ec);
                 return;
@@ -98,7 +117,7 @@ public:
     }
 
 private:
-    void openHandler (::websocketpp::connection_hdl hdl) {
+    void handleOpen (::websocketpp::connection_hdl hdl) {
         auto ec = boost::system::error_code{};
         auto con = mWsClient.get_con_from_hdl(hdl, ec);
         if (!ec) {
@@ -115,7 +134,7 @@ private:
                     con->set_open_handler(nullptr);
                     con->set_fail_handler(nullptr);
                 });
-                mq.setConnection(con);
+                mq.setConnectionPtr(con);
                 handler(con->get_transport_ec());
             }
             else {
@@ -139,11 +158,13 @@ private:
     mutable boost::log::sources::logger mLog;
 };
 
-class Connector : public util::TransparentIoObject<ConnectorImpl> {
+class Connector : public util::asio::TransparentIoObject<ConnectorImpl> {
 public:
     explicit Connector (boost::asio::io_service& ios)
-        : util::TransparentIoObject<ConnectorImpl>(ios)
-    {}
+        : util::asio::TransparentIoObject<ConnectorImpl>(ios)
+    {
+        this->get_implementation()->init();
+    }
 
     using MessageQueue = ConnectorImpl::MessageQueue;
     UTIL_ASIO_DECL_ASYNC_METHOD(asyncConnect)
