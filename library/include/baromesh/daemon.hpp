@@ -48,7 +48,7 @@ using ResolveSerialIdHandler = std::function<ResolveSerialIdHandlerSignature>;
 template <class Duration, class Handler>
 BOOST_ASIO_INITFN_RESULT_TYPE(Handler, ResolveSerialIdHandlerSignature)
 asyncResolveSerialId (WebSocketClient& daemon, std::string serialId, Duration&& timeout, Handler&& handler) {
-    util::AsyncCompletion<
+    util::asio::AsyncCompletion<
         Handler, ResolveSerialIdHandlerSignature
     > init { std::forward<Handler>(handler) };
     auto& realHandler = init.handler;

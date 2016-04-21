@@ -47,7 +47,7 @@ using boost::asio::use_future;
 struct Linkbot::Impl {
 private:
     explicit Impl (const std::string& host, const std::string& service)
-        : io(util::IoThread::getGlobal())
+        : io(util::asio::IoThread::getGlobal())
         , wsConnector(io->context())
         , robot(io->context(), log)
     {
@@ -113,7 +113,7 @@ public:
     // ownership of the returned pointer.
     static Impl* fromSerialId (const std::string& serialId) {
         initializeLoggingCore();
-        auto io = util::IoThread::getGlobal();
+        auto io = util::asio::IoThread::getGlobal();
         boost::log::sources::logger log;
         baromesh::WebSocketClient daemon {io->context(), log};
 
@@ -207,7 +207,7 @@ public:
     }
     mutable boost::log::sources::logger log;
 
-    std::shared_ptr<util::IoThread> io;
+    std::shared_ptr<util::asio::IoThread> io;
     baromesh::websocket::Connector wsConnector;
 
     baromesh::WebSocketClient robot;  // RPC client
