@@ -1,7 +1,7 @@
 #ifndef BAROMESH_WEBSOCKETMESSAGEQUEUE_HPP
 #define BAROMESH_WEBSOCKETMESSAGEQUEUE_HPP
 
-#include <util/asio/queue.hpp>
+#include <util/producerconsumerqueue.hpp>
 #include <util/asio/asynccompletion.hpp>
 #include <util/asio/transparentservice.hpp>
 
@@ -48,15 +48,21 @@ public:
     }
 
     void close (boost::system::error_code& ec) {
-        mReceiveQueue.clear([this](boost::system::error_code ec2, MessagePtr msg) {
-            if (!ec2) {
-                BOOST_LOG(mLog) << "Discarding " << msg->get_payload().size() << " byte message";
-            }
-            else {
-                BOOST_LOG(mLog) << "Discarding error message: " << ec2.message();
-            }
-        }, boost::asio::error::operation_aborted, nullptr);
-
+        while (mReceiveQueue.depth() < 0) {
+            mReceiveQueue.produce(boost::asio::error::operation_aborted, nullptr);
+        }
+        while (mReceiveQueue.depth() > 0) {
+            mReceiveQueue.consume([this](boost::system::error_code ec2, MessagePtr msg) {
+                if (!ec2) {
+                    BOOST_LOG(mLog) << "Discarding " << msg->get_payload().size()
+                        << " byte message";
+                }
+                else {
+                    BOOST_LOG(mLog) << "Discarding error message: " << ec2.message();
+                }
+            });
+        }
+        ec = {};
         if (mPtr) {
             mPtr->close(websocketpp::close::status::normal, "See ya bro", ec);
         }
@@ -106,7 +112,7 @@ public:
                     }
                     mContext.post(std::bind(handler, ec2, nCopied));
                 };
-                mReceiveQueue.asyncConsume(consume);
+                mReceiveQueue.consume(consume);
             }
             else {
                 mContext.post(std::bind(handler, ec, 0));
@@ -135,7 +141,7 @@ private:
 
     boost::asio::io_service& mContext;
     ConnectionPtr mPtr;
-    util::asio::Queue<boost::system::error_code, MessagePtr> mReceiveQueue;
+    util::ProducerConsumerQueue<boost::system::error_code, MessagePtr> mReceiveQueue;
 
     mutable boost::log::sources::logger mLog;
 };

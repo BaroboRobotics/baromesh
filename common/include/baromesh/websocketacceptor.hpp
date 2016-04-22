@@ -1,6 +1,7 @@
 #ifndef BAROMESH_WEBSOCKETACCEPTOR_HPP
 #define BAROMESH_WEBSOCKETACCEPTOR_HPP
 
+#include <util/producerconsumerqueue.hpp>
 #include <util/asio/asynccompletion.hpp>
 #include <util/asio/transparentservice.hpp>
 
@@ -53,9 +54,11 @@ public:
     }
 
     void close (boost::system::error_code& ec) {
-        auto self = this->shared_from_this();
         ec = {};
-        mContext.post([self, this]() {
+        while (mConnectionQueue.depth() < 0) {
+            mConnectionQueue.produce(boost::asio::error::operation_aborted, nullptr);
+        }
+        while (mConnectionQueue.depth() > 0) {
             mConnectionQueue.clear([this](boost::system::error_code ec2, ConnectionPtr ptr) {
                 if (!ec2) {
                     BOOST_LOG(mLog) << "Discarding accepted connection from "
@@ -64,8 +67,8 @@ public:
                 else {
                     BOOST_LOG(mLog) << "Discarding error message: " << ec2.message();
                 }
-            }, boost::asio::error::operation_aborted, nullptr);
-        });
+            });
+        }
     }
 
     void listen (const boost::asio::ip::tcp::endpoint& endpoint) {
@@ -100,7 +103,7 @@ public:
                 }
                 handler(ec);
             };
-            mConnectionQueue.asyncConsume(consume);
+            mConnectionQueue.consume(consume);
         });
 
         return init.result.get();
@@ -129,7 +132,7 @@ private:
 
     boost::asio::io_service& mContext;
     ::websocketpp::server<Config> mWsServer;
-    util::asio::Queue<boost::system::error_code, ConnectionPtr> mConnectionQueue;
+    util::ProducerConsumerQueue<boost::system::error_code, ConnectionPtr> mConnectionQueue;
 
     mutable boost::log::sources::logger mLog;
 };
