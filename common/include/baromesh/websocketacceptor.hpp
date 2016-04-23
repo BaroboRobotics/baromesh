@@ -59,7 +59,7 @@ public:
             mConnectionQueue.produce(boost::asio::error::operation_aborted, nullptr);
         }
         while (mConnectionQueue.depth() > 0) {
-            mConnectionQueue.clear([this](boost::system::error_code ec2, ConnectionPtr ptr) {
+            mConnectionQueue.consume([this](boost::system::error_code ec2, ConnectionPtr ptr) {
                 if (!ec2) {
                     BOOST_LOG(mLog) << "Discarding accepted connection from "
                         << ptr->get_uri()->str();
