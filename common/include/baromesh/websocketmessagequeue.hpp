@@ -20,7 +20,7 @@ typedef void ReceiveHandlerSignature(boost::system::error_code, size_t);
 typedef void SendHandlerSignature(boost::system::error_code);
 
 template <class Config>
-class MessageQueueImpl : std::enable_shared_from_this<MessageQueueImpl<Config>> {
+class MessageQueueImpl : public std::enable_shared_from_this<MessageQueueImpl<Config>> {
 public:
     using Connection = websocketpp::connection<Config>;
     using ConnectionPtr = typename Connection::ptr;
@@ -136,7 +136,12 @@ private:
     }
 
     void handleClose (websocketpp::connection_hdl) {
-        mReceiveQueue.produce(mPtr->get_transport_ec(), nullptr);
+        BOOST_LOG(mLog) << "WebSocket message queue closing: "
+            << mPtr->get_remote_close_code() << " ["
+            << mPtr->get_remote_close_reason() << "]";
+        auto ec = mPtr->get_transport_ec();
+        ec = ec ? ec : boost::asio::error::operation_aborted;
+        mReceiveQueue.produce(ec, nullptr);
     }
 
     boost::asio::io_service& mContext;
