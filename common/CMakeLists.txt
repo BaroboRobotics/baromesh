@@ -23,7 +23,7 @@ set(SOURCES
 add_library(baromesh-common STATIC ${SOURCES})
 
 set_target_properties(baromesh-common
-    PROPERTIES CXX_STANDARD 11
+    PROPERTIES CXX_STANDARD 14
                CXX_STANDARD_REQUIRED ON
                )
 

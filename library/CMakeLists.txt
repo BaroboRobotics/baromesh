@@ -37,7 +37,7 @@ if(MSVC)
 endif()
 
 set_target_properties(baromesh
-    PROPERTIES CXX_STANDARD 11
+    PROPERTIES CXX_STANDARD 14
                CXX_STANDARD_REQUIRED ON
                )
 target_include_directories(baromesh
