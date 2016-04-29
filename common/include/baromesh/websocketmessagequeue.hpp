@@ -28,10 +28,7 @@ public:
 
     MessageQueueImpl (boost::asio::io_service& ios)
         : mContext(ios)
-    {}
-
-    void init (boost::log::sources::logger log) {
-        mLog = log;
+    {
         mLog.add_attribute("Protocol", boost::log::attributes::constant<std::string>("WSQ"));
     }
 
@@ -154,11 +151,9 @@ private:
 template <class Config>
 class MessageQueue : public util::asio::TransparentIoObject<MessageQueueImpl<Config>> {
 public:
-    explicit MessageQueue (boost::asio::io_service& ios, boost::log::sources::logger log)
+    explicit MessageQueue (boost::asio::io_service& ios)
         : util::asio::TransparentIoObject<MessageQueueImpl<Config>>(ios)
-    {
-        this->get_implementation()->init(log);
-    }
+    {}
 
     using ConnectionPtr = typename MessageQueueImpl<Config>::ConnectionPtr;
     void setConnectionPtr (ConnectionPtr ptr) {

@@ -49,7 +49,7 @@ private:
     explicit Impl (const std::string& host, const std::string& service)
         : io(util::asio::IoThread::getGlobal())
         , wsConnector(io->context())
-        , robot(io->context(), log)
+        , robot(io->context())
     {
 #if 0
         auto uri = std::make_shared<websocketpp::uri>(false, host, service, "");
@@ -115,7 +115,7 @@ public:
         initializeLoggingCore();
         auto io = util::asio::IoThread::getGlobal();
         boost::log::sources::logger log;
-        baromesh::WebSocketClient daemon {io->context(), log};
+        baromesh::WebSocketClient daemon {io->context()};
 
 #if 0
         auto daemonUri = std::make_shared<websocketpp::uri>(

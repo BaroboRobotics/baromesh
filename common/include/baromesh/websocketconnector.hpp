@@ -45,8 +45,20 @@ public:
         : mContext(ios)
     {
         mWsClient.init_asio(&mContext);
-        // We can't set generic open/fail handlers here, because they would need a shared_ptr to
-        // this to be safe, and shared_from_this() does not work in constructors.
+        mWsClient.set_access_channels(::websocketpp::log::alevel::none);
+        mWsClient.set_access_channels(
+            ::websocketpp::log::alevel::connect
+            | ::websocketpp::log::alevel::disconnect
+            | ::websocketpp::log::alevel::http
+            | ::websocketpp::log::alevel::fail
+        );
+        mWsClient.set_error_channels(::websocketpp::log::elevel::none);
+        mWsClient.set_error_channels(
+            ::websocketpp::log::elevel::info
+            | ::websocketpp::log::elevel::warn
+            | ::websocketpp::log::elevel::rerror
+            | ::websocketpp::log::elevel::fatal
+        );
     }
 
     void init () {

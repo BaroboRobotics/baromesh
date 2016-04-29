@@ -46,15 +46,25 @@ public:
         : mContext(ios)
     {
         mWsServer.init_asio(&mContext);
-    }
-
-    ~AcceptorImpl () {
-        boost::system::error_code ec;
-        close(ec);
+        mWsServer.set_access_channels(::websocketpp::log::alevel::none);
+        mWsServer.set_access_channels(
+            ::websocketpp::log::alevel::connect
+            | ::websocketpp::log::alevel::disconnect
+            | ::websocketpp::log::alevel::http
+            | ::websocketpp::log::alevel::fail
+        );
+        mWsServer.set_error_channels(::websocketpp::log::elevel::none);
+        mWsServer.set_error_channels(
+            ::websocketpp::log::elevel::info
+            | ::websocketpp::log::elevel::warn
+            | ::websocketpp::log::elevel::rerror
+            | ::websocketpp::log::elevel::fatal
+        );
     }
 
     void close (boost::system::error_code& ec) {
         ec = {};
+        mWsServer.stop_listening(ec);
         while (mConnectionQueue.depth() < 0) {
             mConnectionQueue.produce(boost::asio::error::operation_aborted, nullptr);
         }
@@ -94,17 +104,14 @@ public:
             CompletionToken, void(boost::system::error_code)
         > init { std::forward<CompletionToken>(token) };
 
-        auto handler = init.handler;
-        auto self = this->shared_from_this();
-        mContext.post([&mq, handler, self, this]() mutable {
-            auto consume = [&mq, handler](boost::system::error_code ec, ConnectionPtr con) mutable {
-                if (!ec) {
-                    mq.setConnectionPtr(con);
-                }
-                handler(ec);
-            };
-            mConnectionQueue.consume(consume);
-        });
+        auto consume = [&mq, handler=init.handler]
+                (boost::system::error_code ec, ConnectionPtr con) mutable {
+            if (!ec) {
+                mq.setConnectionPtr(con);
+            }
+            handler(ec);
+        };
+        mConnectionQueue.consume(consume);
 
         return init.result.get();
     }
