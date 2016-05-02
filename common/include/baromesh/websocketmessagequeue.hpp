@@ -128,7 +128,7 @@ public:
 
 private:
     void handleMessage (websocketpp::connection_hdl, MessagePtr msg) {
-        BOOST_LOG(mLog) << "Received " << msg->get_payload().size();
+        //BOOST_LOG(mLog) << "Received " << msg->get_payload().size();
         mReceiveQueue.produce(boost::system::error_code(), msg);
     }
 
