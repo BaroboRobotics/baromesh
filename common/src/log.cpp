@@ -1,8 +1,8 @@
 #define BOOST_LOG_USE_NATIVE_SYSLOG
 
-#include "baromesh/log.hpp"
+#include <baromesh/log.hpp>
 
-#include "util/logsafely.hpp"
+#include <util/logsafely.hpp>
 
 #include <boost/log/common.hpp>
 #include <boost/log/expressions.hpp>

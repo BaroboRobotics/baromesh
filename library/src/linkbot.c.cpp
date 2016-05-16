@@ -1,5 +1,5 @@
-#include "baromesh/linkbot.h"
-#include "baromesh/linkbot.hpp"
+#include <baromesh/linkbot.h>
+#include <baromesh/linkbot.hpp>
 
 #include <iostream>
 #include <string>
@@ -97,8 +97,8 @@ int linkbotGetJointSpeeds(Linkbot *l, double *s1, double *s2, double *s3)
     LINKBOT_C_WRAPPER_FUNC_IMPL(getJointSpeeds, *s1, *s2, *s3);
 }
 
-int linkbotGetJointStates(Linkbot *l, int *timestamp, 
-                          barobo::JointState::Type* j1, 
+int linkbotGetJointStates(Linkbot *l, int *timestamp,
+                          barobo::JointState::Type* j1,
                           barobo::JointState::Type* j2,
                           barobo::JointState::Type* j3)
 {
@@ -164,7 +164,7 @@ int linkbotSetBuzzerFrequency(Linkbot *l, float freq)
     LINKBOT_C_WRAPPER_FUNC_IMPL(setBuzzerFrequency, freq);
 }
 
-int linkbotSetJointSpeeds(Linkbot *l, int mask, double j1, double j2, 
+int linkbotSetJointSpeeds(Linkbot *l, int mask, double j1, double j2,
                           double j3)
 {
     LINKBOT_C_WRAPPER_FUNC_IMPL(setJointSpeeds, mask, j1, j2, j3);
@@ -176,7 +176,7 @@ int linkbotSetJointStates(Linkbot *l, int mask,
         barobo::JointState::Type s3, double d3
         )
 {
-    LINKBOT_C_WRAPPER_FUNC_IMPL(setJointStates, mask, 
+    LINKBOT_C_WRAPPER_FUNC_IMPL(setJointStates, mask,
         s1, d1,
         s2, d2,
         s3, d3);
@@ -216,19 +216,19 @@ int linkbotMoveAccel(Linkbot *l, int mask, int relativeMask,
     double a1, double timeout1, barobo::JointState::Type endstate1,
     double a2, double timeout2, barobo::JointState::Type endstate2)
 {
-    LINKBOT_C_WRAPPER_FUNC_IMPL(moveAccel, mask, relativeMask, 
+    LINKBOT_C_WRAPPER_FUNC_IMPL(moveAccel, mask, relativeMask,
             a0, timeout0, endstate0,
             a1, timeout1, endstate1,
             a2, timeout2, endstate2);
 }
 
-int linkbotMoveSmooth(Linkbot *l, int mask, int relativeMask, 
+int linkbotMoveSmooth(Linkbot *l, int mask, int relativeMask,
     double a0, double a1, double a2)
 {
     LINKBOT_C_WRAPPER_FUNC_IMPL(moveSmooth, mask, relativeMask, a0, a1, a2);
 }
 
-int linkbotMoveContinuous(Linkbot *l, int mask, 
+int linkbotMoveContinuous(Linkbot *l, int mask,
                           double d1,
                           double d2,
                           double d3)
@@ -293,7 +293,7 @@ SET_EVENT_CALLBACK(JointEventCallback)
 SET_EVENT_CALLBACK(AccelerometerEventCallback)
 SET_EVENT_CALLBACK(ConnectionTerminatedCallback)
 
-int linkbotSetEncoderEventCallback(Linkbot* l, 
+int linkbotSetEncoderEventCallback(Linkbot* l,
                                    barobo::EncoderEventCallback cb,
                                    float granularity,
                                    void* userData)
@@ -301,14 +301,14 @@ int linkbotSetEncoderEventCallback(Linkbot* l,
     if (!l) {
         return -1;
     }
-    try { 
-        l->impl.setEncoderEventCallback(cb, granularity, userData); 
-        return 0; 
-    } 
-    catch (std::exception& e) { 
-        fprintf(stderr, "Runtime exception: %s\n", e.what()); 
-        return -1; 
-    } 
+    try {
+        l->impl.setEncoderEventCallback(cb, granularity, userData);
+        return 0;
+    }
+    catch (std::exception& e) {
+        fprintf(stderr, "Runtime exception: %s\n", e.what());
+        return -1;
+    }
 }
 
 

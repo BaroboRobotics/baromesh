@@ -1,7 +1,7 @@
 #ifndef BAROMESH_LINKBOT_HPP
 #define BAROMESH_LINKBOT_HPP
 
-#include "baromesh/linkbot.h"
+#include <baromesh/linkbot.h>
 
 #include <string>
 #include <vector>

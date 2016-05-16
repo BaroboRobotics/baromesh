@@ -1,7 +1,7 @@
 #ifndef BAROMESH_SYSTEM_ERROR_HPP
 #define BAROMESH_SYSTEM_ERROR_HPP
 
-#include "baromesh/status.hpp"
+#include <baromesh/status.hpp>
 
 #include <boost/system/error_code.hpp>
 #include <boost/system/system_error.hpp>
