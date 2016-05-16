@@ -61,7 +61,7 @@ public:
         }
         ec = {};
         if (mPtr) {
-            mPtr->close(websocketpp::close::status::normal, "See ya bro", ec);
+            mPtr->close(websocketpp::close::status::normal, "", ec);
         }
     }
 
