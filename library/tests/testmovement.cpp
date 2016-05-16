@@ -10,9 +10,23 @@
 #undef M_PI
 #define M_PI 3.14159265358979323846
 
+struct EncoderEventCallback {
+    std::string serialId;
+
+    static void call (int joint, double angle, int timestamp, void* userData) {
+        static_cast<EncoderEventCallback*>(userData)->callback(joint, angle, timestamp);
+    }
+
+    void callback (int joint, double angle, int timestamp) {
+        std::cout << "[" << timestamp << "]" << serialId
+            << " joint " << joint << ": " << angle << "\n";
+    }
+};
+
 void testMovement (std::string serialId) {
     double t = 0;
     try {
+        auto encoderEventCallback = EncoderEventCallback{serialId};
         barobo::Linkbot linkbot { serialId };
 
         std::cout << "Linkbot " << serialId << " constructed\n";
@@ -21,6 +35,8 @@ void testMovement (std::string serialId) {
         using std::chrono::seconds;
         using std::chrono::milliseconds;
         const auto jointMask = 0x04 | 0x01;
+
+        linkbot.setEncoderEventCallback(&EncoderEventCallback::call, 20.0, &encoderEventCallback);
 
         std::cout << "moving forward quickly for a second\n";
         linkbot.setJointSpeeds(jointMask, 200, 0, 200);
