@@ -8,11 +8,16 @@ if(WIN32 AND NOT CMAKE_COMPILER_IS_GNUCXX)
     #)
 endif()
 
-# Linking statically to Boost is easier for prototyping. For multi-module
-# projects we'll want to use shared libraries and defined -DBOOST_ALL_DYN_LINK
-# or the like.
-set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.59.0 REQUIRED COMPONENTS system chrono log thread program_options)
+set(AVR OFF)
+if(CMAKE_SYSTEM_NAME MATCHES "AVR")
+    set(AVR ON)
+endif()
+
+if(AVR)
+else()
+    set(Boost_USE_STATIC_LIBS ON)
+    find_package(Boost 1.59.0 REQUIRED COMPONENTS system chrono log thread program_options)
+endif()
 
 set(SOURCES
     src/dongledevicepath.cpp
