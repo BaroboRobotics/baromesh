@@ -1,12 +1,13 @@
 #ifndef BAROMESH_DAEMON_HPP
 #define BAROMESH_DAEMON_HPP
 
-#include "baromesh/tcpclient.hpp"
 #include "gen-daemon.pb.hpp"
 
-#include "baromesh/system_error.hpp"
+#include <util/asio/asynccompletion.hpp>
 
-#include <boost/asio/async_result.hpp>
+#include <baromesh/system_error.hpp>
+#include <baromesh/websocketclient.hpp>
+
 #include <boost/asio/io_service.hpp>
 
 #include <boost/log/sources/logger.hpp>
@@ -40,13 +41,14 @@ std::string daemonServiceName () {
 
 }
 
-using ResolveSerialIdHandlerSignature = void(boost::system::error_code, std::pair<std::string, std::string>);
+using StringPair = std::pair<std::string, std::string>;
+typedef void ResolveSerialIdHandlerSignature(boost::system::error_code, StringPair);
 using ResolveSerialIdHandler = std::function<ResolveSerialIdHandlerSignature>;
 
 template <class Duration, class Handler>
 BOOST_ASIO_INITFN_RESULT_TYPE(Handler, ResolveSerialIdHandlerSignature)
-asyncResolveSerialId (TcpClient& daemon, std::string serialId, Duration&& timeout, Handler&& handler) {
-    boost::asio::detail::async_result_init<
+asyncResolveSerialId (WebSocketClient& daemon, std::string serialId, Duration&& timeout, Handler&& handler) {
+    util::asio::AsyncCompletion<
         Handler, ResolveSerialIdHandlerSignature
     > init { std::forward<Handler>(handler) };
     auto& realHandler = init.handler;
@@ -62,13 +64,14 @@ asyncResolveSerialId (TcpClient& daemon, std::string serialId, Duration&& timeou
             auto log = daemon.log();
             try {
                 if (ec) {
-                    BOOST_LOG(log) << "resolveSerialId reported error: " << ec.message();
+                    BOOST_LOG(log) << "Error firing resolveSerialId: " << ec.message();
                     throw boost::system::system_error(ec);
                 }
 
-                if (!result.has_endpoint) {
-                    BOOST_LOG(log) << "resolveSerialId result has no endpoint";
-                    throw boost::system::system_error(Status::NO_ROBOT_ENDPOINT);
+                if (result.status) {
+                    ec = Status(result.status);
+                    BOOST_LOG(log) << "resolveSerialId resulted in error: " << ec.message();
+                    throw boost::system::system_error(ec);
                 }
 
                 auto port = uint16_t(result.endpoint.port);

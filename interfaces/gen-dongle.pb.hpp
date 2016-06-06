@@ -6,12 +6,14 @@
 
 RPCDEF_HPP(
         // the interface we're defining and it's version triplet
-        (barobo, Dongle), (0, 1, 0),
+        (barobo, Dongle), (0, 1, 2),
         // all methods
+        (getFirmwareVersion)
         (transmitUnicast)
+        (transmitRadioBroadcast)
         ,
         // all broadcasts
-        (receiveUnicast)
+        (receiveTransmission)
         )
 
 #endif

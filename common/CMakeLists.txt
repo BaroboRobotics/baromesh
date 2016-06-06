@@ -1,50 +1,55 @@
-cmake_minimum_required(VERSION 2.8.12) 
-project(baromesh-common CXX C)
-
-set(VERSION_MAJOR 0)
-set(VERSION_MINOR 2)
-set(VERSION_PATCH 0)
-set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH})
+cmake_minimum_required(VERSION 3.2.1)
+project(baromesh-common VERSION 0.2.0)
 
 if(WIN32 AND NOT CMAKE_COMPILER_IS_GNUCXX)
-  add_definitions("-D_ALLOW_KEYWORD_MACROS")
-  #set_target_properties(${target} PROPERTIES
-  #  COMPILE_FLAGS "-D_ALLOW_KEYWORD_MACROS"
-  #)
+    add_definitions("-D_ALLOW_KEYWORD_MACROS")
+    #set_target_properties(${target} PROPERTIES
+    #  COMPILE_FLAGS "-D_ALLOW_KEYWORD_MACROS"
+    #)
 endif()
 
-# Linking statically to Boost is easier for prototyping. For multi-module
-# projects we'll want to use shared libraries and defined -DBOOST_ALL_DYN_LINK
-# or the like.
-set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.54.0 REQUIRED COMPONENTS system)
+set(AVR OFF)
+if(CMAKE_SYSTEM_NAME MATCHES "AVR")
+    set(AVR ON)
+endif()
+
+if(AVR)
+else()
+    set(Boost_USE_STATIC_LIBS ON)
+    find_package(Boost 1.59.0 REQUIRED COMPONENTS system chrono log thread program_options)
+endif()
 
 set(SOURCES
     src/dongledevicepath.cpp
-    src/iocore.cpp
+    src/log.cpp
     src/system_error.cpp
     )
 
 add_library(baromesh-common STATIC ${SOURCES})
 
-set_source_files_properties(${SOURCES}
-    PROPERTIES COMPILE_FLAGS "-std=c++11")
+set_target_properties(baromesh-common
+    PROPERTIES CXX_STANDARD 14
+               CXX_STANDARD_REQUIRED ON
+               )
 
+target_compile_definitions(baromesh-common
+    PUBLIC _WEBSOCKETPP_NO_CPP11_SYSTEM_ERROR_ _WEBSOCKETPP_CPP11_RANDOM_DEVICE_)
+
+message(INFO "WS Include is: ${WEBSOCKETPP_INCLUDE}")
 target_include_directories(baromesh-common
     PUBLIC ${Boost_INCLUDE_DIRS}
+    PUBLIC websocketpp/
            include
     )
 target_link_libraries(baromesh-common
-    PUBLIC ${Boost_LIBRARIES}
+    PUBLIC daemon-interface
+           cxx-util
+           usbcdc
+           ${Boost_LIBRARIES}
     )
 
-if(WIN32)
-    target_link_libraries(baromesh-common
-        PRIVATE setupapi 
-        )
-endif()
 set_target_properties(baromesh-common PROPERTIES
-    VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}
-    SOVERSION ${VERSION_MAJOR}
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
     MACOSX_RPATH ON
 )

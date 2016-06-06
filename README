@@ -1,6 +1,5 @@
 The baromesh project contains multiple components:
 
-  - daemon     : baromeshd program, provides Linkbot communications service
-  - library    : libbaromesh, provides an API for interacting with baromeshd
+  - library    : libbaromesh, provides an API for interacting with the daemon
   - common     : code shared between the daemon and the library
-  - interfaces : ribbon-bridge interfaces used by the baromesh project
+  - interfaces : ribbon-bridge interfaces

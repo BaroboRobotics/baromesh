@@ -2,25 +2,49 @@ import "nanopb.proto";
 import "commontypes.proto";
 package barobo.Dongle;
 
-message Payload {
-    required bytes value = 1 [(nanopb).max_size = 128];
-}
-
 //////////////////////////////////////////////////////////////////////////////
 // Methods
 
+message getFirmwareVersion {
+    message In {}
+    message Result {
+        required uint32 major = 1;
+        required uint32 minor = 2;
+        required uint32 patch = 3;
+    }
+}
+
 message transmitUnicast {
     message In {
-        required barobo.commontypes.SerialId serialId = 1;
-        required Payload payload = 2;
+        required barobo.SerialId serialId = 1;
+        required uint32 destinationPort = 2;
+        required uint32 sourcePort = 3;
+        required barobo.SessionMessage sessionMessage = 4;
     }
-    message Result { }
+    message Result {
+        required barobo.Status status = 1;
+        required int32 queuedMessages = 2;
+    }
+}
+
+message transmitRadioBroadcast {
+    message In {
+        required uint32 destinationPort = 1;
+        required uint32 sourcePort = 2;
+        required barobo.SessionMessage sessionMessage = 3;
+    }
+    message Result {
+        required barobo.Status status = 1;
+        required int32 queuedMessages = 2;
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////////
 // Broadcasts
 
-message receiveUnicast {
-    required barobo.commontypes.SerialId serialId = 1;
-    required Payload payload = 2;
+message receiveTransmission {
+    required barobo.SerialId serialId = 1;
+    required uint32 destinationPort = 2;
+    required uint32 sourcePort = 3;
+    required barobo.SessionMessage sessionMessage = 4;
 }

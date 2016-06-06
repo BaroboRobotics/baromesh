@@ -6,9 +6,10 @@
 
 RPCDEF_HPP(
         // the interface we're defining and it's version triplet
-        (barobo, Robot), (0, 1, 0),
+        (barobo, Robot), (0, 2, 2),
         // all methods
         (getAccelerometerData)
+        (getAdcRaw)
         (getLedColor)
         (setLedColor)
         (getBuzzerFrequency)
@@ -17,18 +18,23 @@ RPCDEF_HPP(
         (enableButtonEvent)
         (enableEncoderEvent)
         (enableJointEvent)
+        (getMotorControllerSafetyThreshold)
+        (getMotorControllerSafetyAngle)
         (getMotorControllerAlphaI)
         (getMotorControllerAlphaF)
         (getMotorControllerOmega)
         (getMotorControllerProportionalGain)
         (getMotorControllerIntegratorGain)
         (getMotorControllerDerivativeGain)
+        (setMotorControllerSafetyThreshold)
+        (setMotorControllerSafetyAngle)
         (setMotorControllerAlphaI)
         (setMotorControllerAlphaF)
         (setMotorControllerOmega)
         (setMotorControllerProportionalGain)
         (setMotorControllerIntegratorGain)
         (setMotorControllerDerivativeGain)
+        (getBatteryVoltage)
         (getEncoderValues)
         (getFormFactor)
         (getJointStates)
@@ -38,6 +44,10 @@ RPCDEF_HPP(
         (resetEncoderRevs)
         (stop)
         (writeEeprom)
+        (readEeprom)
+        (writeTwi)
+        (readTwi)
+        (writeReadTwi)
         ,
         // all broadcasts
         (buttonEvent)
@@ -45,6 +55,7 @@ RPCDEF_HPP(
         (accelerometerEvent)
         (jointEvent)
         (debugMessageEvent)
+        (connectionTerminated)
         )
 
 #endif
