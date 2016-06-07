@@ -1,5 +1,0 @@
-The baromesh project contains multiple components:
-
-  - library    : libbaromesh, provides an API for interacting with the daemon
-  - common     : code shared between the daemon and the library
-  - interfaces : ribbon-bridge interfaces
