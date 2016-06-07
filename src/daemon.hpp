@@ -3,10 +3,11 @@
 
 #include "gen-daemon.pb.hpp"
 
+#include "websocketclient.hpp"
+
 #include <util/asio/asynccompletion.hpp>
 
 #include <baromesh/system_error.hpp>
-#include <baromesh/websocketclient.hpp>
 
 #include <boost/asio/io_service.hpp>
 

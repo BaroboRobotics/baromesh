@@ -1,12 +1,13 @@
+#include "daemon.hpp"
+
 #include <baromesh/linkbot.hpp>
 #include <baromesh/error.hpp>
 #include <baromesh/log.hpp>
-#include <baromesh/daemon.hpp>
 
 #include "gen-robot.pb.hpp"
 
+#include "websocketclient.hpp"
 #include <baromesh/websocketconnector.hpp>
-#include <baromesh/websocketclient.hpp>
 
 #include <util/asio/iothread.hpp>
 
