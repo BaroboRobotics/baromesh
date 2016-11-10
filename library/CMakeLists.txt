@@ -17,7 +17,7 @@ endif()
 # projects we'll want to use shared libraries and defined -DBOOST_ALL_DYN_LINK
 # or the like.
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.54.0 REQUIRED COMPONENTS system log_setup log filesystem thread)
+find_package(Boost 1.54.0 )
 
 find_package(Threads)
 

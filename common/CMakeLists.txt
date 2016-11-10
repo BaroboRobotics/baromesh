@@ -17,7 +17,7 @@ endif()
 # projects we'll want to use shared libraries and defined -DBOOST_ALL_DYN_LINK
 # or the like.
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.54.0 REQUIRED COMPONENTS system chrono log thread program_options)
+find_package(Boost 1.54.0 )
 
 if(APPLE)
   add_subdirectory(CFPP)
